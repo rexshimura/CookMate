@@ -1,0 +1,26 @@
+{
+  "name": "cookmate",
+  "version": "1.0.0",
+  "description": "CookMate - AI Kitchen Assistant - Full Stack Monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend/functions && npm run serve",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "deploy": "cd backend && firebase deploy",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend/functions && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "backend/functions"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
