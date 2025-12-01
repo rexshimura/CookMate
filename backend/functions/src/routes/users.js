@@ -2,14 +2,30 @@ const express = require('express');
 const router = express.Router();
 const { db, admin } = require('../config/firebase');
 
-// Middleware mock (Replace with actual auth middleware later)
-const getUserId = (req) => req.headers.userid || 'test_user_id'; 
+// Middleware to verify Firebase Auth tokens
+const verifyAuthToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.userId = decodedToken.uid;
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Auth token verification failed:', error);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}; 
 
 // 1. Get User Profile
-router.get('/profile', async (req, res) => {
+router.get('/profile', verifyAuthToken, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    const userDoc = await db.collection('users').doc(userId).get();
+    const userDoc = await db.collection('users').doc(req.userId).get();
 
     if (!userDoc.exists) {
       return res.status(404).json({ error: 'User not found' });
@@ -22,13 +38,12 @@ router.get('/profile', async (req, res) => {
 });
 
 // 2. Update User Profile
-router.put('/profile', async (req, res) => {
+router.put('/profile', verifyAuthToken, async (req, res) => {
   try {
-    const userId = getUserId(req);
     const updates = req.body; // e.g. { displayName: "Chef John" }
 
     // .update() only changes the fields provided, leaves others alone
-    await db.collection('users').doc(userId).update(updates);
+    await db.collection('users').doc(req.userId).update(updates);
 
     res.status(200).json({ message: 'Profile updated successfully' });
   } catch (error) {
@@ -37,13 +52,12 @@ router.put('/profile', async (req, res) => {
 });
 
 // 3. Add to Favorites
-router.post('/favorites/:recipeId', async (req, res) => {
+router.post('/favorites/:recipeId', verifyAuthToken, async (req, res) => {
   try {
-    const userId = getUserId(req);
     const { recipeId } = req.params;
 
     // arrayUnion adds the item only if it doesn't already exist (no duplicates)
-    await db.collection('users').doc(userId).update({
+    await db.collection('users').doc(req.userId).update({
       favorites: admin.firestore.FieldValue.arrayUnion(recipeId)
     });
 
@@ -54,13 +68,12 @@ router.post('/favorites/:recipeId', async (req, res) => {
 });
 
 // 4. Remove from Favorites
-router.delete('/favorites/:recipeId', async (req, res) => {
+router.delete('/favorites/:recipeId', verifyAuthToken, async (req, res) => {
   try {
-    const userId = getUserId(req);
     const { recipeId } = req.params;
 
     // arrayRemove deletes the specific item from the array
-    await db.collection('users').doc(userId).update({
+    await db.collection('users').doc(req.userId).update({
       favorites: admin.firestore.FieldValue.arrayRemove(recipeId)
     });
 
@@ -71,12 +84,10 @@ router.delete('/favorites/:recipeId', async (req, res) => {
 });
 
 // 5. Get All Favorite Recipes (Full Details)
-router.get('/favorites', async (req, res) => {
+router.get('/favorites', verifyAuthToken, async (req, res) => {
   try {
-    const userId = getUserId(req);
-    
     // 1. Get user doc to find favorite IDs
-    const userDoc = await db.collection('users').doc(userId).get();
+    const userDoc = await db.collection('users').doc(req.userId).get();
     const favIds = userDoc.data()?.favorites || [];
 
     if (favIds.length === 0) {

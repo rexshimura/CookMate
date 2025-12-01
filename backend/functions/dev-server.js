@@ -1,47 +1,47 @@
 const express = require('express');
-const router = express.Router();
-const axios = require('axios');
+const cors = require('cors');
 const dotenv = require('dotenv');
-const { admin } = require('../config/firebase');
+const axios = require('axios');
 
 // Load environment variables
 dotenv.config();
 
-// Middleware to verify Firebase Auth tokens
-const verifyAuthToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
-    
-    const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Auth token verification failed:', error);
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+const app = express();
+const PORT = process.env.PORT || 5002;
+
+// Middleware
+app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001'] }));
+app.use(express.json());
+
+// Mock authentication middleware
+const mockAuth = (req, res, next) => {
+  req.userId = 'mock-user-id';
+  req.user = { uid: 'mock-user-id', email: 'test@example.com' };
+  next();
 };
 
-const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
-// Default to Mistral-7B-Instruct if not set in .env
-const HF_MODEL_URL = process.env.HUGGING_FACE_MODEL_URL || "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    message: 'CookMate Backend API is running!',
+    timestamp: new Date().toISOString(),
+    environment: 'development'
+  });
+});
 
-// Helper function to call Hugging Face
+// AI Routes (simplified for testing)
+const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
+
 async function callHuggingFace(prompt) {
   try {
     const response = await axios.post(
-      HF_MODEL_URL,
+      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
       { 
         inputs: prompt, 
         parameters: { 
-          max_new_tokens: 1024, // Allow for long recipes
-          temperature: 0.7,     // Creative but not too random
-          return_full_text: false // Only give us the new text, not the prompt
+          max_new_tokens: 500,
+          temperature: 0.7,
+          return_full_text: false
         } 
       },
       { 
@@ -52,7 +52,6 @@ async function callHuggingFace(prompt) {
       }
     );
     
-    // Hugging Face returns an array of objects. We want the 'generated_text' from the first one.
     if (response.data && response.data.length > 0) {
       return response.data[0].generated_text.trim();
     }
@@ -63,8 +62,30 @@ async function callHuggingFace(prompt) {
   }
 }
 
-// 1. Generate Recipe Route
-router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
+// Chat endpoint
+app.post('/api/ai/chat', mockAuth, async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    const prompt = `<s>[INST] You are CookMate, a helpful and friendly AI kitchen assistant. 
+    User: ${message}
+    Assistant: [/INST]`;
+    
+    const aiReply = await callHuggingFace(prompt);
+    
+    const mockResponse = {
+      message: aiReply || "Hello! I'm CookMate, your AI cooking assistant. How can I help you with recipes today?",
+      timestamp: new Date().toISOString()
+    };
+    
+    res.status(200).json({ response: mockResponse });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate Recipe endpoint
+app.post('/api/ai/generate-recipe', mockAuth, async (req, res) => {
   try {
     const { ingredients, dietaryPreferences, recipeType } = req.body;
     
@@ -72,8 +93,6 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: "No ingredients provided" });
     }
 
-    // Construct a specific prompt for Mistral
-    // We ask for JSON format to make it easier to display in the frontend
     const prompt = `<s>[INST] You are an expert chef. Create a recipe using these ingredients: ${ingredients.join(', ')}.
     ${dietaryPreferences ? `Dietary preferences: ${dietaryPreferences}.` : ''}
     ${recipeType ? `Recipe type: ${recipeType}.` : ''}
@@ -96,10 +115,8 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       throw new Error("No response from AI");
     }
 
-    // Attempt to parse the JSON string from the AI
     let recipeData;
     try {
-      // Sometimes AI adds text before/after JSON, so we find the first '{' and last '}'
       const jsonStart = generatedText.indexOf('{');
       const jsonEnd = generatedText.lastIndexOf('}');
       if (jsonStart !== -1 && jsonEnd !== -1) {
@@ -109,14 +126,12 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
         throw new Error("Invalid JSON format");
       }
     } catch (parseError) {
-      // Fallback if AI didn't give perfect JSON: return raw text wrapped in structure
-      console.warn("Could not parse AI JSON, returning raw text");
       recipeData = {
         title: "AI Recipe Suggestion",
         ingredients: ingredients,
-        instructions: [generatedText], // Put the whole text as one step
-        cookingTime: "Unknown",
-        servings: 2,
+        instructions: [generatedText],
+        cookingTime: "30 minutes",
+        servings: 4,
         difficulty: "Medium"
       };
     }
@@ -131,33 +146,8 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
   }
 });
 
-// 2. Chat Route
-router.post('/chat', verifyAuthToken, async (req, res) => {
-  try {
-    const { message } = req.body;
-    
-    // Simple chat prompt
-    const prompt = `<s>[INST] You are CookMate, a helpful and friendly AI kitchen assistant. 
-    User: ${message}
-    Assistant: [/INST]`;
-    
-    const aiReply = await callHuggingFace(prompt);
-    
-    const mockResponse = {
-      message: aiReply || "I'm having trouble thinking right now. Try again?",
-      timestamp: new Date().toISOString()
-    };
-    
-    res.status(200).json({ 
-      response: mockResponse
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 3. Suggest Ingredients Route
-router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
+// Suggest Ingredients endpoint
+app.post('/api/ai/suggest-ingredients', mockAuth, async (req, res) => {
   try {
     const { availableIngredients } = req.body;
     
@@ -168,8 +158,7 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
     
     const suggestionText = await callHuggingFace(prompt);
     
-    // Convert string "Garlic, Onion" into array ["Garlic", "Onion"]
-    const suggestions = suggestionText ? suggestionText.split(',').map(s => s.trim()) : [];
+    const suggestions = suggestionText ? suggestionText.split(',').map(s => s.trim()) : ['Garlic', 'Olive Oil', 'Salt'];
     
     res.status(200).json({ 
       suggestions,
@@ -180,4 +169,27 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+// Mock user endpoints
+app.get('/api/users/profile', mockAuth, (req, res) => {
+  res.status(200).json({ 
+    user: {
+      uid: req.userId,
+      email: 'test@example.com',
+      displayName: 'Test User',
+      plan: 'free',
+      favorites: []
+    }
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 CookMate Backend API running on http://localhost:${PORT}`);
+  console.log(`📚 API Documentation:`);
+  console.log(`   GET  /api/health - Health check`);
+  console.log(`   POST /api/ai/chat - AI chat`);
+  console.log(`   POST /api/ai/generate-recipe - Generate recipe`);
+  console.log(`   POST /api/ai/suggest-ingredients - Suggest ingredients`);
+  console.log(`   GET  /api/users/profile - Get user profile`);
+});
+
+module.exports = app;
