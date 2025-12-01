@@ -8,10 +8,10 @@ const initializeFirebase = () => {
   if (!admin.apps.length) {
     admin.initializeApp();
   }
-  
+
   // Initialize Firestore
   db = admin.firestore();
-  
+
   return { admin, db };
 };
 

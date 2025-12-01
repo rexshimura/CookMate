@@ -1,0 +1,374 @@
+[debug] [2025-11-30T15:21:36.359Z] ----------------------------------------------------------------------
+[debug] [2025-11-30T15:21:36.362Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
+[debug] [2025-11-30T15:21:36.362Z] CLI Version:   14.26.0
+[debug] [2025-11-30T15:21:36.363Z] Platform:      win32
+[debug] [2025-11-30T15:21:36.363Z] Node Version:  v22.18.0
+[debug] [2025-11-30T15:21:36.363Z] Time:          Sun Nov 30 2025 23:21:36 GMT+0800 (Philippine Standard Time)
+[debug] [2025-11-30T15:21:36.363Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-11-30T15:21:36.725Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-30T15:21:36.726Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-11-30T15:21:36.742Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-30T15:21:36.742Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-11-30T15:21:36.749Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-11-30T15:21:36.750Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-11-30T15:21:36.781Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-30T15:21:36.782Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-30T15:21:36.782Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-11-30T15:21:36.782Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2025-11-30T15:21:36.813Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
+[debug] [2025-11-30T15:21:36.815Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
+[debug] [2025-11-30T15:21:36.817Z] Checked if tokens are valid: true, expires at: 1764519435059
+[debug] [2025-11-30T15:21:36.817Z] Checked if tokens are valid: true, expires at: 1764519435059
+[debug] [2025-11-30T15:21:36.818Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
+[debug] [2025-11-30T15:21:37.206Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
+[debug] [2025-11-30T15:21:37.206Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
+[info] i  ui: downloading ui-v1.15.0.zip... {"metadata":{"emulator":{"name":"ui"},"message":"downloading ui-v1.15.0.zip..."}}
+[debug] [2025-11-30T15:21:37.248Z] >>> [apiv2][query] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip 
+[debug] [2025-11-30T15:21:37.605Z] <<< [apiv2][status] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip 200
+[debug] [2025-11-30T15:21:37.605Z] <<< [apiv2][body] GET https://storage.googleapis.com/firebase-preview-drop/emulator/ui-v1.15.0.zip [stream]
+[debug] [2025-11-30T15:21:38.060Z] Data is 3538469
+[debug] [2025-11-30T15:21:38.060Z] [unzip] Entry: client/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.060Z] [unzip] Processing entry: client\
+[debug] [2025-11-30T15:21:38.060Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\
+[debug] [2025-11-30T15:21:38.061Z] [unzip] Entry: client/favicon-16x16.png (compressed_size=293 bytes, uncompressed_size=293 bytes)
+[debug] [2025-11-30T15:21:38.061Z] [unzip] Processing entry: client\favicon-16x16.png
+[debug] [2025-11-30T15:21:38.061Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.062Z] [unzip] Writing file: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\favicon-16x16.png
+[debug] [2025-11-30T15:21:38.063Z] [unzip] Entry: client/safari-pinned-tab.svg (compressed_size=1433 bytes, uncompressed_size=2611 bytes)
+[debug] [2025-11-30T15:21:38.063Z] [unzip] Processing entry: client\safari-pinned-tab.svg
+[debug] [2025-11-30T15:21:38.064Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.064Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\safari-pinned-tab.svg
+[debug] [2025-11-30T15:21:38.068Z] [unzip] Entry: client/favicon.ico (compressed_size=2933 bytes, uncompressed_size=13294 bytes)
+[debug] [2025-11-30T15:21:38.068Z] [unzip] Processing entry: client\favicon.ico
+[debug] [2025-11-30T15:21:38.069Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.069Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\favicon.ico
+[debug] [2025-11-30T15:21:38.072Z] [unzip] Entry: client/index.html (compressed_size=1364 bytes, uncompressed_size=3071 bytes)
+[debug] [2025-11-30T15:21:38.072Z] [unzip] Processing entry: client\index.html
+[debug] [2025-11-30T15:21:38.073Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.073Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\index.html
+[debug] [2025-11-30T15:21:38.076Z] [unzip] Entry: client/android-chrome-192x192.png (compressed_size=2684 bytes, uncompressed_size=2684 bytes)
+[debug] [2025-11-30T15:21:38.076Z] [unzip] Processing entry: client\android-chrome-192x192.png
+[debug] [2025-11-30T15:21:38.076Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.076Z] [unzip] Writing file: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\android-chrome-192x192.png
+[debug] [2025-11-30T15:21:38.077Z] [unzip] Entry: client/apple-touch-icon.png (compressed_size=2123 bytes, uncompressed_size=2152 bytes)
+[debug] [2025-11-30T15:21:38.078Z] [unzip] Processing entry: client\apple-touch-icon.png
+[debug] [2025-11-30T15:21:38.078Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.078Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\apple-touch-icon.png
+[debug] [2025-11-30T15:21:38.083Z] [unzip] Entry: client/android-chrome-512x512.png (compressed_size=5369 bytes, uncompressed_size=5411 bytes)
+[debug] [2025-11-30T15:21:38.083Z] [unzip] Processing entry: client\android-chrome-512x512.png
+[debug] [2025-11-30T15:21:38.083Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.083Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\android-chrome-512x512.png
+[debug] [2025-11-30T15:21:38.086Z] [unzip] Entry: client/manifest.json (compressed_size=245 bytes, uncompressed_size=551 bytes)
+[debug] [2025-11-30T15:21:38.086Z] [unzip] Processing entry: client\manifest.json
+[debug] [2025-11-30T15:21:38.086Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.091Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\manifest.json
+[debug] [2025-11-30T15:21:38.093Z] [unzip] Entry: client/robots.txt (compressed_size=26 bytes, uncompressed_size=26 bytes)
+[debug] [2025-11-30T15:21:38.094Z] [unzip] Processing entry: client\robots.txt
+[debug] [2025-11-30T15:21:38.094Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.094Z] [unzip] Writing file: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\robots.txt
+[debug] [2025-11-30T15:21:38.098Z] [unzip] Entry: client/mstile-150x150.png (compressed_size=2034 bytes, uncompressed_size=2034 bytes)
+[debug] [2025-11-30T15:21:38.098Z] [unzip] Processing entry: client\mstile-150x150.png
+[debug] [2025-11-30T15:21:38.098Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.099Z] [unzip] Writing file: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\mstile-150x150.png
+[debug] [2025-11-30T15:21:38.101Z] [unzip] Entry: client/assets/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.101Z] [unzip] Processing entry: client\assets\
+[debug] [2025-11-30T15:21:38.101Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\
+[debug] [2025-11-30T15:21:38.102Z] [unzip] Entry: client/assets/index-BX-A56oj.js (compressed_size=582089 bytes, uncompressed_size=2092775 bytes)
+[debug] [2025-11-30T15:21:38.102Z] [unzip] Processing entry: client\assets\index-BX-A56oj.js
+[debug] [2025-11-30T15:21:38.102Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets
+[debug] [2025-11-30T15:21:38.103Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\index-BX-A56oj.js
+[debug] [2025-11-30T15:21:38.133Z] [unzip] Entry: client/assets/index-CjB9C900.css (compressed_size=35979 bytes, uncompressed_size=298654 bytes)
+[debug] [2025-11-30T15:21:38.133Z] [unzip] Processing entry: client\assets\index-CjB9C900.css
+[debug] [2025-11-30T15:21:38.133Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets
+[debug] [2025-11-30T15:21:38.133Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\index-CjB9C900.css
+[debug] [2025-11-30T15:21:38.150Z] [unzip] Entry: client/assets/index-BX-A56oj.js.map (compressed_size=2362482 bytes, uncompressed_size=10036679 bytes)
+[debug] [2025-11-30T15:21:38.150Z] [unzip] Processing entry: client\assets\index-BX-A56oj.js.map
+[debug] [2025-11-30T15:21:38.150Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets
+[debug] [2025-11-30T15:21:38.151Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\index-BX-A56oj.js.map
+[debug] [2025-11-30T15:21:38.237Z] [unzip] Entry: client/assets/extensions/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.237Z] [unzip] Processing entry: client\assets\extensions\
+[debug] [2025-11-30T15:21:38.237Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\extensions\
+[debug] [2025-11-30T15:21:38.237Z] [unzip] Entry: client/assets/extensions/default-extension.png (compressed_size=1646 bytes, uncompressed_size=1657 bytes)
+[debug] [2025-11-30T15:21:38.238Z] [unzip] Processing entry: client\assets\extensions\default-extension.png
+[debug] [2025-11-30T15:21:38.238Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\extensions
+[debug] [2025-11-30T15:21:38.238Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\extensions\default-extension.png
+[debug] [2025-11-30T15:21:38.240Z] [unzip] Entry: client/assets/img/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.241Z] [unzip] Processing entry: client\assets\img\
+[debug] [2025-11-30T15:21:38.241Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\img\
+[debug] [2025-11-30T15:21:38.241Z] [unzip] Entry: client/assets/img/database.png (compressed_size=29449 bytes, uncompressed_size=29988 bytes)
+[debug] [2025-11-30T15:21:38.242Z] [unzip] Processing entry: client\assets\img\database.png
+[debug] [2025-11-30T15:21:38.242Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\img
+[debug] [2025-11-30T15:21:38.242Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\img\database.png
+[debug] [2025-11-30T15:21:38.244Z] [unzip] Entry: client/assets/provider-icons/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.244Z] [unzip] Processing entry: client\assets\provider-icons\
+[debug] [2025-11-30T15:21:38.244Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\
+[debug] [2025-11-30T15:21:38.244Z] [unzip] Entry: client/assets/provider-icons/auth_service_saml.svg (compressed_size=575 bytes, uncompressed_size=1226 bytes)
+[debug] [2025-11-30T15:21:38.244Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_saml.svg
+[debug] [2025-11-30T15:21:38.244Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.245Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_saml.svg
+[debug] [2025-11-30T15:21:38.247Z] [unzip] Entry: client/assets/provider-icons/auth_service_phone.svg (compressed_size=261 bytes, uncompressed_size=414 bytes)
+[debug] [2025-11-30T15:21:38.247Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_phone.svg
+[debug] [2025-11-30T15:21:38.247Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.248Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_phone.svg
+[debug] [2025-11-30T15:21:38.249Z] [unzip] Entry: client/assets/provider-icons/auth_service_facebook.svg (compressed_size=289 bytes, uncompressed_size=457 bytes)
+[debug] [2025-11-30T15:21:38.250Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_facebook.svg
+[debug] [2025-11-30T15:21:38.250Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.250Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_facebook.svg
+[debug] [2025-11-30T15:21:38.252Z] [unzip] Entry: client/assets/provider-icons/auth_service_game_center.svg (compressed_size=991 bytes, uncompressed_size=3921 bytes)
+[debug] [2025-11-30T15:21:38.252Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_game_center.svg
+[debug] [2025-11-30T15:21:38.252Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.252Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_game_center.svg
+[debug] [2025-11-30T15:21:38.258Z] [unzip] Entry: client/assets/provider-icons/auth_service_apple.svg (compressed_size=230 bytes, uncompressed_size=334 bytes)
+[debug] [2025-11-30T15:21:38.258Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_apple.svg
+[debug] [2025-11-30T15:21:38.258Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.259Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_apple.svg
+[debug] [2025-11-30T15:21:38.261Z] [unzip] Entry: client/assets/provider-icons/auth_service_github.svg (compressed_size=466 bytes, uncompressed_size=838 bytes)
+[debug] [2025-11-30T15:21:38.261Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_github.svg
+[debug] [2025-11-30T15:21:38.261Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.261Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_github.svg
+[debug] [2025-11-30T15:21:38.267Z] [unzip] Entry: client/assets/provider-icons/auth_service_mslive.svg (compressed_size=203 bytes, uncompressed_size=378 bytes)
+[debug] [2025-11-30T15:21:38.267Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_mslive.svg
+[debug] [2025-11-30T15:21:38.267Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.268Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_mslive.svg
+[debug] [2025-11-30T15:21:38.270Z] [unzip] Entry: client/assets/provider-icons/auth_service_yahoo.svg (compressed_size=577 bytes, uncompressed_size=1182 bytes)
+[debug] [2025-11-30T15:21:38.270Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_yahoo.svg
+[debug] [2025-11-30T15:21:38.270Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.273Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_yahoo.svg
+[debug] [2025-11-30T15:21:38.276Z] [unzip] Entry: client/assets/provider-icons/auth_service_twitter.svg (compressed_size=444 bytes, uncompressed_size=751 bytes)
+[debug] [2025-11-30T15:21:38.276Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_twitter.svg
+[debug] [2025-11-30T15:21:38.276Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.277Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_twitter.svg
+[debug] [2025-11-30T15:21:38.281Z] [unzip] Entry: client/assets/provider-icons/auth_service_play_games.svg (compressed_size=565 bytes, uncompressed_size=1173 bytes)
+[debug] [2025-11-30T15:21:38.281Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_play_games.svg
+[debug] [2025-11-30T15:21:38.281Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.282Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_play_games.svg
+[debug] [2025-11-30T15:21:38.284Z] [unzip] Entry: client/assets/provider-icons/auth_service_email.svg (compressed_size=228 bytes, uncompressed_size=326 bytes)
+[debug] [2025-11-30T15:21:38.284Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_email.svg
+[debug] [2025-11-30T15:21:38.284Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.285Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_email.svg
+[debug] [2025-11-30T15:21:38.287Z] [unzip] Entry: client/assets/provider-icons/auth_service_google.svg (compressed_size=409 bytes, uncompressed_size=720 bytes)
+[debug] [2025-11-30T15:21:38.287Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_google.svg
+[debug] [2025-11-30T15:21:38.287Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.289Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_google.svg
+[debug] [2025-11-30T15:21:38.292Z] [unzip] Entry: client/assets/provider-icons/auth_service_oidc.svg (compressed_size=414 bytes, uncompressed_size=858 bytes)
+[debug] [2025-11-30T15:21:38.292Z] [unzip] Processing entry: client\assets\provider-icons\auth_service_oidc.svg
+[debug] [2025-11-30T15:21:38.292Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons
+[debug] [2025-11-30T15:21:38.293Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\assets\provider-icons\auth_service_oidc.svg
+[debug] [2025-11-30T15:21:38.295Z] [unzip] Entry: client/browserconfig.xml (compressed_size=491 bytes, uncompressed_size=822 bytes)
+[debug] [2025-11-30T15:21:38.295Z] [unzip] Processing entry: client\browserconfig.xml
+[debug] [2025-11-30T15:21:38.295Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.295Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\browserconfig.xml
+[debug] [2025-11-30T15:21:38.300Z] [unzip] Entry: client/favicon-32x32.png (compressed_size=475 bytes, uncompressed_size=475 bytes)
+[debug] [2025-11-30T15:21:38.300Z] [unzip] Processing entry: client\favicon-32x32.png
+[debug] [2025-11-30T15:21:38.300Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client
+[debug] [2025-11-30T15:21:38.300Z] [unzip] Writing file: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\client\favicon-32x32.png
+[debug] [2025-11-30T15:21:38.303Z] [unzip] Entry: server/ (compressed_size=0 bytes, uncompressed_size=0 bytes)
+[debug] [2025-11-30T15:21:38.303Z] [unzip] Processing entry: server\
+[debug] [2025-11-30T15:21:38.304Z] [unzip] mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\server\
+[debug] [2025-11-30T15:21:38.307Z] [unzip] Entry: server/server.mjs.map (compressed_size=217845 bytes, uncompressed_size=944978 bytes)
+[debug] [2025-11-30T15:21:38.307Z] [unzip] Processing entry: server\server.mjs.map
+[debug] [2025-11-30T15:21:38.307Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\server
+[debug] [2025-11-30T15:21:38.308Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\server\server.mjs.map
+[debug] [2025-11-30T15:21:38.318Z] [unzip] Entry: server/server.mjs (compressed_size=276407 bytes, uncompressed_size=933701 bytes)
+[debug] [2025-11-30T15:21:38.318Z] [unzip] Processing entry: server\server.mjs
+[debug] [2025-11-30T15:21:38.318Z] [unzip] else mkdir: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\server
+[debug] [2025-11-30T15:21:38.319Z] [unzip] deflating: C:\Users\JOHN MARK MAGDASAL\.cache\firebase\emulators\ui-v1.15.0\server\server.mjs
+[info] i  functions: Watching "C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\" for Cloud Functions..."}}
+[debug] [2025-11-30T15:21:38.344Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-11-30T15:21:40.818Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "@types/node": "^18.0.0"
+  }
+}
+[debug] [2025-11-30T15:21:40.819Z] Building nodejs source
+[debug] [2025-11-30T15:21:40.819Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-11-30T15:21:40.822Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-11-30T15:21:40.822Z] Failed to validate key FIREBASE_PRIVATE_KEY: Error: Key FIREBASE_PRIVATE_KEY starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-11-30T15:21:40.822Z] Failed to validate key FIREBASE_CLIENT_EMAIL: Error: Key FIREBASE_CLIENT_EMAIL starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-11-30T15:21:40.823Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
+[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
+[debug] [2025-11-30T15:21:40.829Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[debug] [2025-12-01T04:53:37.510Z] ----------------------------------------------------------------------
+[debug] [2025-12-01T04:53:37.512Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
+[debug] [2025-12-01T04:53:37.512Z] CLI Version:   14.26.0
+[debug] [2025-12-01T04:53:37.512Z] Platform:      win32
+[debug] [2025-12-01T04:53:37.513Z] Node Version:  v22.18.0
+[debug] [2025-12-01T04:53:37.513Z] Time:          Mon Dec 01 2025 12:53:37 GMT+0800 (Philippine Standard Time)
+[debug] [2025-12-01T04:53:37.513Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-01T04:53:37.855Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-01T04:53:37.856Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-12-01T04:53:37.869Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T04:53:37.869Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-12-01T04:53:37.874Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[warn] !  emulators: It seems that you are running multiple instances of the emulator suite for project cookmate-cc941. This may result in unexpected behavior. 
+[debug] [2025-12-01T04:53:37.876Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-01T04:53:37.915Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T04:53:37.915Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T04:53:37.915Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T04:53:37.922Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2025-12-01T04:53:37.947Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
+[debug] [2025-12-01T04:53:37.951Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
+[debug] [2025-12-01T04:53:37.953Z] Checked if tokens are valid: false, expires at: 1764519435059
+[debug] [2025-12-01T04:53:37.953Z] Checked if tokens are valid: false, expires at: 1764519435059
+[debug] [2025-12-01T04:53:37.954Z] > refreshing access token with scopes: []
+[debug] [2025-12-01T04:53:37.956Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-01T04:53:37.956Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-01T04:53:38.152Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-01T04:53:38.152Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-01T04:53:38.189Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
+[debug] [2025-12-01T04:53:38.611Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
+[debug] [2025-12-01T04:53:38.611Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
+[info] i  functions: Watching "C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\" for Cloud Functions..."}}
+[debug] [2025-12-01T04:53:38.667Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-01T04:53:45.231Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "@types/node": "^18.0.0"
+  }
+}
+[debug] [2025-12-01T04:53:45.231Z] Building nodejs source
+[debug] [2025-12-01T04:53:45.232Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-12-01T04:53:45.234Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T04:53:45.234Z] Failed to validate key FIREBASE_PRIVATE_KEY: Error: Key FIREBASE_PRIVATE_KEY starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T04:53:45.234Z] Failed to validate key FIREBASE_CLIENT_EMAIL: Error: Key FIREBASE_CLIENT_EMAIL starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T04:53:45.234Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
+[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
+[debug] [2025-12-01T04:53:45.243Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[debug] [2025-12-01T05:09:31.364Z] File C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\src\routes\ai.js changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\\src\\routes\\ai.js changed, reloading triggers"}}
+[debug] [2025-12-01T05:09:32.375Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-01T05:09:33.760Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "@types/node": "^18.0.0"
+  }
+}
+[debug] [2025-12-01T05:09:33.760Z] Building nodejs source
+[debug] [2025-12-01T05:09:33.760Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-12-01T05:09:33.762Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T05:09:33.762Z] Failed to validate key FIREBASE_PRIVATE_KEY: Error: Key FIREBASE_PRIVATE_KEY starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T05:09:33.762Z] Failed to validate key FIREBASE_CLIENT_EMAIL: Error: Key FIREBASE_CLIENT_EMAIL starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T05:09:33.762Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
+[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
