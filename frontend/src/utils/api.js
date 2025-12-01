@@ -3,18 +3,21 @@ import { auth } from '../firebase';
 
 // Smart API base URL detection
 const getApiBaseUrl = () => {
-  // 1. Check if explicitly set in environment variables
+  // Priority 1: Explicit environment variable (most important)
   if (import.meta.env.VITE_API_BASE_URL) {
+    console.log('🍳 Using explicit VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
     return import.meta.env.VITE_API_BASE_URL;
   }
   
-  // 2. Auto-detect based on development vs production
+  // Priority 2: Auto-detect based on development vs production
   if (import.meta.env.DEV) {
-    // Development: Check if dev-server is running on port 5002
-    return 'http://localhost:5002';
+    // Development: Use Vite proxy which routes to Firebase Emulator
+    console.log('🍳 Using development proxy: /api');
+    return '/api';
   } else {
     // Production: Use Firebase Functions
-    return 'http://localhost:5001/cookmate-cc941/us-central1/api';
+    console.log('🍳 Using production Firebase Functions');
+    return 'https://us-central1-cookmate-cc941.cloudfunctions.net/api';
   }
 };
 

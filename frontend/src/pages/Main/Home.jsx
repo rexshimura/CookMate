@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut } from 'lucide-react';
-import axios from 'axios';
+import { chatWithAI } from '../../utils/api';
 
 export default function CookMateChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -67,17 +67,12 @@ export default function CookMateChat() {
       }));
 
       // 3. Send to Unified Chat Endpoint
-      const response = await axios.post('/api/ai/chat', {
-        message: newMessage.text,
-        history: history
-      });
+      const response = await chatWithAI(newMessage.text, null, history);
 
-      const data = response.data;
-      
       // 4. Add AI Response to UI
       const aiResponse = {
         id: Date.now() + 1,
-        text: data.response.message,
+        text: response.response.message,
         isUser: false,
         timestamp: new Date()
       };
