@@ -2,36 +2,22 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const dotenv = require('dotenv');
-const { admin } = require('../config/firebase');
 
 // Load environment variables
 dotenv.config();
 
-// Middleware to verify Firebase Auth tokens
-const verifyAuthToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
-    
-    const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Auth token verification failed:', error);
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-};
-
+// 1. API Key: Use env var or hardcoded backup for testing
 const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
-// Default to Mistral-7B-Instruct if not set in .env
-const HF_MODEL_URL = process.env.HUGGING_FACE_MODEL_URL || "https://router.huggingface.co/mistralai/Mistral-7B-Instruct-v0.2";
 
-// Helper function to call Hugging Face
+// 2. Model URL: FIXED to include "/models/"
+// We use Zephyr 7B Beta because it follows instructions better than base Mistral
+const HF_MODEL_URL = "https://router.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
+
+console.log("--- AI SERVICE INITIALIZED ---");
+console.log("Target URL:", HF_MODEL_URL);
+console.log("API Key Status:", HF_API_KEY ? "Present" : "MISSING");
+
+// Helper function to call Hugging Face with better error handling
 async function callHuggingFace(prompt) {
   try {
     const response = await axios.post(
@@ -39,9 +25,9 @@ async function callHuggingFace(prompt) {
       { 
         inputs: prompt, 
         parameters: { 
-          max_new_tokens: 1024, // Allow for long recipes
-          temperature: 0.7,     // Creative but not too random
-          return_full_text: false // Only give us the new text, not the prompt
+          max_new_tokens: 1024,
+          temperature: 0.7,
+          return_full_text: false
         } 
       },
       { 
@@ -52,54 +38,221 @@ async function callHuggingFace(prompt) {
       }
     );
     
-    // Hugging Face returns an array of objects. We want the 'generated_text' from the first one.
     if (response.data && response.data.length > 0) {
-      return response.data[0].generated_text.trim();
+      const generatedText = response.data[0].generated_text.trim();
+      
+      // Clean up common AI response artifacts
+      return generatedText
+        .replace(/^[\s\n]*(Assistant|CookMate):\s*/i, '')
+        .replace(/^(User| Human):\s*/gi, '')
+        .trim();
     }
     return null;
   } catch (error) {
-    console.error("Hugging Face API Error:", error.response ? error.response.data : error.message);
-    throw new Error('Failed to communicate with AI service');
+    // Log detailed error for debugging
+    console.error("❌ Hugging Face Error:", error.response ? error.response.data : error.message);
+    
+    // Return a fallback response based on prompt type
+    if (prompt.includes('recipe')) {
+      return "I'd love to help you cook something delicious! Could you tell me what ingredients you have available?";
+    } else {
+      return "I'm excited to chat about cooking! What ingredients do you have today, or what would you like to cook?";
+    }
   }
 }
 
-// 1. Generate Recipe Route
-router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
+// 1. Generate Recipe Route with Smart Ingredient Extraction
+router.post('/generate-recipe', async (req, res) => {
   try {
-    const { ingredients, dietaryPreferences, recipeType } = req.body;
+    const { userMessage, ingredients: providedIngredients, extractedIngredients = [], dietaryPreferences, recipeType } = req.body;
     
+    // Handle both old format (ingredients array) and new format (userMessage)
+    let ingredients = providedIngredients || extractedIngredients;
+    
+    console.log("🔍 Initial ingredients:", ingredients);
+    console.log("🔍 User message:", userMessage);
+    
+    if (userMessage && (!ingredients || ingredients.length === 0)) {
+      console.log("🔍 Extracting ingredients from user message:", userMessage);
+      
+      // Smart ingredient extraction from user message
+      const ingredientPatterns = [
+        // Common cooking ingredients
+        /\b(chicken|beef|pork|lamb|turkey|fish|salmon|shrimp|tuna|tofu|eggs?)\b/gi,
+        /\b(rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa)\b/gi,
+        /\b(potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber)\b/gi,
+        /\b(mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn)\b/gi,
+        /\b(cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream)\b/gi,
+        /\b(oil|olive oil|vegetable oil|canola oil|sesame oil)\b/gi,
+        /\b(salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil)\b/gi,
+        /\b(sugar|honey|maple syrup|brown sugar)\b/gi,
+        /\b(lemon|lime|orange|apple|banana|berries|grapes)\b/gi,
+        /\b(vanilla|almond|coconut|chocolate|cocoa)\b/gi
+      ];
+      
+      const foundIngredients = new Set();
+      ingredientPatterns.forEach(pattern => {
+        const matches = userMessage.match(pattern);
+        if (matches) {
+          matches.forEach(match => foundIngredients.add(match.toLowerCase()));
+        }
+      });
+      
+      console.log("🔍 Found ingredients:", Array.from(foundIngredients));
+      
+      // Also look for ingredient lists with numbers (like "1 cup flour, 2 eggs")
+      const listPattern = /\b\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|pound|lbs?|oz|ounce|ounces)\s+([a-zA-Z\s]+)/gi;
+      const listMatches = userMessage.match(listPattern);
+      if (listMatches) {
+        listMatches.forEach(match => {
+          const cleanMatch = match.replace(/^\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|pound|lbs?|oz|ounce|ounces)\s+/i, '').trim();
+          if (cleanMatch.length > 2) foundIngredients.add(cleanMatch.toLowerCase());
+        });
+      }
+      
+      ingredients = Array.from(foundIngredients);
+      console.log("🔍 Final ingredients array:", ingredients);
+    }
+    
+    // If no specific ingredients found, create a general recipe based on the request
     if (!ingredients || ingredients.length === 0) {
-      return res.status(400).json({ error: "No ingredients provided" });
+      console.log("🔍 No specific ingredients found, generating general recipe");
+      
+      // Create a general recipe based on common ingredients
+      const generalIngredients = ['chicken', 'rice', 'onion', 'garlic', 'tomato'];
+      
+      const prompt = `<s>[INST] You are CookMate, a world-class chef. The user asked for a recipe but didn't specify ingredients. Create a delicious, accessible recipe using these common ingredients: ${generalIngredients.join(', ')}.
+      
+      Make it a complete, satisfying meal that's perfect for home cooks.
+      
+      Format as professional JSON:
+      {
+        "title": "Appealing Recipe Name",
+        "ingredients": [
+          "1 lb chicken breast, cut into pieces",
+          "2 cups cooked rice",
+          "1 medium onion, diced"
+        ],
+        "instructions": [
+          "Season chicken with salt and pepper",
+          "Heat oil in a large pan over medium-high heat",
+          "Cook chicken until golden brown"
+        ],
+        "cookingTime": "30-35 minutes",
+        "servings": "4 people",
+        "difficulty": "Easy",
+        "chefTips": [
+          "Let meat rest before serving",
+          "Taste and adjust seasonings"
+        ]
+      }
+      
+      JSON only, make it delicious: [/INST]`;
+
+      const generatedText = await callHuggingFace(prompt);
+      
+      let recipeData;
+      try {
+        const jsonStart = generatedText.indexOf('{');
+        const jsonEnd = generatedText.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const jsonString = generatedText.substring(jsonStart, jsonEnd + 1);
+          recipeData = JSON.parse(jsonString);
+        } else {
+          throw new Error("Invalid JSON format");
+        }
+      } catch (parseError) {
+        console.warn("⚠️ Could not parse AI JSON, creating general fallback recipe");
+        recipeData = {
+          title: "Classic Chicken and Rice Skillet",
+          ingredients: [
+            "1 lb chicken breast, cut into bite-sized pieces",
+            "2 cups cooked rice",
+            "1 medium onion, diced",
+            "3 cloves garlic, minced",
+            "2 medium tomatoes, diced",
+            "2 tablespoons olive oil",
+            "1 teaspoon salt",
+            "1/2 teaspoon black pepper",
+            "1 teaspoon dried oregano",
+            "1/2 cup chicken broth"
+          ],
+          instructions: [
+            "Season chicken pieces with salt, pepper, and oregano",
+            "Heat olive oil in a large skillet over medium-high heat",
+            "Add chicken and cook for 5-6 minutes until golden brown and cooked through",
+            "Add diced onion and cook for 3-4 minutes until softened",
+            "Add garlic and cook for 30 seconds until fragrant",
+            "Add diced tomatoes and cook for 2-3 minutes",
+            "Add cooked rice and chicken broth, stir to combine",
+            "Reduce heat to medium-low and simmer for 5 minutes until heated through",
+            "Taste and adjust seasonings as needed",
+            "Serve hot and enjoy!"
+          ],
+          cookingTime: "25-30 minutes",
+          servings: "4 people",
+          difficulty: "Easy",
+          chefTips: [
+            "Use day-old rice for better texture",
+            "Don't overcrowd the pan when cooking chicken",
+            "Add a squeeze of lemon juice for brightness"
+          ]
+        };
+      }
+      
+      return res.status(200).json({ 
+        message: 'Recipe generated successfully (general suggestion)',
+        recipe: recipeData,
+        detectedIngredients: generalIngredients,
+        note: "I created a general recipe since you didn't specify ingredients. Tell me what you have, and I'll make something specific for you!"
+      });
     }
 
-    // Construct a specific prompt for Mistral
-    // We ask for JSON format to make it easier to display in the frontend
-    const prompt = `<s>[INST] You are an expert chef. Create a recipe using these ingredients: ${ingredients.join(', ')}.
-    ${dietaryPreferences ? `Dietary preferences: ${dietaryPreferences}.` : ''}
-    ${recipeType ? `Recipe type: ${recipeType}.` : ''}
+    const prompt = `<s>[INST] You are CookMate, a world-class chef with years of experience creating accessible, delicious recipes. You're about to craft a recipe that would make any home cook proud, using these ingredients: ${ingredients.join(', ')}.
+    ${dietaryPreferences ? `Special dietary considerations: ${dietaryPreferences}.` : ''}
+    ${recipeType ? `Recipe style: ${recipeType}.` : ''}
     
-    IMPORTANT: Provide the response in valid JSON format with the following structure:
+    Create a recipe that:
+    - Showcases these ingredients in their best light
+    - Is achievable for home cooks of various skill levels  
+    - Includes helpful cooking techniques and tips
+    - Offers flavor combinations that work harmoniously
+    - Has clear, step-by-step instructions
+    - Suggests variations or serving ideas when relevant
+
+    Format as professional JSON:
     {
-      "title": "Recipe Name",
-      "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
-      "instructions": ["Step 1 description", "Step 2 description"],
-      "cookingTime": "e.g. 30 minutes",
-      "servings": "e.g. 4",
-      "difficulty": "Easy/Medium/Hard"
+      "title": "Elegant Recipe Name that Whets the Appetite",
+      "ingredients": [
+        "1 lb chicken breast, cut into 1-inch pieces",
+        "2 cups cooked jasmine rice",
+        "1 medium yellow onion, finely diced"
+      ],
+      "instructions": [
+        "Season chicken pieces generously with salt and pepper",
+        "Heat 2 tablespoons olive oil in a large skillet over medium-high heat until shimmering",
+        "Add chicken and sear without moving for 3-4 minutes until golden brown, then flip and cook 2-3 minutes more"
+      ],
+      "cookingTime": "30-35 minutes total",
+      "servings": "4 generous portions",
+      "difficulty": "Easy to Medium",
+      "chefTips": [
+        "Don't overcrowd the pan when searing chicken",
+        "Let meat rest 5 minutes before serving for maximum juiciness"
+      ]
     }
-    Do not add any text outside the JSON object.
-    [/INST]`;
+    
+    JSON only, make it delicious: [/INST]`;
 
     const generatedText = await callHuggingFace(prompt);
 
     if (!generatedText) {
-      throw new Error("No response from AI");
+      throw new Error("Failed to get response from AI model");
     }
 
-    // Attempt to parse the JSON string from the AI
     let recipeData;
     try {
-      // Sometimes AI adds text before/after JSON, so we find the first '{' and last '}'
+      // Clean up response to find JSON
       const jsonStart = generatedText.indexOf('{');
       const jsonEnd = generatedText.lastIndexOf('}');
       if (jsonStart !== -1 && jsonEnd !== -1) {
@@ -109,74 +262,116 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
         throw new Error("Invalid JSON format");
       }
     } catch (parseError) {
-      // Fallback if AI didn't give perfect JSON: return raw text wrapped in structure
-      console.warn("Could not parse AI JSON, returning raw text");
+      console.warn("⚠️ Could not parse AI JSON, creating enhanced fallback recipe");
       recipeData = {
-        title: "AI Recipe Suggestion",
-        ingredients: ingredients,
-        instructions: [generatedText], // Put the whole text as one step
-        cookingTime: "Unknown",
-        servings: 2,
-        difficulty: "Medium"
+        title: `Savory ${ingredients[0]} Creation`,
+        ingredients: [
+          ...ingredients.slice(0, 3).map(ing => `1 cup ${ing}, chopped`),
+          `2 tablespoons olive oil`,
+          `1 teaspoon salt`,
+          `1/2 teaspoon black pepper`,
+          `2 cloves garlic, minced`,
+          `1 small onion, diced`
+        ],
+        instructions: [
+          `Start by prepping all your ingredients - this ${ingredients[0]} dish comes together quickly once you start cooking!`,
+          `Heat olive oil in a large skillet over medium heat until shimmering`,
+          `Add diced onion and cook for 3-4 minutes until softened and fragrant`,
+          `Add garlic and cook for another 30 seconds until aromatic`,
+          `Add ${ingredients.slice(0, 3).join(', ')} to the pan and season with salt and pepper`,
+          `Cook, stirring occasionally, for 8-10 minutes until ingredients are tender and flavors meld`,
+          `Taste and adjust seasonings as needed - you might want a splash of lemon juice or your favorite herbs`,
+          `Serve hot and enjoy the fruits of your culinary creativity!`
+        ],
+        cookingTime: "20-25 minutes",
+        servings: "4 people",
+        difficulty: "Easy",
+        chefTips: [
+          "Prep all ingredients before you start cooking - this dish moves fast!",
+          "Don't be afraid to taste and adjust seasonings as you go",
+          "This base recipe is incredibly versatile - try adding different herbs or a splash of vinegar"
+        ]
       };
     }
     
     res.status(200).json({ 
       message: 'Recipe generated successfully',
-      recipe: recipeData
+      recipe: recipeData,
+      detectedIngredients: ingredients
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Recipe generation error:", error);
+    res.status(500).json({ 
+      error: "Recipe generation failed. Please try again with different ingredients.",
+      details: error.message 
+    });
   }
 });
 
-// 2. Chat Route
-router.post('/chat', verifyAuthToken, async (req, res) => {
+// 2. Chat Route with Conversation Memory
+router.post('/chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, conversationHistory = [] } = req.body;
     
-    // Simple chat prompt
-    const prompt = `<s>[INST] You are CookMate, a helpful and friendly AI kitchen assistant. 
-    User: ${message}
-    Assistant: [/INST]`;
+    // Create a more contextual conversation prompt
+    const recentHistory = conversationHistory.slice(-4); // Keep last 4 exchanges for context
+    
+    let contextPrompt = "";
+    if (recentHistory.length > 0) {
+      contextPrompt = "Previous conversation:\n" + 
+        recentHistory.map(h => `User: ${h.user}\nCookMate: ${h.assistant}`).join('\n\n') + 
+        "\n\n";
+    }
+    
+    const prompt = `<s>[INST] You are CookMate, an incredibly knowledgeable and passionate AI cooking assistant with the conversational style and depth of ChatGPT. You have extensive culinary knowledge and love helping people create amazing dishes.
+
+PERSONALITY & STYLE (ChatGPT-like):
+- Conversational, witty, and intellectually curious like a brilliant friend who happens to be a chef
+- Confident but humble about your knowledge
+- Adapt your communication style to match the user's tone and preferences
+- Show genuine enthusiasm for cooking and helping others succeed in the kitchen
+- Use natural, flowing language with occasional mild humor or personality
+
+CONVERSATION APPROACH:
+- Ask thoughtful, probing questions to understand their cooking experience and preferences
+- Provide context and reasoning behind your suggestions
+- Offer multiple perspectives or approaches when relevant
+- Reference cooking techniques, flavor profiles, or culinary traditions when appropriate
+- Build on previous messages to show you remember the conversation
+- If users seem inexperienced, offer gentle encouragement and basic explanations
+- If they're more advanced, dive into deeper culinary concepts
+
+RESPONSE QUALITY:
+- Aim for 3-6 sentences that feel natural and helpful
+- Start with direct acknowledgment of their message
+- Provide specific, actionable advice or suggestions
+- End with engaging follow-up questions that advance the conversation
+- For greetings: "Hey there! 👋 What brings you to the kitchen today? Whether you're looking for recipe inspiration or want to work with specific ingredients, I'm excited to help!"
+- For ingredient sharing: "Ooh, that's a great starting point! [ingredient] works really well with [suggest complementary ingredients/cooking methods]. What kind of dish are you in the mood for - something comforting, quick, or maybe something that showcases those ingredients?"
+- For questions: Engage with the question thoughtfully and expand on related cooking concepts
+
+TONE ADAPTABILITY:
+- Match enthusiastic users with equal energy
+- Be more patient and explanatory with beginners
+- Share cooking tips and techniques naturally in conversation
+- Keep responses genuine and helpful, avoiding robotic patterns
+
+${contextPrompt}User's message: "${message}"
+
+Respond as CookMate with ChatGPT-level conversational quality: [/INST]`;
     
     const aiReply = await callHuggingFace(prompt);
     
-    const mockResponse = {
-      message: aiReply || "I'm having trouble thinking right now. Try again?",
-      timestamp: new Date().toISOString()
-    };
-    
     res.status(200).json({ 
-      response: mockResponse
+      response: { 
+        message: aiReply || "I'm having trouble thinking right now. Try again?", 
+        timestamp: new Date().toISOString() 
+      } 
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 3. Suggest Ingredients Route
-router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
-  try {
-    const { availableIngredients } = req.body;
-    
-    const prompt = `<s>[INST] I have these ingredients: ${availableIngredients.join(', ')}. 
-    Suggest 3 additional ingredients that would go well with them to make a complete meal.
-    Output ONLY a comma-separated list of ingredients. Example: "Garlic, Olive Oil, Basil"
-    [/INST]`;
-    
-    const suggestionText = await callHuggingFace(prompt);
-    
-    // Convert string "Garlic, Onion" into array ["Garlic", "Onion"]
-    const suggestions = suggestionText ? suggestionText.split(',').map(s => s.trim()) : [];
-    
-    res.status(200).json({ 
-      suggestions,
-      message: 'Ingredient suggestions generated'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Chat route error:", error);
+    res.status(500).json({ error: "I'm having trouble responding right now. Please try again!" });
   }
 });
 

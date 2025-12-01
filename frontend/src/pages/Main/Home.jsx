@@ -64,42 +64,99 @@ export default function CookMateChat() {
     setIsTyping(true);
 
     try {
-      // 2. Call Backend API
-      // Use the relative path '/api' which Vite proxies to localhost:5001
-      const response = await axios.post('/api/ai/generate-recipe', {
-        ingredients: [currentInput], 
-        dietaryPreferences: "None" 
-      });
-
-      const data = response.data;
+      // 2. Simple intent detection - just check for explicit recipe requests
+      const lowerInput = currentInput.toLowerCase();
       
-      // 3. Format AI Response
-      let aiText = "I couldn't generate a recipe. Please try again.";
-      if (data.recipe) {
-        const r = data.recipe;
-        // Format the JSON recipe into readable text
-        aiText = `${r.title}\n\n` +
-                 `⏱️ Time: ${r.cookingTime} | 🍽️ Servings: ${r.servings}\n\n` +
-                 `Ingredients:\n• ${r.ingredients.join('\n• ')}\n\n` +
-                 `Instructions:\n${r.instructions.map((step, i) => `${i+1}. ${step}`).join('\n')}`;
+      // Clear recipe request indicators
+      const recipeKeywords = [
+        'recipe', 'cook', 'make', 'prepare', 'how to make', 'how to cook',
+        'recommend', 'suggest', 'give me', 'show me', 'find me'
+      ];
+      
+      // Food/cooking terms that suggest recipe intent
+      const cookingIndicators = [
+        'ingredient', 'ingredients', 'meal', 'dish', 'food', 'cooking',
+        'bake', 'fry', 'roast', 'boil', 'grill', 'stir fry', 'cooking with'
+      ];
+      
+      const hasRecipeKeywords = recipeKeywords.some(keyword => lowerInput.includes(keyword));
+      const hasCookingIndicators = cookingIndicators.some(indicator => lowerInput.includes(indicator));
+      const isRecipeRequest = hasRecipeKeywords || hasCookingIndicators;
+
+      let response;
+      
+      if (isRecipeRequest) {
+        // Call recipe generation API with user message for smart ingredient extraction
+        response = await axios.post('/api/ai/generate-recipe', {
+          userMessage: currentInput, // Pass the full message for ingredient extraction
+          dietaryPreferences: "None"
+        });
+        
+        const data = response.data;
+        
+        // Format recipe response
+        let aiText = "I couldn't generate a recipe. Please try again.";
+        if (data.recipe) {
+          const r = data.recipe;
+          let recipeText = `${r.title}\n\n` +
+                   `⏱️ Time: ${r.cookingTime} | 🍽️ Servings: ${r.servings}\n\n` +
+                   `Ingredients:\n• ${r.ingredients.join('\n• ')}\n\n` +
+                   `Instructions:\n${r.instructions.map((step, i) => `${i+1}. ${step}`).join('\n')}`;
+          
+          // Add chef tips if available
+          if (r.chefTips && r.chefTips.length > 0) {
+            recipeText += `\n\n💡 Chef Tips:\n• ${r.chefTips.join('\n• ')}`;
+          }
+          
+          // Add note if available
+          if (data.note) {
+            recipeText += `\n\n📝 ${data.note}`;
+          }
+          
+          aiText = recipeText;
+        }
+        
+        const aiResponse = {
+          id: messages.length + 2,
+          text: aiText,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiResponse]);
+        
+      } else {
+        // Call chat API for general conversation with history
+        const conversationHistory = messages.slice(-6).map(msg => ({
+          user: msg.isUser ? msg.text : null,
+          assistant: !msg.isUser ? msg.text : null
+        })).filter(msg => msg.user || msg.assistant);
+        
+        response = await axios.post('/api/ai/chat', {
+          message: currentInput,
+          conversationHistory: conversationHistory
+        });
+        
+        const data = response.data;
+        const aiText = data.response?.message || "I'm not sure how to help with that. Try asking me about recipes or ingredients!";
+        
+        const aiResponse = {
+          id: messages.length + 2,
+          text: aiText,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiResponse]);
       }
 
-      const aiResponse = {
-        id: messages.length + 2,
-        text: aiText,
-        isUser: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiResponse]);
-
     } catch (error) {
-      console.error("Error generating recipe:", error);
-      setMessages(prev => [...prev, {
+      console.error("Error communicating with AI:", error);
+      const errorResponse = {
         id: messages.length + 2,
         text: "Sorry, I'm having trouble connecting to the server. Please make sure the backend is running.",
         isUser: false,
         timestamp: new Date()
-      }]);
+      };
+      setMessages(prev => [...prev, errorResponse]);
     } finally {
       setIsTyping(false);
     }
