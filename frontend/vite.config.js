@@ -12,9 +12,12 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        // Target the dev server directly
+        // Format: http://127.0.0.1:5002
+        target: 'http://127.0.0.1:5002',
         changeOrigin: true,
         secure: false,
+        // We do NOT rewrite the path because your Express app expects routes to start with /api
       },
     },
   },
