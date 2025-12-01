@@ -1,17 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, Mail, Lock, ArrowRight, LogOut } from 'lucide-react';
 import axios from 'axios';
+import { useAuth } from '../../hooks/useAuth.jsx';
 
 export default function CookMateChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Auth States
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Auth States - using AuthProvider hooks
+  const { user, userProfile, loading, signOut } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('signin');
-  const [user, setUser] = useState({ name: 'Guest', email: '' });
+  
+  const isLoggedIn = !!user;
+  const userDisplayName = userProfile?.displayName || user?.displayName || 'Guest';
+  const userEmail = userProfile?.email || user?.email || '';
 
   const [messages, setMessages] = useState([
     {
@@ -30,6 +34,188 @@ export default function CookMateChat() {
   ]);
 
   const messagesEndRef = useRef(null);
+  const [savedRecipes, setSavedRecipes] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [userSessions, setUserSessions] = useState([]);
+
+  // Function to save recipe to favorites
+  const saveRecipeToFavorites = async (recipeData) => {
+    if (!isLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      // First save the recipe to the recipes collection
+      const recipeResponse = await axios.post('/api/recipes', {
+        title: recipeData.title,
+        ingredients: recipeData.ingredients,
+        instructions: recipeData.instructions,
+        cookingTime: recipeData.cookingTime,
+        servings: recipeData.servings,
+        difficulty: recipeData.difficulty,
+        userId: user.uid
+      });
+
+      const recipeId = recipeResponse.data.id;
+
+      // Then add to user's favorites
+      await axios.post(`/api/users/favorites/${recipeId}`, {}, {
+        headers: {
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        }
+      });
+
+      // Update local state
+      setSavedRecipes(prev => [...prev, { id: recipeId, ...recipeData }]);
+
+      return recipeId;
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      return null;
+    }
+  };
+
+  // Session management functions
+  const saveCurrentSession = async () => {
+    if (!isLoggedIn || messages.length <= 1) return;
+
+    try {
+      const sessionTitle = messages[1]?.text?.slice(0, 30) + '...' || 'Chat Session';
+      
+      const sessionData = {
+        title: sessionTitle,
+        messages: messages.map(msg => ({
+          text: msg.text,
+          isUser: msg.isUser,
+          timestamp: msg.timestamp
+        }))
+      };
+
+      if (currentSessionId) {
+        // Update existing session
+        await axios.put(`/api/sessions/${currentSessionId}`, sessionData, {
+          headers: {
+            'Authorization': `Bearer ${await user.getIdToken()}`
+          }
+        });
+      } else {
+        // Create new session
+        const response = await axios.post('/api/sessions', sessionData, {
+          headers: {
+            'Authorization': `Bearer ${await user.getIdToken()}`
+          }
+        });
+        setCurrentSessionId(response.data.sessionId);
+      }
+    } catch (error) {
+      console.error('Error saving session:', error);
+    }
+  };
+
+  const loadUserSessions = async () => {
+    if (!isLoggedIn) return;
+
+    try {
+      const response = await axios.get('/api/sessions', {
+        headers: {
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        }
+      });
+      setUserSessions(response.data.sessions || []);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    }
+  };
+
+  const loadSession = async (sessionId) => {
+    try {
+      const response = await axios.get(`/api/sessions/${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        }
+      });
+      
+      const session = response.data.session;
+      setMessages(session.messages.map((msg, index) => ({
+        id: index + 1,
+        text: msg.text,
+        isUser: msg.isUser,
+        timestamp: new Date(msg.timestamp)
+      })));
+      setCurrentSessionId(sessionId);
+      
+      if (isMobile) setSidebarOpen(false);
+    } catch (error) {
+      console.error('Error loading session:', error);
+    }
+  };
+
+  // Function to remove recipe from favorites
+  const removeRecipeFromFavorites = async (recipeId) => {
+    try {
+      await axios.delete(`/api/users/favorites/${recipeId}`, {
+        headers: {
+          'Authorization': `Bearer ${await user.getIdToken()}`
+        }
+      });
+
+      setSavedRecipes(prev => prev.filter(recipe => recipe.id !== recipeId));
+    } catch (error) {
+      console.error('Error removing recipe:', error);
+    }
+  };
+
+  // Recipe Save Button Component
+  const RecipeSaveButton = ({ recipeData, messageId }) => {
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+
+    const handleSave = async () => {
+      if (isSaving) return;
+      
+      setIsSaving(true);
+      const recipeId = await saveRecipeToFavorites(recipeData);
+      setIsSaving(false);
+      
+      if (recipeId) {
+        setIsSaved(true);
+      }
+    };
+
+    const handleRemove = async () => {
+      const recipe = savedRecipes.find(r => r.title === recipeData.title);
+      if (recipe) {
+        await removeRecipeFromFavorites(recipe.id);
+        setIsSaved(false);
+      }
+    };
+
+    if (isSaved) {
+      return (
+        <button
+          onClick={handleRemove}
+          className="mt-3 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors flex items-center gap-2"
+        >
+          ✅ Saved to Cookbook
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={handleSave}
+        disabled={isSaving}
+        className={`mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+          isSaving 
+            ? 'bg-stone-100 text-stone-400 cursor-not-allowed' 
+            : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+        }`}
+      >
+        {isSaving ? '⏳ Saving...' : '💾 Save to Cookbook'}
+      </button>
+    );
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -45,6 +231,27 @@ export default function CookMateChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Load user sessions when authenticated
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadUserSessions();
+    } else {
+      setUserSessions([]);
+      setCurrentSessionId(null);
+    }
+  }, [isLoggedIn]);
+
+  // Auto-save session when messages change (for authenticated users)
+  useEffect(() => {
+    if (isLoggedIn && messages.length > 1) {
+      const timeoutId = setTimeout(() => {
+        saveCurrentSession();
+      }, 2000); // Save after 2 seconds of inactivity
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [messages, isLoggedIn]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -94,7 +301,7 @@ export default function CookMateChat() {
         
         const data = response.data;
         
-        // Format recipe response
+        // Format recipe response with save functionality
         let aiText = "I couldn't generate a recipe. Please try again.";
         if (data.recipe) {
           const r = data.recipe;
@@ -108,10 +315,12 @@ export default function CookMateChat() {
             recipeText += `\n\n💡 Chef Tips:\n• ${r.chefTips.join('\n• ')}`;
           }
           
-          // Add note if available
+          // Add save button and note if available
           if (data.note) {
             recipeText += `\n\n📝 ${data.note}`;
           }
+          
+          recipeText += `\n\n💾 Want to save this recipe? ${isLoggedIn ? 'Click the save button below!' : 'Sign in to save recipes to your digital cookbook!'}`;
           
           aiText = recipeText;
         }
@@ -169,7 +378,24 @@ export default function CookMateChat() {
       isUser: false,
       timestamp: new Date()
     }]);
+    setCurrentSessionId(null);
     if (isMobile) setSidebarOpen(false);
+  };
+
+  // Format session timestamp for display
+  const formatSessionTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   // Basic format time helper
@@ -179,7 +405,13 @@ export default function CookMateChat() {
   const UserAccountFooter = ({ collapsed }) => (
     <div className="p-4 border-t border-stone-100 mt-auto bg-stone-50/50">
       <button
-        onClick={() => !isLoggedIn && setShowAuthModal(true)}
+        onClick={() => {
+          if (isLoggedIn) {
+            signOut();
+          } else {
+            setShowAuthModal(true);
+          }
+        }}
         className={`
           flex items-center ${collapsed ? 'justify-center' : 'gap-3'} 
           w-full p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all duration-200 border border-transparent hover:border-stone-100
@@ -189,34 +421,57 @@ export default function CookMateChat() {
           w-9 h-9 rounded-full flex items-center justify-center font-medium text-xs shadow-sm flex-shrink-0
           ${isLoggedIn ? 'bg-gradient-to-tr from-orange-400 to-red-500 text-white' : 'bg-stone-200 text-stone-500'}
         `}>
-          {isLoggedIn ? 'JS' : <User className="w-4 h-4" />}
+          {isLoggedIn ? (
+            userDisplayName ? userDisplayName.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'
+          ) : (
+            <User className="w-4 h-4" />
+          )}
         </div>
 
         {!collapsed && (
           <div className="text-left flex-1 overflow-hidden">
             <p className="text-sm font-semibold text-stone-700 truncate">
-              {isLoggedIn ? user.name : 'Sign In / Sign Up'}
+              {isLoggedIn ? userDisplayName : 'Sign In / Sign Up'}
             </p>
             <p className="text-xs text-stone-400 truncate">
-              {isLoggedIn ? 'Pro Plan' : 'Sync your recipes'}
+              {isLoggedIn ? (userProfile?.plan || 'Free Plan') : 'Sync your recipes'}
             </p>
           </div>
+        )}
+        
+        {isLoggedIn && !collapsed && (
+          <LogOut className="w-4 h-4 text-stone-400" />
         )}
       </button>
     </div>
   );
 
+  // Show loading spinner while authentication state is being determined
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-stone-50 font-sans text-slate-800 overflow-hidden items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-stone-600">Loading CookMate...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-stone-50 font-sans text-slate-800 overflow-hidden">
 
-      {/* --- Auth Modal (Placeholder for now) --- */}
+      {/* --- Auth Modal (Redirect to auth pages) --- */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={() => setShowAuthModal(false)} />
           <div className="bg-white rounded-2xl p-6 relative z-10 max-w-sm w-full text-center">
             <h2 className="text-xl font-bold mb-2">Sign In Required</h2>
-            <p className="text-stone-500 mb-4">Please go to the Sign In page to access your account.</p>
-            <a href="/signin" className="inline-block bg-orange-600 text-white px-6 py-2 rounded-xl font-medium">Go to Sign In</a>
+            <p className="text-stone-500 mb-4">Please sign in or create an account to save your recipes and chat history.</p>
+            <div className="flex gap-3">
+              <a href="/signin" className="flex-1 bg-orange-600 text-white px-4 py-2 rounded-xl font-medium text-center">Sign In</a>
+              <a href="/signup" className="flex-1 bg-stone-100 text-stone-700 px-4 py-2 rounded-xl font-medium text-center">Sign Up</a>
+            </div>
           </div>
         </div>
       )}
@@ -237,12 +492,27 @@ export default function CookMateChat() {
               <button onClick={createNewSession} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium"><Plus className="w-5 h-5" /><span>New Chat</span></button>
             </div>
             <div className="flex-1 overflow-y-auto px-2">
-              <p className="px-4 text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2 mt-2">Recent</p>
-              {sessions.map((session) => (
-                <div key={session.id} className="p-3 rounded-xl hover:bg-orange-50 cursor-pointer mb-1">
-                  <h4 className="font-medium text-stone-800 text-sm">{session.title}</h4>
-                </div>
-              ))}
+              <p className="px-4 text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2 mt-2">Recent Chats</p>
+              {userSessions.length > 0 ? (
+                userSessions.map((session) => (
+                  <div 
+                    key={session.id} 
+                    onClick={() => loadSession(session.id)}
+                    className={`p-3 rounded-xl cursor-pointer mb-1 transition-colors ${
+                      currentSessionId === session.id 
+                        ? 'bg-orange-100 border border-orange-200' 
+                        : 'hover:bg-orange-50'
+                    }`}
+                  >
+                    <h4 className="font-medium text-stone-800 text-sm truncate">{session.title}</h4>
+                    <p className="text-xs text-stone-400 mt-1">
+                      {formatSessionTime(session.updatedAt)} • {session.messageCount} messages
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="px-4 text-stone-400 text-sm">No saved chats yet</p>
+              )}
             </div>
             <UserAccountFooter collapsed={false} />
           </div>
@@ -269,7 +539,27 @@ export default function CookMateChat() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
-             {/* Sessions map here same as mobile */}
+            <p className="px-2 text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2 mt-2">Recent Chats</p>
+            {userSessions.length > 0 ? (
+              userSessions.map((session) => (
+                <div 
+                  key={session.id} 
+                  onClick={() => loadSession(session.id)}
+                  className={`p-2 rounded-lg cursor-pointer transition-colors ${
+                    currentSessionId === session.id 
+                      ? 'bg-orange-100 border border-orange-200' 
+                      : 'hover:bg-orange-50'
+                  }`}
+                >
+                  <h4 className="font-medium text-stone-800 text-sm truncate">{session.title}</h4>
+                  <p className="text-xs text-stone-400 mt-1">
+                    {formatSessionTime(session.updatedAt)} • {session.messageCount}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="px-2 text-stone-400 text-sm">No saved chats</p>
+            )}
           </div>
           <UserAccountFooter collapsed={sidebarCollapsed} />
         </div>
@@ -296,6 +586,22 @@ export default function CookMateChat() {
                   <div className={`px-5 py-4 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${message.isUser ? 'bg-orange-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-700 rounded-2xl rounded-tl-sm'}`}>
                     {message.text}
                   </div>
+                  
+                  {/* Add save button for recipe responses */}
+                  {!message.isUser && message.text.includes('Time:') && message.text.includes('Ingredients:') && (
+                    <RecipeSaveButton 
+                      recipeData={{
+                        title: message.text.split('\n')[0],
+                        ingredients: message.text.match(/Ingredients:\n• (.+?)\n\n/s)?.[1]?.split('\n• ') || [],
+                        instructions: message.text.match(/Instructions:\n(.+?)(?:\n\n|$)/s)?.[1]?.split('\n').filter(line => line.match(/^\d+\./)) || [],
+                        cookingTime: message.text.match(/⏱️ Time: (.+?) \|/)?.[1] || '',
+                        servings: message.text.match(/🍽️ Servings: (.+?)\n\n/)?.[1] || '',
+                        difficulty: 'Medium'
+                      }}
+                      messageId={message.id}
+                    />
+                  )}
+                  
                   <span className="text-[11px] text-stone-400 mt-1.5 px-1 font-medium">{formatTime(message.timestamp)}</span>
                 </div>
               </div>

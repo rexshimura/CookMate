@@ -18,12 +18,14 @@ const authRoutes = require('./routes/auth');
 const recipeRoutes = require('./routes/recipes');
 const userRoutes = require('./routes/users');
 const aiRoutes = require('./routes/ai');
+const sessionRoutes = require('./routes/sessions');
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/recipes', recipeRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api', sessionRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

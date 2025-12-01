@@ -6,58 +6,122 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
-// 1. API Key: Use env var or hardcoded backup for testing
-const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
+// 1. API Key: Use env var or fallback for testing
+const HF_API_KEY = process.env.HUGGING_FACE_API_KEY || "hf_test_key_replace_in_production";
 
-// 2. Model URL: FIXED to include "/models/"
-// We use Zephyr 7B Beta because it follows instructions better than base Mistral
-const HF_MODEL_URL = "https://router.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
+// 2. Multiple model endpoints for reliability
+const HF_MODELS = [
+  {
+    name: "Zephyr 7B Beta",
+    url: "https://router.huggingface.co/HuggingFaceH4/zephyr-7b-beta",
+    apiUrl: "https://router.huggingface.co/HuggingFaceH4/zephyr-7b-beta"
+  },
+  {
+    name: "Mistral 7B Instruct", 
+    url: "https://router.huggingface.co/mistralai/Mistral-7B-Instruct-v0.1",
+    apiUrl: "https://router.huggingface.co/mistralai/Mistral-7B-Instruct-v0.1"
+  },
+  {
+    name: "Phi-2",
+    url: "https://router.huggingface.co/microsoft/phi-2",
+    apiUrl: "https://router.huggingface.co/microsoft/phi-2"
+  }
+];
+
+// Test which models are working
+let workingModelIndex = 0;
 
 console.log("--- AI SERVICE INITIALIZED ---");
-console.log("Target URL:", HF_MODEL_URL);
-console.log("API Key Status:", HF_API_KEY ? "Present" : "MISSING");
+console.log("Available Models:", HF_MODELS.map(m => m.name));
+console.log("API Key Status:", HF_API_KEY && HF_API_KEY !== "hf_test_key_replace_in_production" ? "Present" : "TEST MODE");
 
-// Helper function to call Hugging Face with better error handling
+// Helper function to call Hugging Face with multiple model fallbacks
 async function callHuggingFace(prompt) {
-  try {
-    const response = await axios.post(
-      HF_MODEL_URL,
-      { 
-        inputs: prompt, 
-        parameters: { 
-          max_new_tokens: 1024,
-          temperature: 0.7,
-          return_full_text: false
-        } 
-      },
-      { 
-        headers: { 
-          Authorization: `Bearer ${HF_API_KEY}`,
-          "Content-Type": "application/json"
-        } 
-      }
-    );
+  // If no API key, use mock response for testing
+  if (!HF_API_KEY || HF_API_KEY === "hf_test_key_replace_in_production") {
+    console.log("🔧 Using mock response (no API key)");
+    return generateMockResponse(prompt);
+  }
+
+  // Try each model until one works
+  for (let i = 0; i < HF_MODELS.length; i++) {
+    const modelIndex = (workingModelIndex + i) % HF_MODELS.length;
+    const model = HF_MODELS[modelIndex];
     
-    if (response.data && response.data.length > 0) {
-      const generatedText = response.data[0].generated_text.trim();
+    try {
+      console.log(`🤖 Trying model: ${model.name}`);
       
-      // Clean up common AI response artifacts
-      return generatedText
-        .replace(/^[\s\n]*(Assistant|CookMate):\s*/i, '')
-        .replace(/^(User| Human):\s*/gi, '')
-        .trim();
+      const response = await axios.post(
+        model.apiUrl,
+        { 
+          inputs: prompt, 
+          parameters: { 
+            max_new_tokens: 1024,
+            temperature: 0.7,
+            return_full_text: false,
+            do_sample: true,
+            top_p: 0.95
+          } 
+        },
+        { 
+          headers: { 
+            Authorization: `Bearer ${HF_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      if (response.data && response.data.length > 0) {
+        const generatedText = response.data[0].generated_text?.trim() || response.data[0].generatedText?.trim();
+        
+        if (generatedText) {
+          workingModelIndex = modelIndex; // Update working model
+          console.log(`✅ Success with model: ${model.name}`);
+          
+          // Clean up common AI response artifacts
+          return generatedText
+            .replace(/^[\s\n]*(Assistant|CookMate):\s*/i, '')
+            .replace(/^(User| Human):\s*/gi, '')
+            .replace(/^[\s\n]*Inst>[\s\n]*/gi, '')
+            .trim();
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ Model ${model.name} failed:`, error.response?.status, error.response?.data?.error || error.message);
+      
+      // If it's a 404 or 422, this model is likely not available, skip it
+      if (error.response?.status === 404 || error.response?.status === 422) {
+        console.log(`🚫 Skipping unavailable model: ${model.name}`);
+        continue;
+      }
+      
+      // For other errors, try the next model
+      continue;
     }
-    return null;
-  } catch (error) {
-    // Log detailed error for debugging
-    console.error("❌ Hugging Face Error:", error.response ? error.response.data : error.message);
-    
-    // Return a fallback response based on prompt type
-    if (prompt.includes('recipe')) {
-      return "I'd love to help you cook something delicious! Could you tell me what ingredients you have available?";
+  }
+  
+  // If all models failed, return a fallback response
+  console.log("❌ All models failed, using fallback response");
+  return generateMockResponse(prompt);
+}
+
+// Generate mock responses for testing when API is unavailable
+function generateMockResponse(prompt) {
+  console.log("🔧 Generating mock response for:", prompt.substring(0, 50) + "...");
+  
+  if (prompt.toLowerCase().includes('recipe') || prompt.includes('ingredients')) {
+    if (prompt.toLowerCase().includes('chicken')) {
+      return "Great choice! Chicken is so versatile. You could make Lemon Herb Chicken, Crispy Chicken Parmesan, or a simple Chicken Stir Fry. Which sounds most appealing to you right now?";
+    } else if (prompt.toLowerCase().includes('rice')) {
+      return "Rice is a fantastic base! You could make Fried Rice, Rice Pilaf, Rice Bowls, or even Rice Pudding. What other ingredients do you have to work with?";
     } else {
-      return "I'm excited to chat about cooking! What ingredients do you have today, or what would you like to cook?";
+      return "I love working with what you have! Here are some ideas:\n\n🥘 **Quick Stir Fry** - Combine with vegetables and your favorite sauce\n🍲 **One-Pot Meal** - Perfect for busy weeknights\n🥗 **Fresh Bowl** - Great with greens and a tasty dressing\n\nWhat sounds most appealing?";
     }
+  } else if (prompt.toLowerCase().includes('hello') || prompt.toLowerCase().includes('hi')) {
+    return "Hello! 👋 I'm CookMate, your personal AI kitchen assistant! I'm here to help you create amazing dishes with whatever ingredients you have. What brings you to the kitchen today?";
+  } else {
+    return "That's interesting! I'd love to help you cook something delicious. Could you tell me what ingredients you have available, or what kind of dish you're in the mood for?";
   }
 }
 
@@ -309,19 +373,39 @@ router.post('/generate-recipe', async (req, res) => {
   }
 });
 
-// 2. Chat Route with Conversation Memory
+// 2. Chat Route with Enhanced Conversation Memory
 router.post('/chat', async (req, res) => {
   try {
     const { message, conversationHistory = [] } = req.body;
     
-    // Create a more contextual conversation prompt
-    const recentHistory = conversationHistory.slice(-4); // Keep last 4 exchanges for context
+    // Create enhanced conversation context
+    const recentHistory = conversationHistory.slice(-6); // Keep last 6 exchanges for better context
     
     let contextPrompt = "";
     if (recentHistory.length > 0) {
       contextPrompt = "Previous conversation:\n" + 
         recentHistory.map(h => `User: ${h.user}\nCookMate: ${h.assistant}`).join('\n\n') + 
         "\n\n";
+    }
+    
+    // Smart conversation mode detection
+    const isInitialGreeting = !recentHistory.length && (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi'));
+    const isIngredientSharing = message.toLowerCase().includes('i have') || 
+                                message.toLowerCase().includes('i\'ve got') ||
+                                message.toLowerCase().includes('available') ||
+                                /rice|chicken|vegetables?|tomato|onion|garlic|eggs?|beef|pork|fish/i.test(message);
+    const isRecipeRequest = message.toLowerCase().includes('recipe') || 
+                           message.toLowerCase().includes('how to make') ||
+                           message.toLowerCase().includes('cook') ||
+                           message.toLowerCase().includes('prepare');
+    
+    let conversationMode = "general";
+    if (isInitialGreeting) {
+      conversationMode = "greeting";
+    } else if (isIngredientSharing) {
+      conversationMode = "ingredient_sharing";
+    } else if (isRecipeRequest) {
+      conversationMode = "recipe_request";
     }
     
     const prompt = `<s>[INST] You are CookMate, an incredibly knowledgeable and passionate AI cooking assistant with the conversational style and depth of ChatGPT. You have extensive culinary knowledge and love helping people create amazing dishes.
@@ -342,31 +426,18 @@ CONVERSATION APPROACH:
 - If users seem inexperienced, offer gentle encouragement and basic explanations
 - If they're more advanced, dive into deeper culinary concepts
 
-RESPONSE QUALITY:
-- Aim for 3-6 sentences that feel natural and helpful
-- Start with direct acknowledgment of their message
-- Provide specific, actionable advice or suggestions
-- End with engaging follow-up questions that advance the conversation
-- For greetings: "Hey there! 👋 What brings you to the kitchen today? Whether you're looking for recipe inspiration or want to work with specific ingredients, I'm excited to help!"
-- For ingredient sharing: "Ooh, that's a great starting point! [ingredient] works really well with [suggest complementary ingredients/cooking methods]. What kind of dish are you in the mood for - something comforting, quick, or maybe something that showcases those ingredients?"
-- For questions: Engage with the question thoughtfully and expand on related cooking concepts
-
-TONE ADAPTABILITY:
-- Match enthusiastic users with equal energy
-- Be more patient and explanatory with beginners
-- Share cooking tips and techniques naturally in conversation
-- Keep responses genuine and helpful, avoiding robotic patterns
-
+CONVERSATION MODE: ${conversationMode}
 ${contextPrompt}User's message: "${message}"
 
-Respond as CookMate with ChatGPT-level conversational quality: [/INST]`;
+Respond as CookMate with ChatGPT-level conversational quality, adapting to the conversation mode: [/INST]`;
     
     const aiReply = await callHuggingFace(prompt);
     
     res.status(200).json({ 
       response: { 
         message: aiReply || "I'm having trouble thinking right now. Try again?", 
-        timestamp: new Date().toISOString() 
+        timestamp: new Date().toISOString(),
+        conversationMode: conversationMode
       } 
     });
   } catch (error) {
