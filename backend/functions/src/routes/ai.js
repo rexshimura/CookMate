@@ -28,132 +28,7 @@ const verifyAuthToken = async (req, res, next) => {
   }
 };
 
-// AI-powered cooking assistant responses
-async function generateIntelligentResponse(message, conversationHistory = []) {
-  // Direct AI response without fallback mechanisms
-  return await callAI(message, conversationHistory, extractIngredients(message));
-}
-
-// Direct AI service integration
-async function callAI(message, history, ingredients) {
-  // Direct call to OpenAI-compatible API (Groq)
-  return await callOpenAICompatibleAPI(message, history, ingredients);
-}
-
-// Hugging Face Inference API (Free models)
-async function callHuggingFaceAPI(message, history, ingredients) {
-  const modelId = "microsoft/DialoGPT-medium"; // Free conversational model
-  const hfToken = process.env.HUGGINGFACE_API_KEY || process.env.HF_API_TOKEN || process.env.HF_TOKEN;
-  
-  const response = await fetch(`https://api-inference.huggingface.co/models/${modelId}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
-    },
-    body: JSON.stringify({
-      inputs: message,
-      parameters: {
-        max_length: 200,
-        temperature: 0.7,
-        do_sample: true
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`HuggingFace API failed: ${response.status}`);
-  }
-  
-  const data = await response.json();
-  return data[0]?.generated_text || "I apologize, but I'm having trouble generating a response right now.";
-}
-
-// OpenAI-compatible API (using free models from Groq)
-async function callOpenAICompatibleAPI(message, history, ingredients) {
-  const apiKey = process.env.GROQ_API_KEY || process.env.GROQ_API_KEY_FALLBACK;
-  
-  const systemMessage = {
-    role: "system",
-    content: "You are CookMate, a helpful AI cooking assistant. Help users with recipes, cooking advice, and ingredient suggestions. Be friendly, informative, and focus on cooking topics. Provide practical, actionable cooking advice."
-  };
-  const conversation = Array.isArray(history) ? history : [];
-  const last = conversation[conversation.length - 1];
-  const includeUserTail = !(last && last.role === 'user' && last.content === message);
-  const messages = [systemMessage, ...conversation, ...(includeUserTail ? [{ role: 'user', content: message }] : [])];
-  
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey || 'demo'}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: "llama3-8b-8192", // Free tier model
-      messages: messages,
-      max_tokens: 150,
-      temperature: 0.7
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Groq API failed: ${response.status}`);
-  }
-  
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "I apologize, but I'm having trouble generating a response right now.";
-}
-
-// Together AI (Free tier)
-async function callTogetherAI(message, history, ingredients) {
-  const apiKey = process.env.TOGETHER_API_KEY || process.env.TOGETHER_API_KEY_FALLBACK;
-  
-  const systemMessage = {
-    role: "system",
-    content: "You are CookMate, a cooking assistant. Help with recipes and cooking advice. Be helpful and focused on cooking topics."
-  };
-  const conversation = Array.isArray(history) ? history : [];
-  const last = conversation[conversation.length - 1];
-  const includeUserTail = !(last && last.role === 'user' && last.content === message);
-  const messages = [systemMessage, ...conversation, ...(includeUserTail ? [{ role: 'user', content: message }] : [])];
-  
-  const response = await fetch("https://api.together.xyz/v1/chat/completions", {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey || 'demo'}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: "togethercomputer/RedPajama-INCITE-Chat-3B-v1", // Free model
-      messages: messages,
-      max_tokens: 150,
-      temperature: 0.7
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Together AI failed: ${response.status}`);
-  }
-  
-  const data = await response.json();
-  return data.choices[0]?.message?.content || "I apologize, but I'm having trouble generating a response right now.";
-}
-
-// Content detection function
-function isOffTopic(message) {
-  const lowerMessage = message.toLowerCase();
-  
-  const offTopicKeywords = [
-    'politics', 'religion', 'sports', 'gaming', 'technology', 'programming', 
-    'coding', 'software', 'apps', 'movies', 'music', 'entertainment', 
-    'celebrities', 'relationships', 'dating', 'work', 'job', 'school',
-    'math', 'science', 'history', 'news', 'stocks', 'investing'
-  ];
-  
-  return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
-}
-
-// Smart ingredient extraction
+// Smart ingredient extraction (keeping this useful feature)
 function extractIngredients(message) {
   const ingredientPatterns = [
     /\b(chicken|beef|pork|lamb|turkey|fish|salmon|shrimp|tuna|tofu|eggs?)\b/gi,
@@ -179,135 +54,86 @@ function extractIngredients(message) {
   return Array.from(foundIngredients);
 }
 
-// Dynamic contextual response generator
-function generateContextualResponse(message, ingredients, lowerMessage) {
-  // Generate dynamic responses based on detected context and ingredients
-  
-  // Ingredient-based intelligent responses
-  if (ingredients.length > 0) {
-    const ingredientList = ingredients.slice(0, 3).join(', ');
-    const moreIngredients = ingredients.length > 3 ? ` and ${ingredients.length - 3} more ingredients` : '';
-    
-    if (lowerMessage.includes('recipe') || lowerMessage.includes('cook') || lowerMessage.includes('make')) {
-      return `I can create something delicious with your ${ingredientList}${moreIngredients}! Each ingredient brings its own unique flavors and textures. What cooking style appeals to you right now - something quick and simple, or are you in the mood for a more elaborate preparation?`;
-    }
-    
-    if (lowerMessage.includes('suggest') || lowerMessage.includes('recommend')) {
-      return `Based on your ${ingredientList}${moreIngredients}, I see some great potential combinations! You could create a balanced meal by pairing proteins with vegetables and adding some healthy fats. What type of cuisine or flavor profile are you craving?`;
-    }
-    
-    if (lowerMessage.includes('combine') || lowerMessage.includes('mix')) {
-      return `Your ingredients offer wonderful possibilities for combination! ${ingredientList} can create either a harmonious single-pan dish or be served as complementary parts of a complete meal. How are you feeling about complexity level - simple and comforting, or something more sophisticated?`;
-    }
-  }
-  
-  // Greeting and help responses
-  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
-    return generatePersonalizedGreeting(ingredients);
-  }
-  
-  if (lowerMessage.includes('help') || lowerMessage.includes('how') || lowerMessage.includes('what can')) {
-    return `I'm your personalized cooking companion! I can analyze what ingredients you have, suggest creative recipes, provide cooking techniques, help with substitutions, and even plan complete meals. Just tell me what you're working with or what you'd like to create!`;
-  }
-  
-  // Cooking method queries
-  if (lowerMessage.includes('bake') || lowerMessage.includes('roast')) {
-    return `Baking and roasting are fantastic methods! Baking works great for breads, cakes, and casseroles, while roasting brings out incredible flavors in vegetables and meats. What would you like to bake or roast?`;
-  }
-  
-  if (lowerMessage.includes('saute') || lowerMessage.includes('fry') || lowerMessage.includes('stir fry')) {
-    return `Quick cooking methods like sautéing and stir-frying are perfect for preserving nutrients and creating vibrant flavors! They're ideal for vegetables and proteins. What ingredients are you planning to cook this way?`;
-  }
-  
-  if (lowerMessage.includes('soup') || lowerMessage.includes('stew')) {
-    return `Soups and stews are wonderful comfort foods that can accommodate many ingredients! They're perfect for using up leftovers and creating hearty, nutritious meals. What base are you thinking - broth-based, creamy, or hearty?`;
-  }
-  
-  // Dietary and preference responses
-  if (lowerMessage.includes('healthy') || lowerMessage.includes('diet')) {
-    return `I'd love to help you create healthy, delicious meals! I can suggest nutrient-dense combinations, lighter cooking methods, and balanced macronutrients. What are your specific health goals or dietary preferences?`;
-  }
-  
-  if (lowerMessage.includes('quick') || lowerMessage.includes('easy') || lowerMessage.includes('fast')) {
-    return `Quick and easy cooking is one of my specialties! I can suggest simple techniques, minimal ingredient dishes, and time-saving methods that don't sacrifice flavor. What are you in the mood for that won't take too long?`;
-  }
-  
-  if (lowerMessage.includes('vegetarian') || lowerMessage.includes('vegan') || lowerMessage.includes('gluten free')) {
-    return `I can definitely help with dietary preferences! There are so many wonderful plant-based proteins, gluten-free grains, and creative alternatives to explore. What specific dietary needs are you working with?`;
-  }
-  
-  // Default contextual response
-  return generateDynamicDefaultResponse(ingredients, lowerMessage);
-}
-
-// Generate personalized greeting based on available ingredients
-function generatePersonalizedGreeting(ingredients) {
-  if (ingredients.length === 0) {
-    return `Hello! I'm excited to help you create something delicious today. Do you have any ingredients in your kitchen that you'd like to use, or are you looking for inspiration for your next meal?`;
-  }
-  
-  const ingredientList = ingredients.slice(0, 2).join(' and ');
-  const moreIngredients = ingredients.length > 2 ? ` (plus ${ingredients.length - 2} more)` : '';
-  
-  return `Hello! I see you have ${ingredientList}${moreIngredients} - that's a great foundation for something delicious! What kind of dish are you thinking of creating today?`;
-}
-
-// Generate dynamic default responses
-function generateDynamicDefaultResponse(ingredients, lowerMessage) {
-  if (ingredients.length > 0) {
-    const suggestion = `With your ${ingredients.length} ingredient${ingredients.length > 1 ? 's' : ''}, you could create something wonderfully creative`;
-    
-    if (lowerMessage.includes('?')) {
-      return `${suggestion}! I'm here to help answer any cooking questions you have. What specifically would you like to know about cooking or meal preparation?`;
-    }
-    
-    return `${suggestion}. What kind of dish or cooking style interests you most right now?`;
-  }
-  
-  return `I'm here to help you create amazing dishes! Whether you have specific ingredients to work with, want cooking techniques, need recipe ideas, or have questions about food preparation - I'm your cooking companion. What would you like to explore in the kitchen today?`;
-}
-
-// Intelligent fallback when all AI services fail
-async function generateIntelligentFallback(message, ingredients) {
+// Content detection function
+function isOffTopic(message) {
   const lowerMessage = message.toLowerCase();
   
-  // Use the same dynamic response system
-  return generateContextualResponse(message, ingredients, lowerMessage);
+  const offTopicKeywords = [
+    'politics', 'religion', 'sports', 'gaming', 'technology', 'programming', 
+    'coding', 'software', 'apps', 'movies', 'music', 'entertainment', 
+    'celebrities', 'relationships', 'dating', 'work', 'job', 'school',
+    'math', 'science', 'history', 'news', 'stocks', 'investing'
+  ];
+  
+  return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
-// AI-powered recipe generation
-async function generateSmartRecipe(ingredients, dietaryPreferences = '') {
-  // Use AI to generate dynamic recipe
-  const ingredientList = ingredients.join(', ');
-  const dietaryNote = dietaryPreferences ? ` Dietary preferences: ${dietaryPreferences}.` : '';
+// Groq AI API - Single ChatGPT-like service
+async function callGroqAI(message, conversationHistory = []) {
+  const apiKey = process.env.GROQ_API_KEY;
   
-  const recipePrompt = `Create a delicious recipe using these ingredients: ${ingredientList}.${dietaryNote}
-  
-  Provide the response in valid JSON format with the following structure:
-  {
-    "title": "Recipe Name",
-    "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
-    "instructions": ["Step 1 description", "Step 2 description"],
-    "cookingTime": "e.g. 30 minutes",
-    "servings": "e.g. 4",
-    "difficulty": "Easy/Medium/Hard"
+  // Check if API key is provided
+  if (!apiKey || apiKey === 'your_groq_api_key_here' || apiKey.trim() === '') {
+    throw new Error('GROQ_API_KEY environment variable is required. Please get a free API key from https://console.groq.com/ and add it to your .env file.');
   }
-  Do not add any text outside the JSON object.`;
+
+  const systemMessage = {
+    role: "system",
+    content: "You are CookMate, a helpful AI cooking assistant. Help users with recipes, cooking advice, meal planning, and ingredient suggestions. Be friendly, informative, and focus on cooking topics. Provide practical, actionable cooking advice. When users mention ingredients, acknowledge them and suggest creative ways to use them. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking."
+  };
   
-  const aiResponse = await callAI(recipePrompt, [], ingredients);
+  // Prepare conversation messages
+  const conversation = Array.isArray(conversationHistory) ? conversationHistory : [];
+  const messages = [systemMessage];
   
-  // Parse JSON response from AI
-  const jsonStart = aiResponse.indexOf('{');
-  const jsonEnd = aiResponse.lastIndexOf('}');
-  if (jsonStart !== -1 && jsonEnd !== -1) {
-    const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
-    return JSON.parse(jsonString);
+  // Add conversation history (limit to last 10 messages to manage token count)
+  const recentHistory = conversation.slice(-10);
+  messages.push(...recentHistory);
+  
+  // Add current user message if not already included
+  const lastMessage = recentHistory[recentHistory.length - 1];
+  const includeUserMessage = !(lastMessage && lastMessage.role === 'user' && lastMessage.content === message);
+  
+  if (includeUserMessage) {
+    messages.push({
+      role: 'user',
+      content: message
+    });
   }
   
-  throw new Error('Failed to parse AI recipe response');
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant", // Current free tier model
+      messages: messages,
+      max_tokens: 200,
+      temperature: 0.7,
+      top_p: 0.9,
+      stream: false
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error('Groq API Error:', response.status, errorData);
+    throw new Error(`Groq API request failed: ${response.status} - ${errorData}`);
+  }
+  
+  const data = await response.json();
+  const aiResponse = data.choices[0]?.message?.content;
+  
+  if (!aiResponse) {
+    throw new Error('No response generated from Groq API');
+  }
+  
+  return aiResponse;
 }
 
-// CHAT ENDPOINT - Enhanced with AI
+// CHAT ENDPOINT - ChatGPT-like interface
 router.post('/chat', verifyAuthToken, async (req, res) => {
   try {
     const { message, history, sessionId } = req.body;
@@ -329,8 +155,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       });
     }
     
-    // Generate intelligent AI response
-    const aiReply = await generateIntelligentResponse(message, history);
+    // Generate AI response using Groq
+    const aiReply = await callGroqAI(message, history);
     
     res.status(200).json({
       response: {
@@ -343,14 +169,30 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
   } catch (error) {
     console.error('Chat error:', error);
-    res.status(500).json({ 
-      error: 'Chat service temporarily unavailable. Please try again.',
-      message: "I'm having a technical issue right now. Can you try asking that again?"
+    
+    // Provide helpful error messages
+    if (error.message.includes('GROQ_API_KEY')) {
+      return res.status(500).json({
+        error: 'API_KEY_REQUIRED',
+        message: 'Groq API key is required. Please get a free API key from https://console.groq.com/ and add it to your .env file as GROQ_API_KEY.',
+        instructions: {
+          step1: 'Visit https://console.groq.com/',
+          step2: 'Create a free account',
+          step3: 'Generate an API key',
+          step4: 'Add it to your .env file as GROQ_API_KEY=your_key_here'
+        }
+      });
+    }
+    
+    res.status(500).json({
+      error: 'CHAT_SERVICE_ERROR',
+      message: 'AI service temporarily unavailable. Please try again later.',
+      details: error.message
     });
   }
 });
 
-// GENERATE RECIPE ENDPOINT
+// GENERATE RECIPE ENDPOINT - Enhanced with real AI
 router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
   try {
     const { userMessage, ingredients: providedIngredients, dietaryPreferences, recipeType } = req.body;
@@ -362,10 +204,64 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       ingredients = extractIngredients(userMessage);
     }
     
-    const recipeData = await generateSmartRecipe(ingredients, dietaryPreferences);
+    // Create a detailed prompt for recipe generation
+    let recipePrompt = `Create a delicious recipe`;
+    
+    if (ingredients && ingredients.length > 0) {
+      recipePrompt += ` using these ingredients: ${ingredients.join(', ')}`;
+    }
+    
+    if (dietaryPreferences) {
+      recipePrompt += `. Dietary preferences: ${dietaryPreferences}`;
+    }
+    
+    if (recipeType) {
+      recipePrompt += `. Recipe type: ${recipeType}`;
+    }
+    
+    recipePrompt += `. Please provide the recipe in this JSON format:
+{
+  "title": "Recipe Name",
+  "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
+  "instructions": ["Step 1 description", "Step 2 description"],
+  "cookingTime": "e.g. 30 minutes",
+  "servings": "e.g. 4",
+  "difficulty": "Easy/Medium/Hard",
+  "description": "Brief appetizing description"
+}
+
+Only return the JSON, no additional text.`;
+
+    // Generate recipe using Groq
+    const aiResponse = await callGroqAI(recipePrompt);
+    
+    // Parse JSON response from AI
+    let recipeData;
+    try {
+      const jsonStart = aiResponse.indexOf('{');
+      const jsonEnd = aiResponse.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+        recipeData = JSON.parse(jsonString);
+      } else {
+        throw new Error('No JSON found in response');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI recipe response:', parseError);
+      // Fallback to basic recipe structure
+      recipeData = {
+        title: "AI Generated Recipe",
+        ingredients: ingredients || ["Please specify ingredients"],
+        instructions: aiResponse.split('\n').filter(line => line.trim()),
+        cookingTime: "Varies",
+        servings: "4",
+        difficulty: "Medium",
+        description: aiResponse
+      };
+    }
     
     res.status(200).json({
-      message: 'Recipe generated successfully',
+      message: 'Recipe generation successful',
       recipe: recipeData,
       detectedIngredients: ingredients,
       userId: req.userId
@@ -373,19 +269,60 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
     
   } catch (error) {
     console.error('Recipe generation error:', error);
-    res.status(500).json({ 
-      error: 'Recipe generation failed',
-      message: "I'm having trouble creating that recipe. Can you try again?"
+    
+    if (error.message.includes('GROQ_API_KEY')) {
+      return res.status(500).json({
+        error: 'API_KEY_REQUIRED',
+        message: 'Groq API key is required for recipe generation. Please get a free API key from https://console.groq.com/'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'RECIPE_GENERATION_FAILED',
+      message: "I'm having trouble creating that recipe. Can you try again?",
+      details: error.message
     });
   }
 });
 
-// SUGGEST INGREDIENTS ENDPOINT
+// SUGGEST INGREDIENTS ENDPOINT - Enhanced with AI suggestions
 router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
   try {
     const { availableIngredients } = req.body;
     
-    // Generate intelligent ingredient suggestions based on available ingredients
+    // If we have available ingredients, use AI to suggest complementary ingredients
+    if (availableIngredients && availableIngredients.length > 0) {
+      try {
+        const prompt = `I have these ingredients: ${availableIngredients.join(', ')}. Suggest 5-7 complementary ingredients that would go well with them for cooking. Return only a JSON array of ingredient strings.`;
+        
+        const aiResponse = await callGroqAI(prompt);
+        
+        // Try to parse AI suggestions
+        let aiSuggestions = [];
+        try {
+          const jsonStart = aiResponse.indexOf('[');
+          const jsonEnd = aiResponse.lastIndexOf(']');
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+            aiSuggestions = JSON.parse(jsonString);
+          }
+        } catch (parseError) {
+          console.log('Failed to parse AI suggestions, using fallback');
+        }
+        
+        if (aiSuggestions.length > 0) {
+          return res.status(200).json({
+            suggestions: aiSuggestions,
+            message: 'AI-generated ingredient suggestions',
+            userId: req.userId
+          });
+        }
+      } catch (aiError) {
+        console.log('AI suggestion failed, using fallback:', aiError.message);
+      }
+    }
+    
+    // Fallback to rule-based suggestions
     const available = availableIngredients.map(ing => ing.toLowerCase());
     const suggestions = [];
     
@@ -411,13 +348,6 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
       suggestions.push('Garlic', 'Olive Oil', 'Salt', 'Black Pepper', 'Fresh Herbs');
     }
     
-    // Add dietary preference suggestions if provided
-    if (dietaryPreferences && dietaryPreferences.toLowerCase().includes('vegan')) {
-      suggestions.push('Nutritional Yeast', 'Turmeric', 'Coconut Milk');
-    } else if (dietaryPreferences && dietaryPreferences.toLowerCase().includes('vegetarian')) {
-      suggestions.push('Parmesan', 'Mozzarella', 'Fresh Basil');
-    }
-    
     res.status(200).json({
       suggestions,
       message: 'Smart ingredient suggestions generated',
@@ -426,8 +356,8 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
     
   } catch (error) {
     console.error('Ingredient suggestion error:', error);
-    res.status(500).json({ 
-      error: 'Suggestion generation failed',
+    res.status(500).json({
+      error: 'SUGGESTION_GENERATION_FAILED',
       suggestions: ['Garlic', 'Olive Oil', 'Salt', 'Black Pepper', 'Herbs']
     });
   }
