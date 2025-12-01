@@ -29,7 +29,7 @@ const verifyAuthToken = async (req, res, next) => {
 
 const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
 // Default to Mistral-7B-Instruct if not set in .env
-const HF_MODEL_URL = process.env.HUGGING_FACE_MODEL_URL || "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
+const HF_MODEL_URL = process.env.HUGGING_FACE_MODEL_URL || "https://router.huggingface.co/mistralai/Mistral-7B-Instruct-v0.2";
 
 // Helper function to call Hugging Face
 async function callHuggingFace(prompt) {

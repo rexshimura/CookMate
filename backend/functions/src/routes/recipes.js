@@ -1,57 +1,67 @@
 const express = require('express');
 const router = express.Router();
+const { db } = require('../config/firebase');
 
-// Recipe management routes
-// TODO: Implement Firestore integration for recipe storage
-// TODO: Add recipe CRUD operations and filtering
-
+// GET all recipes
 router.get('/', async (req, res) => {
   try {
-    // TODO: Get recipes from Firestore
-    // TODO: Apply filters (dietary preferences, ingredients, etc.)
-    res.status(200).json({ message: 'Get all recipes', recipes: [] });
+    const snapshot = await db.collection('recipes').orderBy('createdAt', 'desc').get();
+    const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).json({ recipes });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// CREATE a new recipe
 router.post('/', async (req, res) => {
   try {
-    const recipe = req.body;
-    // TODO: Save recipe to Firestore
-    // TODO: Return saved recipe with ID
-    res.status(201).json({ message: 'Recipe created', recipe: recipe });
+    const { title, ingredients, instructions, userId, cookingTime, servings, difficulty } = req.body;
+    
+    // Create a clean recipe object
+    const newRecipe = {
+      title: title || "Untitled Recipe",
+      ingredients: ingredients || [],
+      instructions: instructions || [],
+      userId: userId || 'anonymous',
+      cookingTime: cookingTime || "Unknown",
+      servings: servings || "Varies",
+      difficulty: difficulty || "Medium",
+      createdAt: new Date().toISOString(),
+      likes: 0
+    };
+
+    // Save to Firestore
+    const docRef = await db.collection('recipes').add(newRecipe);
+    
+    res.status(201).json({ 
+      message: 'Recipe created successfully', 
+      id: docRef.id, 
+      ...newRecipe 
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
+// GET a single recipe by ID
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    // TODO: Get recipe by ID from Firestore
-    res.status(200).json({ message: `Get recipe ${id}` });
+    const doc = await db.collection('recipes').doc(req.params.id).get();
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    res.status(200).json({ id: doc.id, ...doc.data() });
   } catch (error) {
-    res.status(404).json({ error: 'Recipe not found' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-    // TODO: Update recipe in Firestore
-    res.status(200).json({ message: `Recipe ${id} updated` });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
+// DELETE a recipe
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    // TODO: Delete recipe from Firestore
-    res.status(200).json({ message: `Recipe ${id} deleted` });
+    await db.collection('recipes').doc(req.params.id).delete();
+    res.status(200).json({ message: 'Recipe deleted successfully' });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

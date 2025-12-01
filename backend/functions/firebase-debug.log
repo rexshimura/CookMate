@@ -1,0 +1,175 @@
+[debug] [2025-12-01T06:17:06.431Z] ----------------------------------------------------------------------
+[debug] [2025-12-01T06:17:06.434Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
+[debug] [2025-12-01T06:17:06.434Z] CLI Version:   14.26.0
+[debug] [2025-12-01T06:17:06.434Z] Platform:      win32
+[debug] [2025-12-01T06:17:06.434Z] Node Version:  v22.18.0
+[debug] [2025-12-01T06:17:06.435Z] Time:          Mon Dec 01 2025 14:17:06 GMT+0800 (Philippine Standard Time)
+[debug] [2025-12-01T06:17:06.435Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-01T06:17:06.725Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-01T06:17:06.725Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-12-01T06:17:06.735Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:17:06.735Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-12-01T06:17:06.741Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-01T06:17:06.741Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-01T06:17:06.772Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:17:06.773Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:17:06.773Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:17:06.773Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2025-12-01T06:17:06.800Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
+[debug] [2025-12-01T06:17:06.801Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
+[debug] [2025-12-01T06:17:06.802Z] Checked if tokens are valid: true, expires at: 1764571342953
+[debug] [2025-12-01T06:17:06.802Z] Checked if tokens are valid: true, expires at: 1764571342953
+[debug] [2025-12-01T06:17:06.803Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
+[debug] [2025-12-01T06:17:07.191Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
+[debug] [2025-12-01T06:17:07.192Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
+[info] i  functions: Watching "C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\" for Cloud Functions..."}}
+[debug] [2025-12-01T06:17:07.233Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-01T06:17:08.813Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "@types/node": "^18.0.0"
+  }
+}
+[debug] [2025-12-01T06:17:08.814Z] Building nodejs source
+[debug] [2025-12-01T06:17:08.814Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-12-01T06:17:08.817Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
+[debug] [2025-12-01T06:17:08.817Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T06:17:08.817Z] Failed to validate key FIREBASE_PRIVATE_KEY: Error: Key FIREBASE_PRIVATE_KEY starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T06:17:08.817Z] Failed to validate key FIREBASE_CLIENT_EMAIL: Error: Key FIREBASE_CLIENT_EMAIL starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
+[debug] [2025-12-01T06:17:08.829Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[debug] [2025-12-01T06:26:24.620Z] ----------------------------------------------------------------------
+[debug] [2025-12-01T06:26:24.622Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
+[debug] [2025-12-01T06:26:24.623Z] CLI Version:   14.26.0
+[debug] [2025-12-01T06:26:24.623Z] Platform:      win32
+[debug] [2025-12-01T06:26:24.623Z] Node Version:  v22.18.0
+[debug] [2025-12-01T06:26:24.623Z] Time:          Mon Dec 01 2025 14:26:24 GMT+0800 (Philippine Standard Time)
+[debug] [2025-12-01T06:26:24.623Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-12-01T06:26:24.876Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-01T06:26:24.876Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
+[info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
+[debug] [2025-12-01T06:26:24.888Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:26:24.888Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-12-01T06:26:24.893Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[warn] !  emulators: It seems that you are running multiple instances of the emulator suite for project cookmate-cc941. This may result in unexpected behavior. 
+[debug] [2025-12-01T06:26:24.893Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-01T06:26:24.914Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:26:24.914Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:26:24.914Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-01T06:26:24.914Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
+[debug] [2025-12-01T06:26:24.930Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
+[debug] [2025-12-01T06:26:24.933Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
+[debug] [2025-12-01T06:26:24.934Z] Checked if tokens are valid: true, expires at: 1764571342953
+[debug] [2025-12-01T06:26:24.934Z] Checked if tokens are valid: true, expires at: 1764571342953
+[debug] [2025-12-01T06:26:24.935Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
+[debug] [2025-12-01T06:26:25.334Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
+[debug] [2025-12-01T06:26:25.334Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
+[info] i  functions: Watching "C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\" for Cloud Functions..."}}
+[debug] [2025-12-01T06:26:25.372Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-01T06:26:26.833Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "@types/node": "^18.0.0"
+  }
+}
+[debug] [2025-12-01T06:26:26.833Z] Building nodejs source
+[debug] [2025-12-01T06:26:26.834Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-12-01T06:26:26.836Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
+[debug] [2025-12-01T06:26:26.836Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T06:26:26.836Z] Failed to validate key FIREBASE_PRIVATE_KEY: Error: Key FIREBASE_PRIVATE_KEY starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[debug] [2025-12-01T06:26:26.836Z] Failed to validate key FIREBASE_CLIENT_EMAIL: Error: Key FIREBASE_CLIENT_EMAIL starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
+[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
+[debug] [2025-12-01T06:26:26.848Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+│ i  View Emulator UI at http://127.0.0.1:4000/               │
+└─────────────────────────────────────────────────────────────┘
+
+┌───────────┬────────────────┬─────────────────────────────────┐
+│ Emulator  │ Host:Port      │ View in Emulator UI             │
+├───────────┼────────────────┼─────────────────────────────────┤
+│ Functions │ 127.0.0.1:5001 │ http://127.0.0.1:4000/functions │
+└───────────┴────────────────┴─────────────────────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 

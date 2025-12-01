@@ -35,7 +35,7 @@ const HF_API_KEY = process.env.HUGGING_FACE_API_KEY;
 async function callHuggingFace(prompt) {
   try {
     const response = await axios.post(
-      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+      'https://router.huggingface.co/mistralai/Mistral-7B-Instruct-v0.2',
       { 
         inputs: prompt, 
         parameters: { 
