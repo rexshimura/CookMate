@@ -191,8 +191,14 @@ export const useSessionChat = (sessionId) => {
       // Save user message to database
       await saveMessage(sessionId, userMessage);
 
-      // Get AI response
-      const aiResponse = await chatWithAI(messageText, sessionId);
+      // Prepare short conversation history for context (last 10 messages)
+      const history = [...messages, userMessage].slice(-10).map(m => ({
+        role: m.isUser ? 'user' : 'assistant',
+        content: m.text
+      }));
+
+      // Get AI response with conversation history for better context
+      const aiResponse = await chatWithAI(messageText, sessionId, history);
       
       if (aiResponse && aiResponse.response) {
         const aiMessage = {

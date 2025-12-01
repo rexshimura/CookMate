@@ -1,7 +1,27 @@
 // API utility functions for backend communication
 import { auth } from '../firebase';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/cookmate-cc941/us-central1/api';
+// Smart API base URL detection
+const getApiBaseUrl = () => {
+  // 1. Check if explicitly set in environment variables
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // 2. Auto-detect based on development vs production
+  if (import.meta.env.DEV) {
+    // Development: Check if dev-server is running on port 5002
+    return 'http://localhost:5002';
+  } else {
+    // Production: Use Firebase Functions
+    return 'http://localhost:5001/cookmate-cc941/us-central1/api';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log the detected API URL for debugging
+console.log('🍳 CookMate API URL:', API_BASE_URL, 'Environment:', import.meta.env.DEV ? 'Development' : 'Production');
 
 // Generic API call function
 async function apiCall(endpoint, options = {}) {
@@ -42,10 +62,11 @@ async function apiCall(endpoint, options = {}) {
 }
 
 // AI Chat API
-export const chatWithAI = async (message, sessionId = null) => {
+export const chatWithAI = async (message, sessionId = null, history = null) => {
   const payload = {
     message,
     ...(sessionId && { sessionId }),
+    ...(Array.isArray(history) && history.length > 0 ? { history } : {}),
   };
   
   return apiCall('/ai/chat', {
