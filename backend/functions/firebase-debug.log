@@ -1,35 +1,40 @@
-[debug] [2025-12-02T22:43:15.715Z] ----------------------------------------------------------------------
-[debug] [2025-12-02T22:43:15.717Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
-[debug] [2025-12-02T22:43:15.718Z] CLI Version:   14.26.0
-[debug] [2025-12-02T22:43:15.718Z] Platform:      win32
-[debug] [2025-12-02T22:43:15.718Z] Node Version:  v22.18.0
-[debug] [2025-12-02T22:43:15.718Z] Time:          Wed Dec 03 2025 06:43:15 GMT+0800 (Philippine Standard Time)
-[debug] [2025-12-02T22:43:15.718Z] ----------------------------------------------------------------------
+[debug] [2025-12-02T23:18:24.685Z] ----------------------------------------------------------------------
+[debug] [2025-12-02T23:18:24.687Z] Command:       C:\nvm4w\nodejs\node.exe C:\nvm4w\nodejs\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --only functions
+[debug] [2025-12-02T23:18:24.688Z] CLI Version:   14.26.0
+[debug] [2025-12-02T23:18:24.688Z] Platform:      win32
+[debug] [2025-12-02T23:18:24.688Z] Node Version:  v22.18.0
+[debug] [2025-12-02T23:18:24.688Z] Time:          Wed Dec 03 2025 07:18:24 GMT+0800 (Philippine Standard Time)
+[debug] [2025-12-02T23:18:24.688Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2025-12-02T22:43:15.927Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2025-12-02T22:43:15.928Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
+[debug] [2025-12-02T23:18:24.918Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-12-02T23:18:24.918Z] > authorizing via signed-in user (magdasaljohnmark29@gmail.com)
 [info] i  emulators: Starting emulators: functions {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: functions"}}
-[debug] [2025-12-02T22:43:15.935Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-12-02T22:43:15.936Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
-[debug] [2025-12-02T22:43:15.939Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
-[debug] [2025-12-02T22:43:15.940Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
-[debug] [2025-12-02T22:43:15.957Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-12-02T22:43:15.957Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-12-02T22:43:15.957Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
-[debug] [2025-12-02T22:43:15.957Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
+[debug] [2025-12-02T23:18:24.928Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-02T23:18:24.928Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[debug] [2025-12-02T23:18:24.932Z] Emulator locator file path: C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-02T23:18:24.932Z] [hub] writing locator at C:\Users\JOHNMA~1\AppData\Local\Temp\hub-cookmate-cc941.json
+[debug] [2025-12-02T23:18:24.950Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-02T23:18:24.951Z] [eventarc] Eventarc Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-02T23:18:24.951Z] [tasks] Cloud Tasks Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-12-02T23:18:24.951Z] late-assigned ports for functions and eventarc emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"ui":[{"address":"127.0.0.1","family":"IPv4","port":4000},{"address":"::1","family":"IPv6","port":4000}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"functions":[{"address":"127.0.0.1","family":"IPv4","port":5001}],"eventarc":[{"address":"127.0.0.1","family":"IPv4","port":9299}],"tasks":[{"address":"127.0.0.1","family":"IPv4","port":9499}]},"metadata":{"message":"late-assigned ports for functions and eventarc emulators"}}
 [warn] !  functions: The following emulators are not running, calls to these services from the Functions emulator will affect production: apphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect {"metadata":{"emulator":{"name":"functions"},"message":"The following emulators are not running, calls to these services from the Functions emulator will affect production: \u001b[1mapphosting, auth, firestore, database, hosting, pubsub, storage, dataconnect\u001b[22m"}}
-[debug] [2025-12-02T22:43:15.971Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
-[debug] [2025-12-02T22:43:15.974Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
-[debug] [2025-12-02T22:43:15.975Z] Checked if tokens are valid: true, expires at: 1764718132406
-[debug] [2025-12-02T22:43:15.975Z] Checked if tokens are valid: true, expires at: 1764718132406
-[debug] [2025-12-02T22:43:15.976Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
-[debug] [2025-12-02T22:43:16.368Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
-[debug] [2025-12-02T22:43:16.369Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
+[debug] [2025-12-02T23:18:24.964Z] defaultcredentials: writing to file C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json
+[debug] [2025-12-02T23:18:24.965Z] Setting GAC to C:\Users\JOHN MARK MAGDASAL\AppData\Roaming\firebase\magdasaljohnmark29_gmail_com_application_default_credentials.json {"metadata":{"emulator":{"name":"functions"},"message":"Setting GAC to C:\\Users\\JOHN MARK MAGDASAL\\AppData\\Roaming\\firebase\\magdasaljohnmark29_gmail_com_application_default_credentials.json"}}
+[debug] [2025-12-02T23:18:24.967Z] Checked if tokens are valid: false, expires at: 1764718132406
+[debug] [2025-12-02T23:18:24.967Z] Checked if tokens are valid: false, expires at: 1764718132406
+[debug] [2025-12-02T23:18:24.967Z] > refreshing access token with scopes: []
+[debug] [2025-12-02T23:18:24.969Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-12-02T23:18:24.969Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-02T23:18:25.159Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-12-02T23:18:25.159Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-12-02T23:18:25.178Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig [none]
+[debug] [2025-12-02T23:18:25.608Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig 200
+[debug] [2025-12-02T23:18:25.608Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/cookmate-cc941/adminSdkConfig {"projectId":"cookmate-cc941","storageBucket":"cookmate-cc941.firebasestorage.app"}
 [info] i  functions: Watching "C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions" for Cloud Functions... {"metadata":{"emulator":{"name":"functions"},"message":"Watching \"C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\" for Cloud Functions..."}}
-[debug] [2025-12-02T22:43:16.400Z] Validating nodejs source
+[debug] [2025-12-02T23:18:25.641Z] Validating nodejs source
 [warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
 [warn] !  functions: Please note that there will be breaking changes when you upgrade. 
-[debug] [2025-12-02T22:43:17.699Z] > [functions] package.json contents: {
+[debug] [2025-12-02T23:18:26.764Z] > [functions] package.json contents: {
   "name": "cookmate-backend",
   "version": "1.0.0",
   "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
@@ -64,17 +69,18 @@
     "firebase-functions-test": "^3.1.0"
   }
 }
-[debug] [2025-12-02T22:43:17.699Z] Building nodejs source
-[debug] [2025-12-02T22:43:17.700Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[debug] [2025-12-02T23:18:26.765Z] Building nodejs source
+[debug] [2025-12-02T23:18:26.765Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
 [warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key FIREBASE_PROJECT_ID: Error: Key FIREBASE_PROJECT_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key FIREBASE_STORAGE_BUCKET: Error: Key FIREBASE_STORAGE_BUCKET starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key FIREBASE_MESSAGING_SENDER_ID: Error: Key FIREBASE_MESSAGING_SENDER_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key FIREBASE_APP_ID: Error: Key FIREBASE_APP_ID starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key FIREBASE_ADMIN_CREDENTIALS: Error: Key FIREBASE_ADMIN_CREDENTIALS starts with a reserved prefix (X_GOOGLE_ FIREBASE_ EXT_)
-[debug] [2025-12-02T22:43:17.702Z] Failed to validate key PORT: Error: Key PORT is reserved for internal use.
-[error] !!  functions: Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env. {"metadata":{"emulator":{"name":"functions"},"message":"Failed to load function definition from source: FirebaseError: Failed to load environment variables from .env."}}
-[debug] [2025-12-02T22:43:17.708Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] i  functions: You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly 
+[debug] [2025-12-02T23:18:26.768Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-12-02T23:18:26.775Z] Found firebase-functions binary at 'C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\node_modules\.bin\firebase-functions'
+[info] Serving at port 8148
+
+[debug] [2025-12-02T23:18:27.765Z] Got response from /__/functions.yaml {"endpoints":{"api":{"platform":"gcfv1","availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"serviceAccountEmail":null,"vpc":null,"httpsTrigger":{},"entryPoint":"api"}},"specVersion":"v1alpha1","requiredAPIs":[]}
+[info] +  functions: Loaded functions definitions from source: api. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api."}}
+[info] +  functions[us-central1-api]: http function initialized (http://127.0.0.1:5001/cookmate-cc941/us-central1/api). {"metadata":{"emulator":{"name":"functions"},"message":"\u001b[1mhttp\u001b[22m function initialized (http://127.0.0.1:5001/cookmate-cc941/us-central1/api)."}}
+[debug] [2025-12-02T23:18:31.807Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
 [info] 
 ┌─────────────────────────────────────────────────────────────┐
 │ ✔  All emulators ready! It is now safe to connect your app. │
@@ -91,3 +97,103 @@
 
 Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
  
+[debug] [2025-12-02T23:22:52.440Z] File C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\package.json changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\\package.json changed, reloading triggers"}}
+[debug] [2025-12-02T23:22:53.457Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-02T23:22:54.695Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "dev": "node dev-server.js",
+    "dev:direct": "node dev-server.js",
+    "shell": "firebase functions:shell",
+    "start": "npm run dev:direct",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^1.1.1",
+    "openai": "^6.9.1",
+    "replicate": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "firebase-functions-test": "^3.1.0"
+  }
+}
+[debug] [2025-12-02T23:22:54.695Z] Building nodejs source
+[debug] [2025-12-02T23:22:54.696Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[info] i  functions: You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly 
+[debug] [2025-12-02T23:22:54.697Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-12-02T23:22:54.704Z] Found firebase-functions binary at 'C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\node_modules\.bin\firebase-functions'
+[info] Serving at port 8590
+
+[debug] [2025-12-02T23:22:55.301Z] Got response from /__/functions.yaml {"endpoints":{"api":{"platform":"gcfv1","availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"serviceAccountEmail":null,"vpc":null,"httpsTrigger":{},"entryPoint":"api"}},"specVersion":"v1alpha1","requiredAPIs":[]}
+[info] +  functions: Loaded functions definitions from source: api. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api."}}
+[debug] [2025-12-02T23:23:27.430Z] File C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\package.json changed, reloading triggers {"metadata":{"emulator":{"name":"functions"},"message":"File C:\\Users\\JOHN MARK MAGDASAL\\OneDrive\\Desktop\\CTU main\\CC316_AppDev_EmTech\\Final_Project\\CookMate\\backend\\functions\\package.json changed, reloading triggers"}}
+[debug] [2025-12-02T23:23:28.444Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-12-02T23:23:29.905Z] > [functions] package.json contents: {
+  "name": "cookmate-backend",
+  "version": "1.0.0",
+  "description": "CookMate AI Kitchen Assistant Backend - Firebase Cloud Functions",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "firebase-admin": "^11.11.1",
+    "firebase-functions": "^4.6.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^1.1.1",
+    "openai": "^6.9.1",
+    "replicate": "^1.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "firebase-functions-test": "^3.1.0"
+  }
+}
+[debug] [2025-12-02T23:23:29.906Z] Building nodejs source
+[debug] [2025-12-02T23:23:29.906Z] Failed to find version of module node: reached end of search path C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\backend\functions\node_modules
+[warn] !  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[info] i  functions: You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly 
+[debug] [2025-12-02T23:23:29.907Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-12-02T23:23:29.914Z] Found firebase-functions binary at 'C:\Users\JOHN MARK MAGDASAL\OneDrive\Desktop\CTU main\CC316_AppDev_EmTech\Final_Project\CookMate\node_modules\.bin\firebase-functions'
+[info] Serving at port 8155
+
+[debug] [2025-12-02T23:23:30.483Z] Got response from /__/functions.yaml {"endpoints":{"api":{"platform":"gcfv1","availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":null,"ingressSettings":null,"serviceAccountEmail":null,"vpc":null,"httpsTrigger":{},"entryPoint":"api"}},"specVersion":"v1alpha1","requiredAPIs":[]}
+[info] +  functions: Loaded functions definitions from source: api. {"metadata":{"emulator":{"name":"functions"},"message":"Loaded functions definitions from source: api."}}

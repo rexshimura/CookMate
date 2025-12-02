@@ -12,7 +12,7 @@ git clone <repository-url>
 cd CookMate
 
 # Run the automated setup
-setup.bat
+.\setup.bat
 ```
 
 #### For Mac/Linux:
@@ -26,7 +26,41 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-### Option 2: Manual Setup
+### Option 2: Automated Startup (Recommended - No Port Conflicts!)
+
+#### For Windows:
+```bash
+# Automatic port cleanup + startup
+start-dev.bat
+```
+
+#### For Mac/Linux:
+```bash
+# Make script executable and run
+chmod +x start-dev.sh
+./start-dev.sh
+```
+
+**What it does:** Automatically cleans up conflicting ports and starts both servers!
+
+### Option 3: Simple Mode (Express Server)
+
+If you prefer to avoid Firebase emulators entirely:
+
+#### For Windows:
+```bash
+start-dev-simple.bat
+```
+
+#### For Mac/Linux:
+```bash
+chmod +x start-dev-simple.sh
+./start-dev-simple.sh
+```
+
+**Benefits:** Uses Express dev server instead of Firebase - more reliable for development!
+
+### Option 4: Manual Setup
 
 ```bash
 # 1. Clone and install dependencies
@@ -64,6 +98,7 @@ npm run dev:frontend   # Terminal 2
 - ✅ Responsive web interface
 
 ### 🆘 Need Help?
+- **Setup script not running?** Use `.\setup.bat` (Windows) or `./setup.sh` (Mac/Linux) to run local scripts
 - **Backend not starting?** Check that Node.js is installed: `node --version`
 - **Port already in use?** Kill processes using ports 5001 or 5173
 - **AI not responding?** Add your GROQ_API_KEY to `.env`
