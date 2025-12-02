@@ -10,7 +10,14 @@
     "build": "npm run build:frontend",
     "build:frontend": "cd frontend && npm run build",
     "deploy": "cd backend && firebase deploy",
-    "install:all": "npm install && cd frontend && npm install && cd ../backend/functions && npm install"
+    "install:all": "npm install && cd frontend && npm install && cd ../backend/functions && npm install",
+    "setup": "npm run install:all && npm run setup:env",
+    "setup:env": "if not exist backend\\functions\\.env (copy backend\\functions\\.env.template backend\\functions\\.env) else (echo Environment file already exists)",
+    "setup:check": "echo Checking prerequisites... && node --version && npm --version && echo Checking if setup is complete... && if exist node_modules if exist frontend\\node_modules if exist backend\\functions\\node_modules (echo ✅ All dependencies installed) else (echo ❌ Some dependencies missing. Run: npm run setup)",
+    "start": "npm run dev",
+    "start:backend": "npm run dev:backend",
+    "start:frontend": "npm run dev:frontend",
+    "test:health": "curl -s http://localhost:5001/api/health || echo 'Backend not running. Start with: npm run start:backend'"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

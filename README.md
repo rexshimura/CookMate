@@ -1,4 +1,171 @@
 # CookMate - Intelligent Conversational Kitchen Assistant
+## 🚀 Getting Started - Super Quick Setup
+
+**Get CookMate running in 3 minutes!**
+
+### Option 1: Automated Setup (Recommended)
+
+#### For Windows:
+```bash
+# Clone the repository
+git clone <repository-url>
+cd CookMate
+
+# Run the automated setup
+setup.bat
+```
+
+#### For Mac/Linux:
+```bash
+# Clone the repository
+git clone <repository-url>
+cd CookMate
+
+# Make setup script executable and run it
+chmod +x setup.sh
+./setup.sh
+```
+
+### Option 2: Manual Setup
+
+```bash
+# 1. Clone and install dependencies
+git clone <repository-url>
+cd CookMate
+npm install
+cd backend/functions && npm install && cd ../..
+cd frontend && npm install && cd ..
+
+# 2. Setup environment file
+cp backend/functions/.env.template backend/functions/.env
+
+# 3. Add your GROQ API key (optional but recommended)
+# Edit backend/functions/.env and replace 'your_groq_api_key_here' with your actual key
+# Get free key: https://console.groq.com/
+
+# 4. Start the servers
+npm run dev:backend    # Terminal 1
+npm run dev:frontend   # Terminal 2
+
+# 5. Open http://localhost:5173 in your browser
+```
+
+### 🔑 API Key Setup (Optional but Recommended)
+- Get your **FREE** GROQ API key: https://console.groq.com/
+- Add it to `backend/functions/.env` as `GROQ_API_KEY=your_actual_key`
+- **Without the key**: App works with smart fallback responses
+- **With the key**: Full AI-powered conversational cooking assistant
+
+### ✅ What's Included
+- ✅ Full authentication system (Firebase Auth)
+- ✅ AI-powered recipe suggestions with memory
+- ✅ Recipe saving and digital cookbook
+- ✅ Session management and chat history
+- ✅ Responsive web interface
+
+### 🆘 Need Help?
+- **Backend not starting?** Check that Node.js is installed: `node --version`
+- **Port already in use?** Kill processes using ports 5001 or 5173
+- **AI not responding?** Add your GROQ_API_KEY to `.env`
+- **Still stuck?** See [Troubleshooting](#troubleshooting) section below
+
+---
+
+## 🛠️ Troubleshooting
+
+### Common Issues & Solutions
+
+#### 1. **"node: command not found" or "npm: command not found"**
+- **Problem**: Node.js is not installed
+- **Solution**: Install Node.js from https://nodejs.org/ (LTS version recommended)
+- **Verify**: Run `node --version` and `npm --version` to confirm installation
+
+#### 2. **Port 5001 or 5173 already in use**
+- **Problem**: Another process is using the required ports
+- **Solution**: 
+  ```bash
+  # Windows
+  netstat -ano | findstr :5001
+  taskkill /PID <PID_NUMBER> /F
+  
+  # Mac/Linux  
+  lsof -ti:5001 | xargs kill -9
+  ```
+
+#### 3. **"Cannot find module" errors**
+- **Problem**: Dependencies not installed properly
+- **Solution**: 
+  ```bash
+  # Clean install
+  rm -rf node_modules package-lock.json
+  rm -rf backend/functions/node_modules backend/functions/package-lock.json  
+  rm -rf frontend/node_modules frontend/package-lock.json
+  
+  # Re-run setup
+  ./setup.sh    # Mac/Linux
+  setup.bat     # Windows
+  ```
+
+#### 4. **Backend server won't start**
+- **Problem**: Missing `.env` file or invalid configuration
+- **Solution**: 
+  ```bash
+  # Check if .env exists
+  ls backend/functions/.env
+  
+  # If missing, create from template
+  cp backend/functions/.env.template backend/functions/.env
+  
+  # Verify Node.js version (should be 16+)
+  node --version
+  ```
+
+#### 5. **AI not responding or giving generic responses**
+- **Problem**: Missing or invalid GROQ API key
+- **Solution**:
+  1. Get free API key from https://console.groq.com/
+  2. Edit `backend/functions/.env`
+  3. Replace `your_groq_api_key_here` with your actual key
+  4. Restart the backend server
+
+#### 6. **Frontend build errors**
+- **Problem**: Node modules corrupted or version conflicts
+- **Solution**:
+  ```bash
+  cd frontend
+  rm -rf node_modules package-lock.json
+  npm install
+  npm run dev
+  ```
+
+#### 7. **Firebase authentication not working**
+- **Problem**: CORS issues or invalid Firebase config
+- **Solution**:
+  1. Check browser console for CORS errors
+  2. Ensure Firebase project allows your domain
+  3. Verify Firebase config in `frontend/src/firebase.js`
+
+#### 8. **Database permission errors**
+- **Problem**: Firestore security rules blocking access
+- **Solution**: 
+  - For development, ensure you're signed in
+  - Check Firebase Console → Firestore → Rules
+  - Test with a simple read operation first
+
+### Still Need Help?
+
+1. **Check the logs**: Look at terminal output for specific error messages
+2. **Verify prerequisites**: Node.js 16+, npm, Git
+3. **Fresh start**: Delete `node_modules` folders and reinstall
+4. **Check versions**: Ensure all dependencies are compatible
+
+### Environment Requirements
+- **Node.js**: Version 16.0 or higher
+- **npm**: Version 7.0 or higher  
+- **Operating System**: Windows 10+, macOS 10.14+, or Linux
+- **Browser**: Chrome 90+, Firefox 88+, Safari 14+, or Edge 90+
+
+---
 
 ## 🎯 Project Overview
 
