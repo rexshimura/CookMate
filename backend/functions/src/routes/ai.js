@@ -54,18 +54,127 @@ function extractIngredients(message) {
   return Array.from(foundIngredients);
 }
 
-// Content detection function
+// Enhanced content detection function with comprehensive off-topic categories
 function isOffTopic(message) {
   const lowerMessage = message.toLowerCase();
   
   const offTopicKeywords = [
-    'politics', 'religion', 'sports', 'gaming', 'technology', 'programming', 
-    'coding', 'software', 'apps', 'movies', 'music', 'entertainment', 
-    'celebrities', 'relationships', 'dating', 'work', 'job', 'school',
-    'math', 'science', 'history', 'news', 'stocks', 'investing'
+    // Politics & Government
+    'politics', 'election', 'vote', 'government', 'policy', 'democrat', 'republican',
+    'congress', 'senate', 'parliament', 'president', 'prime minister', 'mayor',
+    'political', 'campaign', 'ballot', 'legislation', 'law', 'court', 'judge',
+    
+    // Religion & Faith
+    'religion', 'religious', 'god', 'jesus', 'allah', 'buddha', 'christian', 'muslim',
+    'jewish', 'hindu', 'buddhist', 'church', 'mosque', 'temple', 'prayer',
+    'bible', 'quran', 'torah', 'scripture', 'faith', 'spirituality', 'worship',
+    
+    // Sports & Recreation
+    'sports', 'football', 'soccer', 'basketball', 'baseball', 'tennis', 'golf',
+    'hockey', 'volleyball', 'cricket', 'rugby', 'olympics', 'nfl', 'nba', 'mlb',
+    'fifa', 'uefa', 'championship', 'tournament', 'game', 'match', 'season',
+    
+    // Gaming & Entertainment
+    'gaming', 'video games', 'xbox', 'playstation', 'nintendo', 'switch', 'pc gaming',
+    'minecraft', 'fortnite', 'call of duty', 'league of legends', 'wow', 'pokemon',
+    'board games', 'chess', 'poker', 'casino', 'betting', 'movies', 'cinema',
+    'tv show', 'netflix', 'disney', 'marvel', 'star wars', 'harry potter',
+    
+    // Technology & Programming
+    'technology', 'programming', 'coding', 'software', 'javascript', 'python', 'java',
+    'react', 'angular', 'vue', 'node.js', 'html', 'css', 'git', 'github',
+    'artificial intelligence', 'machine learning', 'blockchain', 'cryptocurrency',
+    'bitcoin', 'ethereum', 'startup', 'tech', 'internet', 'website', 'app development',
+    
+    // Business & Finance
+    'business', 'finance', 'stocks', 'investing', 'trading', 'stock market', 'wall street',
+    'crypto', 'money', 'wealth', 'salary', 'income', 'mortgage', 'loan', 'debt',
+    'banking', 'credit', 'retirement', '401k', 'bitcoin', 'forex', 'economics',
+    'entrepreneur', 'startup', 'venture capital', 'ipo', 'merger', 'acquisition',
+    
+    // Education & Academic
+    'education', 'school', 'university', 'college', 'student', 'teacher', 'professor',
+    'homework', 'exam', 'test', 'grade', 'study', 'learning', 'course', 'class',
+    'math', 'algebra', 'calculus', 'physics', 'chemistry', 'biology', 'history',
+    'geography', 'literature', 'essay', 'research', 'thesis', 'dissertation',
+    
+    // Health & Fitness (non-nutrition)
+    'exercise', 'workout', 'gym', 'fitness', 'weight loss', 'muscle', 'cardio',
+    'yoga', 'pilates', 'running', 'swimming', 'cycling', 'training', 'bodybuilding',
+    'medical', 'doctor', 'medicine', 'hospital', 'surgery', 'therapy', 'medication',
+    'disease', 'illness', 'symptoms', 'treatment', 'diagnosis', 'surgery',
+    
+    // Travel & Transportation
+    'travel', 'vacation', 'holiday', 'trip', 'flight', 'airline', 'hotel', 'resort',
+    'tourism', 'passport', 'visa', 'cruise', 'beach', 'mountain', 'city', 'country',
+    'car', 'vehicle', 'driving', 'traffic', 'public transport', 'subway', 'train',
+    'airplane', 'airport', 'transportation', 'commute',
+    
+    // Relationships & Social
+    'relationships', 'dating', 'boyfriend', 'girlfriend', 'husband', 'wife', 'marriage',
+    'wedding', 'divorce', 'family', 'parents', 'children', 'kids', 'baby',
+    'friendship', 'social', 'party', 'event', 'celebration', 'holiday',
+    
+    // News & Current Events
+    'news', 'current events', 'breaking news', 'report', 'journalism', 'media',
+    'newspaper', 'magazine', 'reporter', 'correspondent', 'interview', 'headlines',
+    
+    // Shopping & Consumer Products (non-food)
+    'shopping', 'clothes', 'fashion', 'shoes', 'electronics', 'phone', 'computer',
+    'car', 'house', 'apartment', 'furniture', 'decor', 'makeup', 'cosmetics',
+    'perfume', 'jewelry', 'accessories', 'retail', 'mall', 'store',
+    
+    // Weather & Environment (non-cooking related)
+    'weather', 'climate', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
+    'tornado', 'flood', 'drought', 'environment', 'pollution', 'carbon footprint',
+    
+    // Other Non-Cooking Topics
+    'cars', 'automotive', 'real estate', 'property', 'rent', 'mortgage', 'insurance',
+    'pets', 'animals', 'dogs', 'cats', 'gardening', 'plants', 'flowers', 'lawn',
+    'books', 'reading', 'writing', 'art', 'painting', 'music', 'instruments',
+    'hobbies', 'crafts', 'diy', 'woodworking', 'knitting', 'sewing'
   ];
   
   return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+// Generate contextual cooking suggestions based on the conversation context or random selection
+function getContextualCookingSuggestion() {
+  const suggestions = [
+    "What's in your fridge right now? Let's create something amazing together!",
+    "I bet you have some great ingredients waiting to be turned into something delicious. What do you have?",
+    "Instead of worrying about that, why don't we focus on cooking something tasty? What ingredients do you have?",
+    "Let's put our culinary skills to work! Do you have any proteins, vegetables, or pantry staples you'd like to use?",
+    "Cooking is so much more fun than [off-topic topic]! What would you like to cook today?",
+    "I can help you create a mouth-watering meal instead. What ingredients are you working with?",
+    "Enough about that - let's cook something incredible! What do you have in your kitchen?",
+    "While you're thinking about that, let me suggest we start cooking! What ingredients do you have available?",
+    "Cooking together is the perfect solution! Tell me what's in your pantry and I'll suggest a recipe.",
+    "Let's put our energy into creating something delicious! What ingredients can we work with today?"
+  ];
+  
+  return suggestions[Math.floor(Math.random() * suggestions.length)];
+}
+
+// Enhanced off-topic response with engaging redirects
+function getOffTopicResponse(originalMessage) {
+  const contextualSuggestions = getContextualCookingSuggestion();
+  
+  // Responses that specifically acknowledge what they asked about but redirect to cooking
+  const responses = [
+    `I appreciate your question about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm here to help you with cooking! ${contextualSuggestions}`,
+    `That sounds interesting, but I'm your cooking assistant, so let's focus on what we can create in the kitchen! ${contextualSuggestions}`,
+    `I understand you're curious about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm designed to help with recipes and cooking. ${contextualSuggestions}`,
+    `While I'd love to discuss ${originalMessage.substring(0, 25)}${originalMessage.length > 25 ? '...' : ''} with you, I'm really here to help you cook amazing dishes! ${contextualSuggestions}`,
+    `That's definitely not my area of expertise - I'm your kitchen companion! ${contextualSuggestions}`,
+    `I have to stay focused on my true passion: helping people cook delicious food! ${contextualSuggestions}`,
+    `Let me redirect this conversation to something I'm really good at - cooking! ${contextualSuggestions}`,
+    `That's outside my kitchen expertise, but I'm excellent at recipe creation! ${contextualSuggestions}`,
+    `I might not be the best person to ask about that, but I AM great at cooking! ${contextualSuggestions}`,
+    `While you figure that out, let's cook something wonderful instead! ${contextualSuggestions}`
+  ];
+  
+  return responses[Math.floor(Math.random() * responses.length)];
 }
 
 // Groq AI API - Single ChatGPT-like service
@@ -144,13 +253,15 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
     // Check for off-topic content
     if (isOffTopic(message)) {
-      const aiReply = "I appreciate your interest, but I'm specifically designed to help with cooking and recipes! Let me help you create something delicious instead. What ingredients do you have in your kitchen?";
+      const aiReply = getOffTopicResponse(message);
       
       return res.status(200).json({
         response: {
           message: aiReply,
           timestamp: new Date().toISOString(),
-          userId: req.userId
+          userId: req.userId,
+          isOffTopic: true,
+          redirectToCooking: true
         }
       });
     }
@@ -163,7 +274,9 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
         message: aiReply,
         timestamp: new Date().toISOString(),
         detectedIngredients: extractIngredients(message),
-        userId: req.userId
+        userId: req.userId,
+        isOffTopic: false,
+        redirectToCooking: false
       }
     });
     

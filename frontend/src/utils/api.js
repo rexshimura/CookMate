@@ -3,6 +3,13 @@ import { auth } from '../firebase';
 
 // Smart API base URL detection
 const getApiBaseUrl = () => {
+  console.log('🔍 API Debug - Environment variables:', {
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+    VITE_FORCE_PROXY: import.meta.env.VITE_FORCE_PROXY,
+    DEV: import.meta.env.DEV,
+    MODE: import.meta.env.MODE
+  });
+  
   // Priority 1: Explicit environment variable (most important)
   if (import.meta.env.VITE_API_BASE_URL) {
     console.log('🍳 Using explicit VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
@@ -72,7 +79,7 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
     ...(Array.isArray(history) && history.length > 0 ? { history } : {}),
   };
   
-  return apiCall('/ai/chat', {
+  return apiCall('/api/ai/chat', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -80,7 +87,7 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
 
 // Generate Recipe API
 export const generateRecipe = async (ingredients, dietaryPreferences = '', recipeType = '') => {
-  return apiCall('/ai/generate-recipe', {
+  return apiCall('/api/ai/generate-recipe', {
     method: 'POST',
     body: JSON.stringify({
       ingredients: Array.isArray(ingredients) ? ingredients : [ingredients],
@@ -92,7 +99,7 @@ export const generateRecipe = async (ingredients, dietaryPreferences = '', recip
 
 // Suggest Ingredients API
 export const suggestIngredients = async (availableIngredients) => {
-  return apiCall('/ai/suggest-ingredients', {
+  return apiCall('/api/ai/suggest-ingredients', {
     method: 'POST',
     body: JSON.stringify({
       availableIngredients: Array.isArray(availableIngredients) ? availableIngredients : [availableIngredients],
@@ -102,11 +109,11 @@ export const suggestIngredients = async (availableIngredients) => {
 
 // User Profile API
 export const getUserProfile = async () => {
-  return apiCall('/users/profile');
+  return apiCall('/api/users/profile');
 };
 
 export const updateUserProfile = async (updates) => {
-  return apiCall('/users/profile', {
+  return apiCall('/api/users/profile', {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
@@ -114,24 +121,24 @@ export const updateUserProfile = async (updates) => {
 
 // Favorites API
 export const getFavorites = async () => {
-  return apiCall('/users/favorites');
+  return apiCall('/api/users/favorites');
 };
 
 export const addToFavorites = async (recipeId) => {
-  return apiCall(`/users/favorites/${recipeId}`, {
+  return apiCall(`/api/users/favorites/${recipeId}`, {
     method: 'POST',
   });
 };
 
 export const removeFromFavorites = async (recipeId) => {
-  return apiCall(`/users/favorites/${recipeId}`, {
+  return apiCall(`/api/users/favorites/${recipeId}`, {
     method: 'DELETE',
   });
 };
 
 // Health check
 export const healthCheck = async () => {
-  return apiCall('/health');
+  return apiCall('/api/health');
 };
 
 export default {
