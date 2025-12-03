@@ -37,11 +37,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Import the AI routes (using the dynamic version)
+// Import the routes
 const aiRouter = require('./src/routes/ai');
+const userRouter = require('./src/routes/users');
 
 // Use AI routes
 app.use('/api/ai', mockAuth, aiRouter);
+
+// Use user routes (for favorites functionality)
+app.use('/api/users', mockAuth, userRouter);
 
 // Mock user endpoints
 app.get('/api/users/profile', mockAuth, (req, res) => {

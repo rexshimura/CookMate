@@ -1,5 +1,158 @@
 const express = require('express');
 const router = express.Router();
+const { db, admin } = require('../config/firebase');
+
+// In-memory cache for recipe consistency during development
+const recipeCache = new Map();
+
+// Helper function to generate consistent recipe ID
+function generateConsistentRecipeId(recipeName) {
+  return recipeName.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 50);
+}
+
+// Helper function to save recipe to Firestore
+async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
+  try {
+    // Generate a clean recipe ID from title
+    const recipeId = recipeData.title.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 50) + '_' + Date.now();
+
+    const recipeDoc = {
+      id: recipeId,
+      title: recipeData.title,
+      description: recipeData.description || '',
+      ingredients: recipeData.ingredients || [],
+      instructions: recipeData.instructions || [],
+      cookingTime: recipeData.cookingTime || 'Varies',
+      servings: recipeData.servings || '4',
+      difficulty: recipeData.difficulty || 'Medium',
+      estimatedCost: recipeData.estimatedCost || 'Moderate',
+      nutritionInfo: recipeData.nutritionInfo || {},
+      tips: recipeData.tips || [],
+      youtubeUrl: recipeData.youtubeUrl || null,
+      youtubeSearchQuery: recipeData.youtubeSearchQuery || `${recipeData.title} recipe tutorial`,
+      userId: userId,
+      createdAt: new Date().toISOString(),
+      isAIGenerated: true,
+      likes: 0
+    };
+
+    // Save to Firestore
+    await db.collection('recipes').doc(recipeId).set(recipeDoc);
+    
+    console.log('✅ Recipe saved to Firestore:', recipeId);
+    return recipeId;
+  } catch (error) {
+    console.error('❌ Failed to save recipe to Firestore:', error);
+    throw error;
+  }
+}
+
+// Helper function to store detected recipe data
+async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
+  try {
+    const recipeId = generateConsistentRecipeId(recipeName);
+    
+    try {
+      // Check if recipe already exists
+      const existingRecipe = await db.collection('detectedRecipes').doc(recipeId).get();
+      
+      if (existingRecipe.exists) {
+        console.log('✅ Detected recipe already exists:', recipeId);
+        return recipeId;
+      }
+
+      // Generate basic recipe data for detected recipes
+      const recipeData = {
+        id: recipeId,
+        title: recipeName,
+        description: `A delicious ${recipeName} recipe to try`,
+        ingredients: ["Click on the recipe card to get detailed ingredients"],
+        instructions: ["Click on the recipe card to get detailed instructions"],
+        cookingTime: "Varies",
+        servings: "4",
+        difficulty: "Medium",
+        estimatedCost: "Moderate",
+        nutritionInfo: {
+          calories: "Varies",
+          protein: "Varies",
+          carbs: "Varies",
+          fat: "Varies"
+        },
+        tips: ["Click on the recipe to get detailed cooking tips"],
+        youtubeSearchQuery: `${recipeName} recipe tutorial`,
+        userId: userId,
+        createdAt: new Date().toISOString(),
+        isDetected: true
+      };
+
+      // Save to detected recipes collection
+      await db.collection('detectedRecipes').doc(recipeId).set(recipeData);
+      
+      console.log('✅ Detected recipe stored:', recipeId);
+      return recipeId;
+    } catch (collectionError) {
+      console.log('⚠️ Detected recipes collection not available, skipping storage:', collectionError.message);
+      return recipeId; // Return anyway, don't fail the process
+    }
+  } catch (error) {
+    console.error('❌ Failed to store detected recipe:', error);
+    throw error;
+  }
+}
+
+// Helper function to get stored recipe data
+async function getStoredRecipe(recipeName) {
+  try {
+    const recipeId = generateConsistentRecipeId(recipeName);
+    
+    // STEP 1: Check in-memory cache first (for immediate testing)
+    if (recipeCache.has(recipeName)) {
+      console.log('✅ Found recipe in memory cache:', recipeName);
+      return recipeCache.get(recipeName);
+    }
+    
+    // STEP 2: Try to get from detected recipes first
+    try {
+      const detectedRecipe = await db.collection('detectedRecipes').doc(recipeId).get();
+      if (detectedRecipe.exists) {
+        console.log('✅ Found detected recipe:', recipeId);
+        return detectedRecipe.data();
+      }
+    } catch (detectedError) {
+      console.log('⚠️ Detected recipes collection not available:', detectedError.message);
+    }
+
+    // STEP 3: Try to find in main recipes collection using a simpler approach
+    try {
+      const allRecipesSnapshot = await db.collection('recipes').get();
+      
+      if (!allRecipesSnapshot.empty) {
+        const matchingRecipe = allRecipesSnapshot.docs.find(doc => 
+          doc.data().title === recipeName
+        );
+        
+        if (matchingRecipe) {
+          console.log('✅ Found recipe in main collection:', matchingRecipe.id);
+          return matchingRecipe.data();
+        }
+      }
+    } catch (mainError) {
+      console.log('⚠️ Main recipes collection not available:', mainError.message);
+    }
+
+    console.log('❌ No stored recipe found for:', recipeName);
+    return null;
+  } catch (error) {
+    console.error('❌ Failed to get stored recipe:', error);
+    return null;
+  }
+}
 
 // Middleware to verify Firebase Auth tokens (optional for AI chat)
 const verifyAuthToken = async (req, res, next) => {
@@ -52,6 +205,35 @@ function extractIngredients(message) {
   });
   
   return Array.from(foundIngredients);
+}
+
+// Function to detect if user is asking about the app developers
+function isDeveloperQuestion(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  const developerKeywords = [
+    'who made this app', 'who created this app', 'who developed this app',
+    'who built this app', 'who made you', 'who created you', 'who developed you',
+    'who is your developer', 'who is your creator', 'who made cookmate',
+    'who created cookmate', 'who developed cookmate', 'who built cookmate',
+    'who is the developer', 'who is the creator', 'who programmed this',
+    'who coded this', 'who designed this app', 'who built this application',
+    'john mark', 'john paul', 'magdasal', 'mahilom'
+  ];
+  
+  return developerKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+// Function to get developer information response
+function getDeveloperResponse() {
+  return `CookMate was created by:
+  
+👨‍💻 **John Mark P. Magdasal**
+👨‍💻 **John Paul Mahilom**
+
+We're passionate about cooking and technology, and we built CookMate to make cooking more accessible and enjoyable for everyone. We hope this app helps you create amazing meals and discover new flavors!
+
+What would you like to cook today? 🍳`;
 }
 
 // Enhanced content detection function with comprehensive off-topic categories
@@ -138,6 +320,170 @@ function isOffTopic(message) {
   return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
+// Function to detect and extract recipe lists from AI response
+function extractRecipesFromResponse(response) {
+  const recipes = [];
+  
+  console.log('[DEBUG] Starting recipe extraction from response');
+  console.log('[DEBUG] Response length:', response.length);
+  console.log('[DEBUG] Response preview:', response.substring(0, 200) + '...');
+  
+  // Pattern 1: Bold recipe names at the beginning of the response (highest priority)
+  const leadingBoldPattern = /^\s*\*\*([^*]+)\*\*/m;
+  const leadingMatch = response.match(leadingBoldPattern);
+  if (leadingMatch) {
+    const recipeName = leadingMatch[1].trim();
+    console.log('[DEBUG] Pattern 1 match (leading bold):', recipeName);
+    if (isValidRecipe(recipeName)) {
+      recipes.push(recipeName);
+    }
+  }
+  
+  // Pattern 2: Bold recipe names with colon (**: ...:) - only if not already found
+  if (recipes.length === 0) {
+    const boldColonPattern = /\*\*([^*:]+)\*\s*:/g;
+    let match;
+    
+    while ((match = boldColonPattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      console.log('[DEBUG] Pattern 2 match (bold colon):', recipeName);
+      if (isValidRecipe(recipeName)) {
+        recipes.push(recipeName);
+      }
+    }
+  }
+  
+  // Pattern 3: Numbered bold recipe names with colon (1. **Recipe**:)
+  if (recipes.length === 0) {
+    const numberedBoldPattern = /^\s*\d+\.\s*\*\*([^*:]+)\*\*/gm;
+    while ((match = numberedBoldPattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      console.log('[DEBUG] Pattern 3 match (numbered bold):', recipeName);
+      if (isValidRecipe(recipeName)) {
+        recipes.push(recipeName);
+      }
+    }
+  }
+  
+  // Pattern 4: Simple bold recipe names that are standalone and substantial
+  if (recipes.length === 0) {
+    // More strict pattern - only match bold text that's standalone and meaningful
+    const boldPattern = /\*\*([^*]{10,80})\*\s*(?=\n\n|\n[0-9]|\n\*|\n-|Ingredients|Instructions|Here's)/g;
+    while ((match = boldPattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      console.log('[DEBUG] Pattern 4 match (standalone bold):', recipeName);
+      // Additional validation - should contain common recipe words
+      if (isValidRecipe(recipeName) && recipeName.split(' ').length >= 2) {
+        recipes.push(recipeName);
+      }
+    }
+  }
+  
+  // Pattern 5: Numbered lists with recipe names (1. Recipe Name:) - only for substantial names
+  if (recipes.length === 0) {
+    const numberedPattern = /^\s*\d+\.\s*([^*:]{10,80})(?=:)/gm;
+    while ((match = numberedPattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      console.log('[DEBUG] Pattern 5 match (numbered):', recipeName);
+      if (isValidRecipe(recipeName) && recipeName.length > 8) {
+        recipes.push(recipeName);
+      }
+    }
+  }
+  
+  // Pattern 6: Recipe names from bullet points at section starts
+  if (recipes.length === 0) {
+    const sectionPattern = /^\s*[*-]\s*([A-Z][^.\n:]{10,80})(?=[:\n])/gm;
+    while ((match = sectionPattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      console.log('[DEBUG] Pattern 6 match (section):', recipeName);
+      if (isValidRecipe(recipeName) && recipeName.length > 8) {
+        recipes.push(recipeName);
+      }
+    }
+  }
+  
+  console.log('[DEBUG] Final extracted recipes:', recipes);
+  return recipes;
+}
+
+// Helper function to validate if extracted text is actually a recipe (not a category)
+function isValidRecipe(text) {
+  if (!text || text.length === 0) {
+    console.log('[DEBUG] Recipe validation FAILED: empty text');
+    return false;
+  }
+  
+  const lowerText = text.toLowerCase();
+  
+  console.log('[DEBUG] Validating recipe:', text);
+  
+  // Specific items to exclude (these are ingredients, not recipes)
+  const excludeItems = [
+    'salt and pepper', 'salt', 'pepper', 'seasoning', 'seasonings', 'to taste',
+    'garlic powder', 'onion powder', 'paprika', 'cumin', 'oregano', 'thyme',
+    'basil', 'parsley', 'cilantro', 'dill', 'chives', 'marjoram', 'tarragon',
+    'lemon juice', 'lime juice', 'vinegar', 'olive oil', 'vegetable oil',
+    'butter', 'oil', 'water', 'salt', 'sugar', 'flour', 'baking powder',
+    'baking soda', 'yeast', 'vanilla', 'almond extract', 'lemon zest',
+    'ingredients', 'instructions', 'directions', 'method', 'steps'
+  ];
+  
+  // Check for excluded items first
+  if (excludeItems.some(item => lowerText.includes(item))) {
+    console.log('[DEBUG] Recipe validation FAILED: contains excluded item');
+    return false;
+  }
+  
+  // Generic terms to exclude completely
+  const genericTerms = [
+    'recipe suggestions', 'recipe ideas', 'suggestions', 'ideas', 'suggestion', 'idea',
+    'cooking tips', 'cooking advice', 'kitchen tips', 'food suggestions', 'recipe help',
+    'cooking methods', 'cooking techniques', 'recipe variations', 'cooking ideas',
+    'meal ideas', 'food ideas', 'cooking inspiration', 'recipe inspiration',
+    'global inspirations', 'quick and easy', 'veggie delights'
+  ];
+  
+  // Category patterns to exclude (more specific patterns to avoid false positives)
+  const categoryPatterns = [
+    /^(italian|mexican|asian|french|indian|thai|chinese|japanese|korean|mediterranean|american|bbq)\s+(cuisine|food|style|cooking|dishes)/,
+    /^(comfort food|healthy|vegetarian|vegan|gluten free|dessert|appetizer|main course|side dish)$/,
+    /^(breakfast|lunch|dinner|snack|beverage|drink|traditional|classic|modern|fusion)$/,
+    /^recipe (suggestions|ideas|tips|help|variations|inspiration)$/,
+    /^(cooking|tips|advice|methods|techniques|inspiration)$/
+  ];
+  
+  // Check for generic terms first (highest priority to exclude)
+  if (genericTerms.some(term => lowerText.includes(term))) {
+    console.log('[DEBUG] Recipe validation FAILED: contains generic terms');
+    return false;
+  }
+  
+  // Check for category patterns
+  if (categoryPatterns.some(pattern => pattern.test(lowerText))) {
+    console.log('[DEBUG] Recipe validation FAILED: matches category pattern');
+    return false;
+  }
+  
+  // Must contain specific main ingredients or dishes - EXPANDED LIST
+  const hasSpecificIngredients = /\b(chicken|beef|pork|lamb|fish|salmon|shrimp|tuna|tofu|eggs?|pasta|rice|spaghetti|pizza|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|lime|lemon|orange|apple|banana|berries|vanilla|almond|coconut|chocolate|cocoa|honey|sugar|flour|oats|quinoa|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|tomato|potato|onion|garlic|pepper|broccoli|cauliflower|carrots|spinach|kale|basil|oregano|thyme|rosemary|sage|mint|parsley|cilantro|dill|curry|masala|tikka|vindaloo|korma|biryani|pulao|naan|roti|paratha|dosa|idli|vada|sambhar|rasam|paneer|fettuccine|alfredo|carbonara|minestrone|bruschetta|caprese|napoletana|penne|rigatoni|farfalle|linguine|conchiglie|orzo|couscous|barley|bulgur|farro|polenta|grits|oatmeal|porridge|cereal|muesli|granola|heavy cream|half and half|evaporated milk|condensed milk|coconut milk|almond milk|soy milk|oat milk|rice milk|all-purpose flour|whole wheat flour|almond flour|coconut flour|oat flour|cornmeal|cornstarch|arrowroot|tapioca|baking powder|baking soda|yeast|brown sugar|powdered sugar|maple syrup|agave|molasses|coconut sugar|stevia|artificial sweetener|vanilla extract|lemon extract|orange extract|unsweetened chocolate|dark chocolate|milk chocolate|semi-sweet chocolate|white chocolate|chocolate chips|cocoa nibs|vegetable oil|canola oil|sesame oil|avocado oil|grapeseed oil|sunflower oil|corn oil|soybean oil|peanut oil|walnut oil|almond oil|pistachio oil|hazelnut oil|castor oil|lard|shortening|margarine|ghee|clarified butter|portobello|shiitake|cremini|oyster|king oyster|chanterelle|porcini|matsutake|enoki|wood ear|snow peas|sugar snap peas|green beans|lima beans|fava beans|black-eyed peas|split peas|yellow squash|acorn squash|butternut squash|spaghetti squash|pumpkin|arugula|romaine|lettuce|iceberg|boston butter|cress|watercress|dandelion|collard greens|mustard greens|turnip greens|swiss chard|radish|daikon|turnip|beet|parsnip|rutabaga|celeriac|celery|fennel|artichoke|asparagus|bamboo shoots|bean sprouts|broccolini|broccoli rabe|brussels sprouts|napa cabbage|savoy cabbage|red cabbage|green cabbage|leek|scallion|green onion|shallot|yellow onion|red onion|white onion|sweet onion|vidalias|wallas|pearl onion|garlic powder|white pepper|pink peppercorns|green peppercorns|peppercorns|whole peppercorns|cracked pepper|lemongrass|curry leaves|holy basil|thai basil|genovese basil|sweet basil|dried basil|dried oregano|dried thyme|dried rosemary|dried sage|dried mint|dried parsley|dried cilantro|dried dill|dried chives|dried marjoram|dried tarragon|lemon zest|lime zest|orange zest|grapefruit|tangerine|clementine|mandarin|calamansi|kumquat|pomelo|yuzu|finger lime|blood orange|bergamot|ugli fruit|citrus|passion fruit|dragon fruit|starfruit|lychee|rambutan|longan|mangosteen|jackfruit|durian|papaya|mango|peach|nectarine|apricot|plum|prune|cherry|blueberry|strawberry|raspberry|blackberry|cranberry|gooseberry|elderberry|currant|goji berry|açaí berry|kiwi|guava|pineapple|plantain|pear|quince|fig|date|raisin|cashew|pecan|walnut|hazelnut|brazil nut|macadamia nut|pine nut|chestnut|sunflower seed|pumpkin seed|sesame seed|flax seed|chia seed|hemp seed|poppy seed|safflower seed|cardamom|cinnamon|clove|nutmeg|mace|allspice|ginger|turmeric|paprika|sweet paprika|smoked paprika|cayenne|chili powder|chipotle|ancho|pasilla|guajillo|new mexico|cascade|shishito|poblano|jalapeño|habanero|scotch bonnet|ghost pepper|carolina reaper|bhut jolokia|bird's eye|malagueta|pimenta|sambal oelek|sriracha|harissa|gochujang|douchi|black bean sauce|hoisin sauce|oyster sauce|fish sauce|soy sauce|tamari|coconut aminos|vegan worcestershire|vegetarian worcestershire|anchovy|anchovy paste|fish paste|crab paste|shrimp paste|miso|edamame|creamy|sauce|flavor|savory|aroma|tender|juicy|succulent|golden|brown|crispy|soft|chewy|rich|hearty|light|fresh|homemade|homestyle)\b/i;
+  
+  // Must contain specific ingredients or dishes
+  if (!hasSpecificIngredients.test(lowerText)) {
+    console.log('[DEBUG] Recipe validation FAILED: no specific ingredients found');
+    return false;
+  }
+  
+  // Additional validation: must be a meaningful recipe name (not too short)
+  if (text.length < 5) {
+    console.log('[DEBUG] Recipe validation FAILED: text too short');
+    return false;
+  }
+  
+  console.log('[DEBUG] Recipe validation PASSED');
+  return true;
+}
+
 // Generate contextual cooking suggestions based on the conversation context or random selection
 function getContextualCookingSuggestion() {
   const suggestions = [
@@ -188,7 +534,7 @@ async function callGroqAI(message, conversationHistory = []) {
 
   const systemMessage = {
     role: "system",
-    content: "You are CookMate, a helpful AI cooking assistant. Help users with recipes, cooking advice, meal planning, and ingredient suggestions. Be friendly, informative, and focus on cooking topics. Provide practical, actionable cooking advice. When users mention ingredients, acknowledge them and suggest creative ways to use them. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking."
+    content: "You are CookMate, a helpful AI cooking assistant. Help users with recipes, cooking advice, meal planning, and ingredient suggestions. Be friendly, informative, and focus on cooking topics. Provide practical, actionable cooking advice. When users mention ingredients, acknowledge them and suggest creative ways to use them. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking.\n\nIMPORTANT: When you provide multiple recipes, format them as a numbered list where each recipe has a bold name followed by a colon and description. For example:\n\n**Seafood Recipes**\n\n1. **Grilled Salmon**: Fresh salmon fillets seasoned with lemon and herbs, grilled to perfection.\n2. **Shrimp Scampi**: Shrimp sautéed in garlic butter, served with linguine and parsley.\n\nThis format makes it easy for the system to detect and display clickable recipe cards."
   };
   
   // Prepare conversation messages
@@ -254,6 +600,21 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
     
+    // Check for developer questions first (before off-topic check)
+    if (isDeveloperQuestion(message)) {
+      const developerReply = getDeveloperResponse();
+      
+      return res.status(200).json({
+        response: {
+          message: developerReply,
+          timestamp: new Date().toISOString(),
+          userId: req.userId,
+          isDeveloperResponse: true,
+          redirectToCooking: false
+        }
+      });
+    }
+    
     // Check for off-topic content
     if (isOffTopic(message)) {
       const aiReply = getOffTopicResponse(message);
@@ -272,11 +633,32 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     // Generate AI response using Groq
     const aiReply = await callGroqAI(message, history);
     
+    // Extract recipes from the AI response
+    const detectedRecipes = extractRecipesFromResponse(aiReply);
+    
+    // Store detected recipes for consistency
+    if (detectedRecipes.length > 0) {
+      try {
+        await Promise.all(detectedRecipes.map(recipeName => 
+          storeDetectedRecipe(recipeName, req.userId)
+        ));
+        console.log('✅ Stored detected recipes:', detectedRecipes);
+      } catch (storeError) {
+        console.warn('⚠️ Failed to store some detected recipes:', storeError);
+        // Continue without storing - don't block the response
+      }
+    }
+    
+    console.log('[DEBUG] Full AI Response:', aiReply);
+    console.log('[DEBUG] Extracted recipes:', detectedRecipes);
+    console.log('[DEBUG] Number of recipes found:', detectedRecipes.length);
+    
     res.status(200).json({
       response: {
         message: aiReply,
         timestamp: new Date().toISOString(),
         detectedIngredients: extractIngredients(message),
+        detectedRecipes: detectedRecipes,
         userId: req.userId,
         isOffTopic: false,
         redirectToCooking: false
@@ -376,9 +758,22 @@ Only return the JSON, no additional text.`;
       };
     }
     
+    // Save recipe to Firestore if user is authenticated
+    let savedRecipeId = null;
+    if (req.userId && req.userId !== 'anonymous') {
+      try {
+        savedRecipeId = await saveRecipeToFirestore(recipeData, req.userId);
+        recipeData.savedId = savedRecipeId;
+      } catch (saveError) {
+        console.warn('Failed to save recipe to favorites:', saveError);
+        // Continue without saving - don't block the response
+      }
+    }
+    
     res.status(200).json({
       message: 'Recipe generation successful',
       recipe: recipeData,
+      savedRecipeId: savedRecipeId,
       detectedIngredients: ingredients,
       userId: req.userId
     });
@@ -396,6 +791,129 @@ Only return the JSON, no additional text.`;
     res.status(500).json({
       error: 'RECIPE_GENERATION_FAILED',
       message: "I'm having trouble creating that recipe. Can you try again?",
+      details: error.message
+    });
+  }
+});
+
+// RECIPE DETAILS ENDPOINT - Generate full recipe details on demand
+router.post('/recipe-details', verifyAuthToken, async (req, res) => {
+  try {
+    const { recipeName } = req.body;
+    
+    if (!recipeName || typeof recipeName !== 'string') {
+      return res.status(400).json({ error: 'Recipe name is required' });
+    }
+    
+    // STEP 1: Skip cache for now to always get fresh AI-generated data
+    // This ensures users always get full recipe details, not placeholder text
+    console.log('🔄 Always generating fresh recipe details for:', recipeName);
+
+    // STEP 2: If no stored data found, generate new recipe details
+    console.log('🔄 No stored recipe found, generating new details for:', recipeName);
+    
+    // Create a detailed prompt for recipe details generation
+    const detailPrompt = `Create detailed recipe information for "${recipeName}". Please provide the recipe in this exact JSON format:
+{
+  "title": "${recipeName}",
+  "description": "Brief appetizing description of the dish",
+  "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
+  "instructions": ["Step 1 description", "Step 2 description", "Step 3 description"],
+  "cookingTime": "e.g. 30 minutes",
+  "servings": "e.g. 4",
+  "difficulty": "Easy/Medium/Hard",
+  "estimatedCost": "e.g. $10-15",
+  "nutritionInfo": {
+    "calories": "per serving",
+    "protein": "grams",
+    "carbs": "grams",
+    "fat": "grams"
+  },
+  "tips": ["Helpful cooking tip 1", "Cooking tip 2"],
+  "youtubeSearchQuery": "${recipeName} recipe tutorial"
+}
+
+Only return the JSON, no additional text. Make sure the recipe is practical and detailed.`;
+
+    // Generate recipe details using Groq
+    const aiResponse = await callGroqAI(detailPrompt);
+    
+    // Parse JSON response from AI
+    let recipeData;
+    try {
+      const jsonStart = aiResponse.indexOf('{');
+      const jsonEnd = aiResponse.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+        recipeData = JSON.parse(jsonString);
+      } else {
+        throw new Error('No JSON found in response');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI recipe details response:', parseError);
+      // Fallback to basic recipe structure
+      recipeData = {
+        title: recipeName,
+        description: `A delicious ${recipeName} recipe`,
+        ingredients: ["Please refer to the main description for ingredients"],
+        instructions: aiResponse.split('\n').filter(line => line.trim() && !line.includes('JSON')),
+        cookingTime: "Varies",
+        servings: "4",
+        difficulty: "Medium",
+        estimatedCost: "Moderate",
+        nutritionInfo: {
+          calories: "Varies",
+          protein: "Varies",
+          carbs: "Varies", 
+          fat: "Varies"
+        },
+        tips: ["Cook until golden brown", "Taste and adjust seasoning"],
+        youtubeSearchQuery: `${recipeName} recipe tutorial`
+      };
+    }
+    
+    // Generate YouTube search URL
+    const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(recipeData.youtubeSearchQuery)}`;
+    
+    // Add the YouTube URL to the recipe data
+    recipeData.youtubeUrl = youtubeUrl;
+    
+    // Cache the generated recipe for consistency
+    recipeCache.set(recipeName, recipeData);
+    console.log('✅ Recipe cached for consistency:', recipeName);
+    
+    // Save recipe to Firestore if user is authenticated
+    let savedRecipeId = null;
+    if (req.userId && req.userId !== 'anonymous') {
+      try {
+        savedRecipeId = await saveRecipeToFirestore(recipeData, req.userId);
+        recipeData.savedId = savedRecipeId;
+      } catch (saveError) {
+        console.warn('Failed to save recipe to favorites:', saveError);
+        // Continue without saving - don't block the response
+      }
+    }
+    
+    res.status(200).json({
+      message: 'Recipe details generated successfully',
+      recipe: recipeData,
+      savedRecipeId: savedRecipeId,
+      userId: req.userId
+    });
+    
+  } catch (error) {
+    console.error('Recipe details generation error:', error);
+    
+    if (error.message.includes('GROQ_API_KEY')) {
+      return res.status(500).json({
+        error: 'API_KEY_REQUIRED',
+        message: 'Groq API key is required for recipe details generation. Please get a free API key from https://console.groq.com/'
+      });
+    }
+    
+    res.status(500).json({
+      error: 'RECIPE_DETAILS_GENERATION_FAILED',
+      message: "I'm having trouble generating the recipe details. Please try again.",
       details: error.message
     });
   }

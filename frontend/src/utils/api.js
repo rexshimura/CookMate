@@ -107,6 +107,20 @@ export const suggestIngredients = async (availableIngredients) => {
   });
 };
 
+// Recipe Details API
+export const getRecipeDetails = async (recipeName) => {
+  try {
+    const result = await apiCall('/api/ai/recipe-details', {
+      method: 'POST',
+      body: JSON.stringify({ recipeName }),
+    });
+    return { success: true, recipe: result.recipe, message: result.message };
+  } catch (error) {
+    console.error('Recipe details API error:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // User Profile API
 export const getUserProfile = async () => {
   return apiCall('/api/users/profile');
@@ -145,6 +159,7 @@ export default {
   chatWithAI,
   generateRecipe,
   suggestIngredients,
+  getRecipeDetails,
   getUserProfile,
   updateUserProfile,
   getFavorites,

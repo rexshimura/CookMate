@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat, useNewChat } from '../../hooks/useSessions.js';
+import { getRecipeDetails, getFavorites } from '../../utils/api.js';
+import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
+import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 
 export default function CookMateChat() {
   const { user, logout } = useAuth();
@@ -26,7 +29,20 @@ export default function CookMateChat() {
   } = useSessionChat(currentSessionId);
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const inputRef = useRef(null);
   const [inputMessage, setInputMessage] = useState('');
+  const [showScrollButton, setShowScrollButton] = useState(true); // Force to true for testing
+  
+  // Recipe modal state
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [recipeModalOpen, setRecipeModalOpen] = useState(false);
+  const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
+  
+  // Favorites state
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -43,6 +59,61 @@ export default function CookMateChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    console.log('useEffect triggered, ref current:', messagesContainerRef.current);
+    
+    const handleScroll = () => {
+      console.log('Scroll event fired!');
+      if (messagesContainerRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        // Show button if scrolled up more than 20px from bottom
+        const shouldShow = distanceFromBottom > 20;
+        console.log('Scroll detection:', { 
+          scrollTop, 
+          scrollHeight, 
+          clientHeight, 
+          distanceFromBottom, 
+          shouldShow 
+        });
+        setShowScrollButton(shouldShow);
+      }
+    };
+
+    const container = messagesContainerRef.current;
+    console.log('Container check:', container);
+    
+    if (container) {
+      console.log('Adding scroll listener to container');
+      container.addEventListener('scroll', handleScroll);
+      // Check initial scroll position
+      handleScroll();
+      
+      return () => {
+        console.log('Cleaning up scroll listener');
+        if (container) {
+          container.removeEventListener('scroll', handleScroll);
+        }
+      };
+    } else {
+      console.log('Container is null, setting up delayed check');
+      // Try again after component mounts
+      setTimeout(() => {
+        const delayedContainer = messagesContainerRef.current;
+        console.log('Delayed container check:', delayedContainer);
+        if (delayedContainer) {
+          console.log('Adding scroll listener with delay');
+          delayedContainer.addEventListener('scroll', handleScroll);
+          handleScroll();
+        }
+      }, 100);
+    }
+  }, []); // Remove dependency on messagesContainerRef to prevent infinite loops
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   // CRITICAL: This useEffect MUST be called before any conditional returns
   // Initialize with existing session if available
   useEffect(() => {
@@ -50,6 +121,13 @@ export default function CookMateChat() {
       setCurrentSessionId(sessions[0].id);
     }
   }, [sessions, currentSessionId, sessionsLoading]);
+
+  const focusInput = () => {
+    // Small delay to ensure the DOM is ready after re-render
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -60,6 +138,8 @@ export default function CookMateChat() {
     
     try {
       await sendMessage(messageText);
+      // Focus the input after sending the message
+      focusInput();
     } catch (error) {
       console.error('Failed to send message:', error);
     }
@@ -118,6 +198,66 @@ export default function CookMateChat() {
     }
   };
 
+  // Recipe handlers
+  const handleRecipeClick = (recipeName) => {
+    setSelectedRecipe(recipeName);
+    setRecipeModalOpen(true);
+  };
+
+  const handleCloseRecipeModal = () => {
+    setRecipeModalOpen(false);
+    setSelectedRecipe(null);
+  };
+
+  const handleFetchRecipeDetails = async (recipeName) => {
+    setRecipeDetailsLoading(true);
+    try {
+      const result = await getRecipeDetails(recipeName);
+      return result;
+    } finally {
+      setRecipeDetailsLoading(false);
+    }
+  };
+
+  // Favorites handlers
+  const handleShowFavorites = () => {
+    setShowFavorites(true);
+    loadFavoriteRecipes();
+  };
+
+  const handleHideFavorites = () => {
+    setShowFavorites(false);
+  };
+
+  const loadFavoriteRecipes = async () => {
+    setFavoritesLoading(true);
+    try {
+      const result = await getFavorites();
+      if (result.success) {
+        setFavoriteRecipes(result.favorites || []);
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error);
+    } finally {
+      setFavoritesLoading(false);
+    }
+  };
+
+  const handleFavoriteRecipeClick = (recipe) => {
+    // For favorites, we need to fetch the full recipe details since we only have basic info
+    setSelectedRecipe(recipe.title || recipe.name);
+    setRecipeModalOpen(true);
+  };
+
+  // Helper function to check if a recipe is favorited
+  const isRecipeFavorited = (recipeName) => {
+    return favoriteRecipes.some(fav => 
+      fav.title === recipeName || 
+      fav.name === recipeName ||
+      fav.id === recipeName
+    );
+  };
+
   const formatTime = (date) => {
     if (!date) return '';
     const messageDate = date.toDate ? date.toDate() : new Date(date);
@@ -174,7 +314,16 @@ export default function CookMateChat() {
               <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>
               <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4"><button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50"><Plus className="w-5 h-5" /><span>{creatingChat ? 'Creating...' : 'New Chat'}</span></button></div>
+            <div className="p-4 space-y-3">
+            <button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
+              <Plus className="w-5 h-5" />
+              <span>{creatingChat ? 'Creating...' : 'New Chat'}</span>
+            </button>
+            <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
+              <Heart className="w-5 h-5" />
+              <span>My Favorites</span>
+            </button>
+          </div>
             <div className="flex-1" />
             <UserAccountFooter collapsed={false} user={user} onLogout={handleLogout} />
           </div>
@@ -188,9 +337,12 @@ export default function CookMateChat() {
               {sidebarCollapsed && <div className="w-full flex justify-center text-orange-600"><ChefHat className="w-6 h-6" /></div>}
               <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg"><Menu className="w-5 h-5" /></button>
             </div>
-            <div className="p-4">
+            <div className="p-4 space-y-3">
               <button onClick={handleCreateNewChat} disabled={creatingChat} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
                 <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{creatingChat ? 'Creating...' : 'New Chat'}</span>}
+              </button>
+              <button onClick={handleShowFavorites} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm ${sidebarCollapsed ? 'bg-pink-50 text-pink-600 hover:bg-pink-100' : 'bg-pink-600 text-white hover:bg-pink-700'}`}>
+                <Heart className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">My Favorites</span>}
               </button>
             </div>
             <div className="flex-1" />
@@ -205,7 +357,16 @@ export default function CookMateChat() {
               <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600"><Menu className="w-6 h-6" /></button>
               <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
             </div>
-            <button onClick={handleCreateNewChat} disabled={creatingChat} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleShowFavorites}
+                className="p-2 text-pink-600 bg-pink-50 rounded-full hover:bg-pink-100 transition-colors"
+                title="My Favorites"
+              >
+                <Heart className="w-5 h-5" />
+              </button>
+              <button onClick={handleCreateNewChat} disabled={creatingChat} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+            </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8">
@@ -234,7 +395,16 @@ export default function CookMateChat() {
             <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>
             <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
           </div>
-          <div className="p-4"><button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50"><Plus className="w-5 h-5" /><span>{creatingChat ? 'Creating...' : 'New Chat'}</span></button></div>
+          <div className="p-4 space-y-3">
+            <button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
+              <Plus className="w-5 h-5" />
+              <span>{creatingChat ? 'Creating...' : 'New Chat'}</span>
+            </button>
+            <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
+              <Heart className="w-5 h-5" />
+              <span>My Favorites</span>
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto">
             <SessionList 
               sessions={sessions} 
@@ -284,7 +454,7 @@ export default function CookMateChat() {
           <button onClick={handleCreateNewChat} disabled={creatingChat} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
             {messagesLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -305,6 +475,23 @@ export default function CookMateChat() {
                     <div className={`px-5 py-4 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${message.isUser ? 'bg-orange-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-700 rounded-2xl rounded-tl-sm'}`}>
                       {message.text}
                     </div>
+                    
+                    {/* Render Recipe Cards if detectedRecipes exist */}
+                    {!message.isUser && message.detectedRecipes && message.detectedRecipes.length > 0 && (
+                      <div className="mt-4 space-y-3 w-full">
+                        <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
+                        {message.detectedRecipes.map((recipe, index) => (
+                          <RecipeCard
+                            key={index}
+                            recipe={recipe}
+                            onClick={handleRecipeClick}
+                            isLoading={recipeDetailsLoading}
+                            isFavorited={isRecipeFavorited(recipe)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
                     <span className="text-[11px] text-stone-400 mt-1.5 px-1 font-medium">{formatTime(message.timestamp)}</span>
                   </div>
                 </div>
@@ -329,11 +516,26 @@ export default function CookMateChat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+        
+        {/* Scroll Down Button */}
+        {console.log('Rendering button, showScrollButton:', showScrollButton)}
+        {showScrollButton && (
+          <div className="fixed bottom-24 right-8 z-50" style={{ position: 'fixed', bottom: '6rem', right: '2rem', zIndex: 9999 }}>
+            <button
+              onClick={scrollToBottom}
+              className="bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-full shadow-2xl transition-all duration-200 hover:shadow-xl group border-2 border-white"
+              title="Scroll to bottom"
+            >
+              <ArrowDown className="w-6 h-6 group-hover:animate-bounce" />
+            </button>
+          </div>
+        )}
 
         <div className="p-4 lg:p-6 bg-gradient-to-t from-stone-50 via-stone-50 to-transparent">
           <div className="max-w-3xl mx-auto relative">
             <form onSubmit={handleSendMessage} className="relative flex items-center bg-white rounded-full shadow-lg border border-stone-200 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
               <input 
+                ref={inputRef}
                 type="text" 
                 value={inputMessage} 
                 onChange={(e) => setInputMessage(e.target.value)} 
@@ -353,6 +555,72 @@ export default function CookMateChat() {
             </form>
           </div>
         </div>
+        
+        {/* Recipe Detail Modal */}
+        <RecipeDetailModal
+          recipeName={selectedRecipe}
+          isOpen={recipeModalOpen}
+          onClose={handleCloseRecipeModal}
+          fetchRecipeDetails={handleFetchRecipeDetails}
+        />
+
+        {/* Favorites Modal/View */}
+        {showFavorites && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+              onClick={handleHideFavorites}
+            />
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              {/* Favorites Header */}
+              <div className="bg-gradient-to-r from-pink-600 to-red-600 text-white p-6 relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Heart className="w-8 h-8 fill-white" />
+                    <h2 className="text-2xl font-bold">My Favorite Recipes</h2>
+                  </div>
+                  <button
+                    onClick={handleHideFavorites}
+                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Favorites Content */}
+              <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
+                {favoritesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="ml-3 text-stone-600">Loading favorites...</span>
+                  </div>
+                ) : favoriteRecipes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-stone-700 mb-2">No favorites yet</h3>
+                    <p className="text-stone-500">Start saving recipes you love by clicking the heart icon!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-stone-700 mb-4">
+                      You have {favoriteRecipes.length} favorite recipe{favoriteRecipes.length !== 1 ? 's' : ''}
+                    </h3>
+                    {favoriteRecipes.map((recipe, index) => (
+                      <RecipeCard
+                        key={index}
+                        recipe={recipe.title || recipe.name || 'Unknown Recipe'}
+                        onClick={handleFavoriteRecipeClick}
+                        isLoading={false}
+                        isFavorited={true}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

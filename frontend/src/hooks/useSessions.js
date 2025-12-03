@@ -205,7 +205,8 @@ export const useSessionChat = (sessionId) => {
           id: `ai_${Date.now()}`,
           text: aiResponse.response.message,
           isUser: false,
-          timestamp: new Date()
+          timestamp: new Date(),
+          detectedRecipes: aiResponse.response.detectedRecipes || []
         };
 
         // Add AI response to UI
@@ -313,7 +314,8 @@ export const useNewChat = () => {
             id: `ai_initial_${Date.now()}`,
             text: aiResponse.response.message,
             isUser: false,
-            timestamp: new Date()
+            timestamp: new Date(),
+            detectedRecipes: aiResponse.response.detectedRecipes || []
           };
 
           await saveMessage(session.id, aiMessage);
