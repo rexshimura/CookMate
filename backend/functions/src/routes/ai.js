@@ -224,6 +224,20 @@ function isDeveloperQuestion(message) {
   return developerKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
+// Function to detect if user is asking "Who are you?" type questions
+function isIdentityQuestion(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  const identityKeywords = [
+    'who are you', 'what are you', 'introduce yourself', 'tell me about yourself',
+    'what is cookmate', 'who is cookmate', 'explain cookmate', 'describe cookmate',
+    'your purpose', 'your function', 'what do you do', 'your role',
+    'tell me about you', 'about yourself', 'help me understand you'
+  ];
+  
+  return identityKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 // Function to get developer information response
 function getDeveloperResponse() {
   return `CookMate was created by:
@@ -236,6 +250,29 @@ We're passionate about cooking and technology, and we built CookMate to make coo
 What would you like to cook today? 🍳`;
 }
 
+// Function to get identity/who are you response
+function getIdentityResponse() {
+  return `Hello! I'm CookMate, your comprehensive AI cooking assistant! 👨‍🍳
+
+I'm an intelligent cooking companion designed to help you with everything related to food and cooking. Here's what I can do for you:
+
+**🍳 Recipe Help**: Get detailed recipes with ingredients, step-by-step instructions, cooking times, and difficulty levels
+
+**👨‍🍳 Celebrity Chefs**: Learn about famous chefs like Gordon Ramsay, Julia Child, Anthony Bourdain, Ina Garten, and many others - their cooking styles, signature dishes, and culinary contributions
+
+**🥗 Ingredient Suggestions**: Tell me what ingredients you have, and I'll suggest delicious recipes you can make
+
+**🥗 Health & Nutrition**: Learn about the nutritional benefits of foods and cooking methods
+
+**⚠️ Food Safety**: Get important safety guidelines including proper cooking temperatures, food storage, and hygiene practices
+
+**🍽️ Meal Planning**: Get help planning meals based on your preferences, dietary needs, or available ingredients
+
+I was created by John Mark P. Magdasal and John Paul Mahilom to make cooking more accessible, enjoyable, and safe for everyone. Whether you're a beginner or an experienced cook, I'm here to help you create amazing meals!
+
+What would you like to cook or learn about today? 🍳`;
+}
+
 // Enhanced content detection function with comprehensive off-topic categories
 function isOffTopic(message) {
   const lowerMessage = message.toLowerCase();
@@ -246,7 +283,7 @@ function isOffTopic(message) {
     'congress', 'senate', 'parliament', 'president', 'prime minister', 'mayor',
     'political', 'campaign', 'ballot', 'legislation', 'law', 'court', 'judge',
     
-    // Religion & Faith
+    // Religion & Faith (but not dietary religious practices)
     'religion', 'religious', 'god', 'jesus', 'allah', 'buddha', 'christian', 'muslim',
     'jewish', 'hindu', 'buddhist', 'church', 'mosque', 'temple', 'prayer',
     'bible', 'quran', 'torah', 'scripture', 'faith', 'spirituality', 'worship',
@@ -256,35 +293,36 @@ function isOffTopic(message) {
     'hockey', 'volleyball', 'cricket', 'rugby', 'olympics', 'nfl', 'nba', 'mlb',
     'fifa', 'uefa', 'championship', 'tournament', 'game', 'match', 'season',
     
-    // Gaming & Entertainment
+    // Gaming & Entertainment (but not food-related gaming)
     'gaming', 'video games', 'xbox', 'playstation', 'nintendo', 'switch', 'pc gaming',
     'minecraft', 'fortnite', 'call of duty', 'league of legends', 'wow', 'pokemon',
     'board games', 'chess', 'poker', 'casino', 'betting', 'movies', 'cinema',
     'tv show', 'netflix', 'disney', 'marvel', 'star wars', 'harry potter',
     
-    // Technology & Programming
+    // Technology & Programming (but not cooking technology)
     'technology', 'programming', 'coding', 'software', 'javascript', 'python', 'java',
     'react', 'angular', 'vue', 'node.js', 'html', 'css', 'git', 'github',
     'artificial intelligence', 'machine learning', 'blockchain', 'cryptocurrency',
     'bitcoin', 'ethereum', 'startup', 'tech', 'internet', 'website', 'app development',
     
-    // Business & Finance
+    // Business & Finance (but not food business/finance)
     'business', 'finance', 'stocks', 'investing', 'trading', 'stock market', 'wall street',
     'crypto', 'money', 'wealth', 'salary', 'income', 'mortgage', 'loan', 'debt',
     'banking', 'credit', 'retirement', '401k', 'bitcoin', 'forex', 'economics',
     'entrepreneur', 'startup', 'venture capital', 'ipo', 'merger', 'acquisition',
     
-    // Education & Academic
+    // Education & Academic (but not cooking education)
     'education', 'school', 'university', 'college', 'student', 'teacher', 'professor',
     'homework', 'exam', 'test', 'grade', 'study', 'learning', 'course', 'class',
     'math', 'algebra', 'calculus', 'physics', 'chemistry', 'biology', 'history',
     'geography', 'literature', 'essay', 'research', 'thesis', 'dissertation',
     
-    // Health & Fitness (non-nutrition)
+    // Health & Fitness (EXCLUDING nutrition - that's cooking related!)
+    // Only medical/fitness topics that are NOT food-related
     'exercise', 'workout', 'gym', 'fitness', 'weight loss', 'muscle', 'cardio',
     'yoga', 'pilates', 'running', 'swimming', 'cycling', 'training', 'bodybuilding',
     'medical', 'doctor', 'medicine', 'hospital', 'surgery', 'therapy', 'medication',
-    'disease', 'illness', 'symptoms', 'treatment', 'diagnosis', 'surgery',
+    'disease', 'illness', 'symptoms', 'treatment', 'diagnosis',
     
     // Travel & Transportation
     'travel', 'vacation', 'holiday', 'trip', 'flight', 'airline', 'hotel', 'resort',
@@ -303,7 +341,7 @@ function isOffTopic(message) {
     
     // Shopping & Consumer Products (non-food)
     'shopping', 'clothes', 'fashion', 'shoes', 'electronics', 'phone', 'computer',
-    'car', 'house', 'apartment', 'furniture', 'decor', 'makeup', 'cosmetics',
+    'house', 'apartment', 'furniture', 'decor', 'makeup', 'cosmetics',
     'perfume', 'jewelry', 'accessories', 'retail', 'mall', 'store',
     
     // Weather & Environment (non-cooking related)
@@ -418,15 +456,36 @@ function isValidRecipe(text) {
   
   console.log('[DEBUG] Validating recipe:', text);
   
+  // Safety and instruction content to exclude
+  const excludeSafetyItems = [
+    'beef pork and lamb', 'ground meats', 'poultry', 'fish', 'temperature', 'temperatures',
+    'safe temperature', 'cooking temperature', 'internal temperature', 'fahrenheit', 'celsius',
+    'cross contamination', 'food safety', 'storage guidelines', 'shelf life',
+    'refrigerate', 'refrigeration', 'freezing', 'freeze', 'perishable', 'raw meat',
+    'fire extinguisher', 'first aid', 'emergency', 'burns', 'cuts', 'injuries',
+    'oven mitts', 'potholders', 'hot surfaces', 'sharp knives', 'cutting board',
+    'protective gear', 'apron', 'gloves', 'hat', 'hygiene', 'clean kitchen',
+    'appliance', 'manufacturer', 'guidelines', 'maintenance'
+  ];
+  
+  // Check for safety/instruction content first
+  if (excludeSafetyItems.some(item => lowerText.includes(item))) {
+    console.log('[DEBUG] Recipe validation FAILED: contains safety/instruction content');
+    return false;
+  }
+  
   // Specific items to exclude (these are ingredients, not recipes)
   const excludeItems = [
     'salt and pepper', 'salt', 'pepper', 'seasoning', 'seasonings', 'to taste',
     'garlic powder', 'onion powder', 'paprika', 'cumin', 'oregano', 'thyme',
     'basil', 'parsley', 'cilantro', 'dill', 'chives', 'marjoram', 'tarragon',
     'lemon juice', 'lime juice', 'vinegar', 'olive oil', 'vegetable oil',
-    'butter', 'oil', 'water', 'salt', 'sugar', 'flour', 'baking powder',
+    'butter', 'oil', 'water', 'sugar', 'flour', 'baking powder',
     'baking soda', 'yeast', 'vanilla', 'almond extract', 'lemon zest',
-    'ingredients', 'instructions', 'directions', 'method', 'steps'
+    'ingredients', 'instructions', 'directions', 'method', 'steps',
+    'degree', '°f', '°c', '°celsius', '°fahrenheit', 'minutes', 'hours',
+    'pound', 'pounds', 'cup', 'cups', 'tablespoon', 'tablespoons', 'teaspoon', 'teaspoons',
+    'ounce', 'ounces', 'gram', 'grams', 'kilogram', 'kilograms', 'liter', 'liters'
   ];
   
   // Check for excluded items first
@@ -465,8 +524,15 @@ function isValidRecipe(text) {
     return false;
   }
   
+  // Check if it looks like temperature or measurement information
+  const tempOrMeasurePattern = /\d+°?f|°c|\d+\s*(cup|cups|tbsp|tsp|tablespoon|teaspoon|pound|pounds|oz|ounce|gram|grams|lb|lbs)/i;
+  if (tempOrMeasurePattern.test(text)) {
+    console.log('[DEBUG] Recipe validation FAILED: contains temperature or measurement');
+    return false;
+  }
+  
   // Must contain specific main ingredients or dishes - EXPANDED LIST
-  const hasSpecificIngredients = /\b(chicken|beef|pork|lamb|fish|salmon|shrimp|tuna|tofu|eggs?|pasta|rice|spaghetti|pizza|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|lime|lemon|orange|apple|banana|berries|vanilla|almond|coconut|chocolate|cocoa|honey|sugar|flour|oats|quinoa|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|tomato|potato|onion|garlic|pepper|broccoli|cauliflower|carrots|spinach|kale|basil|oregano|thyme|rosemary|sage|mint|parsley|cilantro|dill|curry|masala|tikka|vindaloo|korma|biryani|pulao|naan|roti|paratha|dosa|idli|vada|sambhar|rasam|paneer|fettuccine|alfredo|carbonara|minestrone|bruschetta|caprese|napoletana|penne|rigatoni|farfalle|linguine|conchiglie|orzo|couscous|barley|bulgur|farro|polenta|grits|oatmeal|porridge|cereal|muesli|granola|heavy cream|half and half|evaporated milk|condensed milk|coconut milk|almond milk|soy milk|oat milk|rice milk|all-purpose flour|whole wheat flour|almond flour|coconut flour|oat flour|cornmeal|cornstarch|arrowroot|tapioca|baking powder|baking soda|yeast|brown sugar|powdered sugar|maple syrup|agave|molasses|coconut sugar|stevia|artificial sweetener|vanilla extract|lemon extract|orange extract|unsweetened chocolate|dark chocolate|milk chocolate|semi-sweet chocolate|white chocolate|chocolate chips|cocoa nibs|vegetable oil|canola oil|sesame oil|avocado oil|grapeseed oil|sunflower oil|corn oil|soybean oil|peanut oil|walnut oil|almond oil|pistachio oil|hazelnut oil|castor oil|lard|shortening|margarine|ghee|clarified butter|portobello|shiitake|cremini|oyster|king oyster|chanterelle|porcini|matsutake|enoki|wood ear|snow peas|sugar snap peas|green beans|lima beans|fava beans|black-eyed peas|split peas|yellow squash|acorn squash|butternut squash|spaghetti squash|pumpkin|arugula|romaine|lettuce|iceberg|boston butter|cress|watercress|dandelion|collard greens|mustard greens|turnip greens|swiss chard|radish|daikon|turnip|beet|parsnip|rutabaga|celeriac|celery|fennel|artichoke|asparagus|bamboo shoots|bean sprouts|broccolini|broccoli rabe|brussels sprouts|napa cabbage|savoy cabbage|red cabbage|green cabbage|leek|scallion|green onion|shallot|yellow onion|red onion|white onion|sweet onion|vidalias|wallas|pearl onion|garlic powder|white pepper|pink peppercorns|green peppercorns|peppercorns|whole peppercorns|cracked pepper|lemongrass|curry leaves|holy basil|thai basil|genovese basil|sweet basil|dried basil|dried oregano|dried thyme|dried rosemary|dried sage|dried mint|dried parsley|dried cilantro|dried dill|dried chives|dried marjoram|dried tarragon|lemon zest|lime zest|orange zest|grapefruit|tangerine|clementine|mandarin|calamansi|kumquat|pomelo|yuzu|finger lime|blood orange|bergamot|ugli fruit|citrus|passion fruit|dragon fruit|starfruit|lychee|rambutan|longan|mangosteen|jackfruit|durian|papaya|mango|peach|nectarine|apricot|plum|prune|cherry|blueberry|strawberry|raspberry|blackberry|cranberry|gooseberry|elderberry|currant|goji berry|açaí berry|kiwi|guava|pineapple|plantain|pear|quince|fig|date|raisin|cashew|pecan|walnut|hazelnut|brazil nut|macadamia nut|pine nut|chestnut|sunflower seed|pumpkin seed|sesame seed|flax seed|chia seed|hemp seed|poppy seed|safflower seed|cardamom|cinnamon|clove|nutmeg|mace|allspice|ginger|turmeric|paprika|sweet paprika|smoked paprika|cayenne|chili powder|chipotle|ancho|pasilla|guajillo|new mexico|cascade|shishito|poblano|jalapeño|habanero|scotch bonnet|ghost pepper|carolina reaper|bhut jolokia|bird's eye|malagueta|pimenta|sambal oelek|sriracha|harissa|gochujang|douchi|black bean sauce|hoisin sauce|oyster sauce|fish sauce|soy sauce|tamari|coconut aminos|vegan worcestershire|vegetarian worcestershire|anchovy|anchovy paste|fish paste|crab paste|shrimp paste|miso|edamame|creamy|sauce|flavor|savory|aroma|tender|juicy|succulent|golden|brown|crispy|soft|chewy|rich|hearty|light|fresh|homemade|homestyle)\b/i;
+  const hasSpecificIngredients = /\b(chicken|beef|pork|lamb|fish|salmon|shrimp|tuna|tofu|eggs?|pasta|rice|spaghetti|pizza|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|lime|lemon|orange|apple|banana|berries|vanilla|almond|coconut|chocolate|cocoa|honey|oats|quinoa|cheese|mozzarella|parmesan|cheddar|milk|cream|yogurt|tomato|potato|onion|garlic|pepper|broccoli|cauliflower|carrots|spinach|kale|basil|oregano|thyme|rosemary|sage|mint|cilantro|curry|masala|tikka|vindaloo|korma|biryani|pulao|naan|roti|paratha|dosa|idli|vada|sambhar|rasam|paneer|fettuccine|alfredo|carbonara|minestrone|bruschetta|caprese|napoletana|penne|rigatoni|farfalle|linguine|conchiglie|orzo|couscous|barley|bulgur|farro|polenta|grits|oatmeal|porridge|cereal|muesli|granola|heavy cream|half and half|evaporated milk|condensed milk|coconut milk|almond milk|soy milk|oat milk|rice milk|all-purpose flour|whole wheat flour|almond flour|coconut flour|oat flour|cornmeal|cornstarch|arrowroot|tapioca|baking powder|baking soda|yeast|brown sugar|powdered sugar|maple syrup|agave|molasses|coconut sugar|stevia|artificial sweetener|vanilla extract|lemon extract|orange extract|unsweetened chocolate|dark chocolate|milk chocolate|semi-sweet chocolate|white chocolate|chocolate chips|cocoa nibs|canola oil|sesame oil|avocado oil|grapeseed oil|sunflower oil|corn oil|soybean oil|peanut oil|walnut oil|almond oil|pistachio oil|hazelnut oil|castor oil|lard|shortening|margarine|ghee|clarified butter|portobello|shiitake|cremini|oyster|king oyster|chanterelle|porcini|matsutake|enoki|wood ear|snow peas|sugar snap peas|green beans|lima beans|fava beans|black-eyed peas|split peas|yellow squash|acorn squash|butternut squash|spaghetti squash|pumpkin|arugula|romaine|lettuce|iceberg|boston butter|cress|watercress|dandelion|collard greens|mustard greens|turnip greens|swiss chard|radish|daikon|turnip|beet|parsnip|rutabaga|celeriac|celery|fennel|artichoke|asparagus|bamboo shoots|bean sprouts|broccolini|broccoli rabe|brussels sprouts|napa cabbage|savoy cabbage|red cabbage|green cabbage|leek|scallion|green onion|shallot|yellow onion|red onion|white onion|sweet onion|vidalias|wallas|pearl onion|white pepper|pink peppercorns|green peppercorns|peppercorns|whole peppercorns|cracked pepper|lemongrass|curry leaves|holy basil|thai basil|genovese basil|sweet basil|dried basil|dried oregano|dried thyme|dried rosemary|dried sage|dried mint|dried parsley|dried cilantro|dried dill|dried chives|dried marjoram|dried tarragon|lemon zest|lime zest|orange zest|grapefruit|tangerine|clementine|mandarin|calamansi|kumquat|pomelo|yuzu|finger lime|blood orange|bergamot|ugli fruit|citrus|passion fruit|dragon fruit|starfruit|lychee|rambutan|longan|mangosteen|jackfruit|durian|papaya|mango|peach|nectarine|apricot|plum|prune|cherry|blueberry|strawberry|raspberry|blackberry|cranberry|gooseberry|elderberry|currant|goji berry|açaí berry|kiwi|guava|pineapple|plantain|pear|quince|fig|date|raisin|cashew|pecan|walnut|hazelnut|brazil nut|macadamia nut|pine nut|chestnut|sunflower seed|pumpkin seed|sesame seed|flax seed|chia seed|hemp seed|poppy seed|safflower seed|cardamom|cinnamon|clove|nutmeg|mace|allspice|ginger|turmeric|paprika|sweet paprika|smoked paprika|cayenne|chili powder|chipotle|ancho|pasilla|guajillo|new mexico|cascade|shishito|poblano|jalapeño|habanero|scotch bonnet|ghost pepper|carolina reaper|bhut jolokia|bird's eye|malagueta|pimenta|sambal oelek|sriracha|harissa|gochujang|douchi|black bean sauce|hoisin sauce|oyster sauce|fish sauce|soy sauce|tamari|coconut aminos|vegan worcestershire|vegetarian worcestershire|anchovy|anchovy paste|fish paste|crab paste|shrimp paste|miso|edamame|creamy|sauce|flavor|savory|aroma|tender|juicy|succulent|golden|brown|crispy|soft|chewy|rich|hearty|light|fresh|homemade|homestyle)\b/i;
   
   // Must contain specific ingredients or dishes
   if (!hasSpecificIngredients.test(lowerText)) {
@@ -489,14 +555,14 @@ function getContextualCookingSuggestion() {
   const suggestions = [
     "What's in your fridge right now? Let's create something amazing together!",
     "I bet you have some great ingredients waiting to be turned into something delicious. What do you have?",
-    "Instead of worrying about that, why don't we focus on cooking something tasty? What ingredients do you have?",
     "Let's put our culinary skills to work! Do you have any proteins, vegetables, or pantry staples you'd like to use?",
-    "Cooking is so much more fun than [off-topic topic]! What would you like to cook today?",
     "I can help you create a mouth-watering meal instead. What ingredients are you working with?",
-    "Enough about that - let's cook something incredible! What do you have in your kitchen?",
-    "While you're thinking about that, let me suggest we start cooking! What ingredients do you have available?",
+    "Let's cook something incredible! What do you have in your kitchen?",
     "Cooking together is the perfect solution! Tell me what's in your pantry and I'll suggest a recipe.",
-    "Let's put our energy into creating something delicious! What ingredients can we work with today?"
+    "Let's put our energy into creating something delicious! What ingredients can we work with today?",
+    "I'm here to help with any cooking questions! What would you like to cook or learn about?",
+    "How about we explore some recipes together? What sounds good to you?",
+    "I can suggest recipes based on what you have available. What ingredients do you have?"
   ];
   
   return suggestions[Math.floor(Math.random() * suggestions.length)];
@@ -506,18 +572,18 @@ function getContextualCookingSuggestion() {
 function getOffTopicResponse(originalMessage) {
   const contextualSuggestions = getContextualCookingSuggestion();
   
-  // Responses that specifically acknowledge what they asked about but redirect to cooking
+  // More welcoming responses that acknowledge non-cooking topics but focus on cooking
   const responses = [
-    `I appreciate your question about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm here to help you with cooking! ${contextualSuggestions}`,
-    `That sounds interesting, but I'm your cooking assistant, so let's focus on what we can create in the kitchen! ${contextualSuggestions}`,
-    `I understand you're curious about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm designed to help with recipes and cooking. ${contextualSuggestions}`,
-    `While I'd love to discuss ${originalMessage.substring(0, 25)}${originalMessage.length > 25 ? '...' : ''} with you, I'm really here to help you cook amazing dishes! ${contextualSuggestions}`,
-    `That's definitely not my area of expertise - I'm your kitchen companion! ${contextualSuggestions}`,
-    `I have to stay focused on my true passion: helping people cook delicious food! ${contextualSuggestions}`,
-    `Let me redirect this conversation to something I'm really good at - cooking! ${contextualSuggestions}`,
-    `That's outside my kitchen expertise, but I'm excellent at recipe creation! ${contextualSuggestions}`,
-    `I might not be the best person to ask about that, but I AM great at cooking! ${contextualSuggestions}`,
-    `While you figure that out, let's cook something wonderful instead! ${contextualSuggestions}`
+    `I appreciate your question about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm specifically designed to help with cooking! ${contextualSuggestions}`,
+    `That's an interesting topic, but I'm your dedicated cooking assistant. Let's focus on creating something delicious! ${contextualSuggestions}`,
+    `I understand you're curious about "${originalMessage.substring(0, 30)}${originalMessage.length > 30 ? '...' : ''}", but I'm here to help with recipes, cooking techniques, and food-related questions. ${contextualSuggestions}`,
+    `While that's outside my cooking expertise, I'm excellent at helping with culinary topics! ${contextualSuggestions}`,
+    `I'm focused on all things cooking and food-related. Let me help you create something amazing in the kitchen! ${contextualSuggestions}`,
+    `That's not my specialty area, but I'm passionate about cooking and would love to help with recipes! ${contextualSuggestions}`,
+    `I'm your cooking companion, so let's channel that energy into creating something delicious! ${contextualSuggestions}`,
+    `That's outside my culinary scope, but I'm great at recipe suggestions and cooking advice! ${contextualSuggestions}`,
+    `I'm here specifically for cooking and food topics. Let's explore some recipes instead! ${contextualSuggestions}`,
+    `Let me redirect to something I'm really good at - helping you cook amazing dishes! ${contextualSuggestions}`
   ];
   
   return responses[Math.floor(Math.random() * responses.length)];
@@ -534,7 +600,7 @@ async function callGroqAI(message, conversationHistory = []) {
 
   const systemMessage = {
     role: "system",
-    content: "You are CookMate, a helpful AI cooking assistant. Help users with recipes, cooking advice, meal planning, and ingredient suggestions. Be friendly, informative, and focus on cooking topics. Provide practical, actionable cooking advice. When users mention ingredients, acknowledge them and suggest creative ways to use them. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking.\n\nIMPORTANT: When you provide multiple recipes, format them as a numbered list where each recipe has a bold name followed by a colon and description. For example:\n\n**Seafood Recipes**\n\n1. **Grilled Salmon**: Fresh salmon fillets seasoned with lemon and herbs, grilled to perfection.\n2. **Shrimp Scampi**: Shrimp sautéed in garlic butter, served with linguine and parsley.\n\nThis format makes it easy for the system to detect and display clickable recipe cards."
+    content: "You are CookMate, a comprehensive AI cooking assistant with extensive culinary knowledge. You can help with a wide range of cooking-related tasks:\n\n**CORE CAPABILITIES:**\n\n1. **Celebrity Chefs & Cooking Personalities**: You know about famous chefs like Gordon Ramsay, Julia Child, Anthony Bourdain, Ina Garten, Bobby Flay, Giada De Laurentiis, Jamie Oliver, Nigella Lawson, Martha Stewart, Wolfgang Puck, and many others. Share interesting facts about their cooking styles, signature dishes, and contributions to cuisine.\n\n2. **Recipe Details**: When asked for a recipe, always provide:\n   - Complete ingredient list with measurements\n   - Step-by-step cooking instructions\n   - Cooking time, prep time, and servings\n   - Difficulty level\n   - Tips and variations\n\n3. **Ingredient-Based Suggestions**: When users list ingredients, suggest delicious recipes using those ingredients. Be creative and practical.\n\n4. **Health & Nutrition**: Provide information about the nutritional benefits of foods, cooking methods, and ingredient combinations. Include vitamins, minerals, and health benefits.\n\n5. **Safety Guidelines**: Always include food safety information when relevant:\n   - Proper cooking temperatures\n   - Food storage guidelines\n   - Handling raw meats safely\n   - Cross-contamination prevention\n   - Proper hygiene practices\n\n6. **About Yourself**: When asked \"Who are you?\" explain that you are CookMate, an AI cooking assistant created by John Mark P. Magdasal and John Paul Mahilom. You were built to help people cook better by providing recipes, cooking advice, and culinary guidance.\n\n**IMPORTANT FORMATTING:** When you provide recipes, format them as:\n\n**Recipe Name**\n\n1. **Ingredients**:\n   - 1 cup ingredient\n   - 2 tbsp ingredient\n\n2. **Instructions**:\n   - Step 1 description\n   - Step 2 description\n\n3. **Nutrition & Benefits**: [Brief health information]\n4. **Safety Tips**: [Relevant safety guidelines]\n\nAlways be informative, helpful, and safety-conscious. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking and cares about your well-being."
   };
   
   // Prepare conversation messages
@@ -600,7 +666,7 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
     
-    // Check for developer questions first (before off-topic check)
+    // Check for developer questions first (highest priority)
     if (isDeveloperQuestion(message)) {
       const developerReply = getDeveloperResponse();
       
@@ -615,7 +681,22 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       });
     }
     
-    // Check for off-topic content
+    // Check for identity questions second (before off-topic check)
+    if (isIdentityQuestion(message)) {
+      const identityReply = getIdentityResponse();
+      
+      return res.status(200).json({
+        response: {
+          message: identityReply,
+          timestamp: new Date().toISOString(),
+          userId: req.userId,
+          isIdentityResponse: true,
+          redirectToCooking: false
+        }
+      });
+    }
+    
+    // Check for off-topic content only after checking legitimate cooking questions
     if (isOffTopic(message)) {
       const aiReply = getOffTopicResponse(message);
       

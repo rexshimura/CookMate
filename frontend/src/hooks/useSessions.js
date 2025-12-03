@@ -20,6 +20,25 @@ export const useSessions = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Listen for global session updates
+  useEffect(() => {
+    const handleSessionUpdate = (event) => {
+      const { sessionId, updates } = event.detail;
+      
+      setSessions(prev => 
+        prev.map(session => 
+          session.id === sessionId ? { ...session, ...updates } : session
+        )
+      );
+    };
+
+    window.addEventListener('sessionUpdated', handleSessionUpdate);
+    
+    return () => {
+      window.removeEventListener('sessionUpdated', handleSessionUpdate);
+    };
+  }, []);
+
   // Load user sessions
   const loadSessions = async () => {
     if (!user) {
@@ -143,6 +162,17 @@ export const useSessionChat = (sessionId) => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
 
+  // Get sessions update function from useSessions context
+  // This is a bit of a hack to avoid circular dependencies
+  const [sessionsState, setSessionsState] = useState({ sessions: [], updateSession: null });
+
+  // Listen for session updates from useSessions hook
+  useEffect(() => {
+    // This effect will be triggered when session updates happen
+    // We can't directly access useSessions here due to circular dependencies
+    // So we'll rely on the global session manager update
+  }, []);
+
   // Load session messages
   const loadMessages = async (sessionIdToLoad = sessionId) => {
     if (!sessionIdToLoad || !user) {
@@ -218,7 +248,12 @@ export const useSessionChat = (sessionId) => {
         // Update session title if it's the first message
         if (messages.length === 0) {
           const sessionTitle = generateSessionTitle(messageText);
-          await updateSession(sessionId, { title: sessionTitle });
+          const updateResult = await updateSession(sessionId, { title: sessionTitle });
+          
+          // Also trigger a global event to update sessions list
+          window.dispatchEvent(new CustomEvent('sessionUpdated', { 
+            detail: { sessionId, updates: { title: sessionTitle } }
+          }));
         }
 
         return aiMessage;

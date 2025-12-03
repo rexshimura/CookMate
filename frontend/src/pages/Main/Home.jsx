@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.jsx';
-import { useSessions, useSessionChat, useNewChat } from '../../hooks/useSessions.js';
+import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
 import { getRecipeDetails, getFavorites } from '../../utils/api.js';
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
@@ -9,7 +9,6 @@ import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 export default function CookMateChat() {
   const { user, logout } = useAuth();
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
-  const { createNewChat, loading: creatingChat } = useNewChat();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -146,10 +145,10 @@ export default function CookMateChat() {
   };
 
   const handleCreateNewChat = async () => {
-    if (creatingChat) return;
+    if (sessionsLoading) return;
     
     try {
-      const newSession = await createNewChat();
+      const newSession = await createNewSession('New Cooking Session');
       if (newSession) {
         setCurrentSessionId(newSession.id);
         if (isMobile) setSidebarOpen(false);
@@ -303,7 +302,7 @@ export default function CookMateChat() {
   }
 
   // If no current session and not creating one, show empty state
-  if (!currentSessionId && !creatingChat) {
+  if (!currentSessionId && !sessionsLoading) {
     return (
       <div className="flex h-screen bg-stone-50 font-sans text-slate-800 overflow-hidden">
         {/* Mobile Sidebar Overlay */}
@@ -315,9 +314,9 @@ export default function CookMateChat() {
               <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
-            <button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
+            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
               <Plus className="w-5 h-5" />
-              <span>{creatingChat ? 'Creating...' : 'New Chat'}</span>
+              <span>{sessionsLoading ? 'Creating...' : 'New Chat'}</span>
             </button>
             <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
               <Heart className="w-5 h-5" />
@@ -338,8 +337,8 @@ export default function CookMateChat() {
               <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg"><Menu className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-3">
-              <button onClick={handleCreateNewChat} disabled={creatingChat} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
-                <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{creatingChat ? 'Creating...' : 'New Chat'}</span>}
+              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
+                <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{sessionsLoading ? 'Creating...' : 'New Chat'}</span>}
               </button>
               <button onClick={handleShowFavorites} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm ${sidebarCollapsed ? 'bg-pink-50 text-pink-600 hover:bg-pink-100' : 'bg-pink-600 text-white hover:bg-pink-700'}`}>
                 <Heart className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">My Favorites</span>}
@@ -365,7 +364,7 @@ export default function CookMateChat() {
               >
                 <Heart className="w-5 h-5" />
               </button>
-              <button onClick={handleCreateNewChat} disabled={creatingChat} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
 
@@ -374,8 +373,8 @@ export default function CookMateChat() {
               <MessageSquare className="w-16 h-16 text-orange-600 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-stone-800 mb-2">Start a New Cooking Conversation</h2>
               <p className="text-stone-600 mb-6">Create your first chat session and let CookMate help you with your culinary adventures!</p>
-              <button onClick={handleCreateNewChat} disabled={creatingChat} className="px-6 py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors disabled:opacity-50">
-                {creatingChat ? 'Creating Chat...' : 'Start New Chat'}
+              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="px-6 py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors disabled:opacity-50">
+                {sessionsLoading ? 'Creating Chat...' : 'Start New Chat'}
               </button>
             </div>
           </div>
@@ -396,9 +395,9 @@ export default function CookMateChat() {
             <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
           </div>
           <div className="p-4 space-y-3">
-            <button onClick={handleCreateNewChat} disabled={creatingChat} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
+            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
               <Plus className="w-5 h-5" />
-              <span>{creatingChat ? 'Creating...' : 'New Chat'}</span>
+              <span>{sessionsLoading ? 'Creating...' : 'New Chat'}</span>
             </button>
             <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
               <Heart className="w-5 h-5" />
@@ -427,8 +426,8 @@ export default function CookMateChat() {
             <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg"><Menu className="w-5 h-5" /></button>
           </div>
           <div className="p-4">
-            <button onClick={handleCreateNewChat} disabled={creatingChat} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
-              <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{creatingChat ? 'Creating...' : 'New Chat'}</span>}
+            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
+              <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{sessionsLoading ? 'Creating...' : 'New Chat'}</span>}
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -451,7 +450,7 @@ export default function CookMateChat() {
             <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600"><Menu className="w-6 h-6" /></button>
             <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
           </div>
-          <button onClick={handleCreateNewChat} disabled={creatingChat} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+          <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
         </div>
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
