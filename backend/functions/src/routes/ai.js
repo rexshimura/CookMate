@@ -219,7 +219,7 @@ async function callGroqAI(message, conversationHistory = []) {
     body: JSON.stringify({
       model: "llama-3.1-8b-instant", // Current free tier model
       messages: messages,
-      max_tokens: 200,
+      max_tokens: 4096, // High token limit for complete responses ( model's maximum)
       temperature: 0.7,
       top_p: 0.9,
       stream: false
@@ -234,6 +234,9 @@ async function callGroqAI(message, conversationHistory = []) {
   
   const data = await response.json();
   const aiResponse = data.choices[0]?.message?.content;
+  
+  console.log('[DEBUG] AI Response Length:', aiResponse ? aiResponse.length : 'null');
+  console.log('[DEBUG] AI Response Preview:', aiResponse ? aiResponse.substring(0, 200) + '...' : 'null');
   
   if (!aiResponse) {
     throw new Error('No response generated from Groq API');

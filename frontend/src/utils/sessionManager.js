@@ -34,8 +34,10 @@ export const createSession = async (userId, title = 'New Cooking Session') => {
       isActive: true,
     };
 
-    await addDoc(collection(db, 'sessions'), sessionData);
-    return { success: true, session: sessionData };
+    const docRef = await addDoc(collection(db, 'sessions'), sessionData);
+    console.log('[DEBUG] Created session - Custom ID:', sessionId, '| Firestore Doc ID:', docRef.id);
+    // Return the Firestore document ID, not the custom ID
+    return { success: true, session: { ...sessionData, id: docRef.id } };
   } catch (error) {
     console.error('Error creating session:', error);
     return { success: false, error: error.message };
@@ -44,21 +46,51 @@ export const createSession = async (userId, title = 'New Cooking Session') => {
 
 export const getUserSessions = async (userId, limitCount = 20) => {
   try {
-    const sessionsQuery = query(
-      collection(db, 'sessions'),
-      where('userId', '==', userId),
-      where('isActive', '==', true),
-      orderBy('updatedAt', 'desc'),
-      limit(limitCount)
-    );
+    // Try the compound query first
+    try {
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('userId', '==', userId),
+        where('isActive', '==', true),
+        orderBy('updatedAt', 'desc'),
+        limit(limitCount)
+      );
 
-    const snapshot = await getDocs(sessionsQuery);
-    const sessions = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+      const snapshot = await getDocs(sessionsQuery);
+      const sessions = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id  // Firestore doc ID must come AFTER spread to override custom id field
+      }));
 
-    return { success: true, sessions };
+      return { success: true, sessions };
+    } catch (indexError) {
+      // Fallback to simpler query if index doesn't exist
+      console.warn('Compound index not found, falling back to simpler query:', indexError);
+      
+      const simpleQuery = query(
+        collection(db, 'sessions'),
+        where('userId', '==', userId),
+        limit(limitCount)
+      );
+
+      const snapshot = await getDocs(simpleQuery);
+      let sessions = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id  // Firestore doc ID must come AFTER spread to override custom id field
+      }));
+
+      // Filter for active sessions and sort client-side
+      sessions = sessions
+        .filter(session => session.isActive !== false)
+        .sort((a, b) => {
+          const dateA = a.updatedAt?.toDate?.() || new Date(a.updatedAt || 0);
+          const dateB = b.updatedAt?.toDate?.() || new Date(b.updatedAt || 0);
+          return dateB - dateA;
+        })
+        .slice(0, limitCount);
+
+      return { success: true, sessions };
+    }
   } catch (error) {
     console.error('Error fetching sessions:', error);
     return { success: false, error: error.message };
@@ -100,7 +132,7 @@ export const getSession = async (sessionId) => {
     const sessionSnap = await getDoc(sessionRef);
     
     if (sessionSnap.exists()) {
-      return { success: true, session: { id: sessionSnap.id, ...sessionSnap.data() } };
+      return { success: true, session: { ...sessionSnap.data(), id: sessionSnap.id } };
     } else {
       return { success: false, error: 'Session not found' };
     }
@@ -136,20 +168,49 @@ export const saveMessage = async (sessionId, message) => {
 
 export const getSessionMessages = async (sessionId, limitCount = 100) => {
   try {
-    const messagesQuery = query(
-      collection(db, 'messages'),
-      where('sessionId', '==', sessionId),
-      orderBy('createdAt', 'asc'),
-      limit(limitCount)
-    );
+    // Try the compound query first
+    try {
+      const messagesQuery = query(
+        collection(db, 'messages'),
+        where('sessionId', '==', sessionId),
+        orderBy('createdAt', 'asc'),
+        limit(limitCount)
+      );
 
-    const snapshot = await getDocs(messagesQuery);
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+      const snapshot = await getDocs(messagesQuery);
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-    return { success: true, messages };
+      return { success: true, messages };
+    } catch (indexError) {
+      // Fallback to simpler query if index doesn't exist
+      console.warn('Messages index not found, falling back to simpler query:', indexError);
+      
+      const simpleQuery = query(
+        collection(db, 'messages'),
+        where('sessionId', '==', sessionId),
+        limit(limitCount)
+      );
+
+      const snapshot = await getDocs(simpleQuery);
+      let messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort messages by creation time client-side
+      messages = messages
+        .sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+          const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+          return dateA - dateB; // ascending order
+        })
+        .slice(0, limitCount);
+
+      return { success: true, messages };
+    }
   } catch (error) {
     console.error('Error fetching messages:', error);
     return { success: false, error: error.message };
