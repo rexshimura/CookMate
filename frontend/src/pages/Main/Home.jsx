@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, ChevronDown } from 'lucide-react';
 import { chatWithAI } from '../../utils/api';
 
 export default function CookMateChat() {
@@ -24,7 +24,10 @@ export default function CookMateChat() {
   const [isTyping, setIsTyping] = useState(false);
   const [sessions, setSessions] = useState([]); // Placeholder for sessions
 
+  // Scroll States & Refs
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -38,8 +41,23 @@ export default function CookMateChat() {
   }, []);
 
   useEffect(() => {
+    // Auto-scroll on new message
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  const handleScroll = () => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      // Show button if we are more than 300px away from the bottom
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 300;
+      setShowScrollButton(!isNearBottom);
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollButton(false);
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -159,7 +177,11 @@ export default function CookMateChat() {
           <button onClick={createNewSession} className="p-2 text-orange-600 bg-orange-50 rounded-full"><Plus className="w-5 h-5" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
+        <div
+          ref={chatContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth"
+        >
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
@@ -183,6 +205,17 @@ export default function CookMateChat() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {/* Scroll To Bottom Button */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30 p-2 bg-white text-orange-600 rounded-full shadow-lg border border-stone-200 hover:bg-orange-50 transition-all animate-bounce"
+            aria-label="Scroll to bottom"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        )}
 
         <div className="p-4 lg:p-6 bg-gradient-to-t from-stone-50 via-stone-50 to-transparent">
           <div className="max-w-3xl mx-auto relative">
