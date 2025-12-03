@@ -277,29 +277,31 @@ const Sidebar = ({
           `}>
             {/* Avatar shimmer effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-            {user.displayName?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+            {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A'}
           </div>
           
           {!isCollapsed && (
             <>
               <div className="text-left flex-1 overflow-hidden">
                 <p className="text-sm font-semibold text-stone-700 truncate">
-                  {user.displayName || 'User'}
+                  {user?.displayName || 'Anonymous User'}
                 </p>
-                <p className="text-xs text-stone-500 truncate">{user.email}</p>
+                <p className="text-xs text-stone-500 truncate">{user?.email || 'Guest'}</p>
               </div>
               
-              <button 
-                onClick={onLogout}
-                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
-              </button>
+              {user && (
+                <button 
+                  onClick={onLogout}
+                  className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                </button>
+              )}
             </>
           )}
           
-          {isCollapsed && (
+          {isCollapsed && user && (
             <div className="absolute left-full ml-3 px-3 py-2 bg-stone-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
               <div className="font-semibold">{user.displayName || 'User'}</div>
               <div className="text-xs text-stone-300">{user.email}</div>

@@ -52,6 +52,10 @@ export default function Home() {
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
 
+  // Login prompt state
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginPromptMessage, setLoginPromptMessage] = useState('');
+
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
@@ -250,12 +254,32 @@ export default function Home() {
 
   // Favorites handlers
   const handleShowFavorites = () => {
+    if (!user) {
+      setLoginPromptMessage('Please sign in to view your favorite recipes.');
+      setShowLoginPrompt(true);
+      return;
+    }
     setShowFavorites(true);
     loadFavoriteRecipes();
   };
 
   const handleHideFavorites = () => {
     setShowFavorites(false);
+  };
+
+  // Login prompt handlers
+  const handleLoginPromptClose = () => {
+    setShowLoginPrompt(false);
+    setLoginPromptMessage('');
+  };
+
+  const requireAuth = (featureName) => {
+    if (!user) {
+      setLoginPromptMessage(`Please sign in to use ${featureName}.`);
+      setShowLoginPrompt(true);
+      return false;
+    }
+    return true;
   };
 
   const loadFavoriteRecipes = async () => {
@@ -330,39 +354,8 @@ export default function Home() {
     return lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
   };
 
-  // If user is not logged in, show login prompt
-  if (!user) {
-    return (
-      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 items-center justify-center relative overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
-        </div>
-        
-        <div className="relative text-center p-8 bg-gradient-to-b from-white via-stone-50/80 to-stone-100/80 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md">
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none rounded-2xl"></div>
-          
-          <div className="relative z-10">
-            <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-200/50">
-              <ChefHat className="w-10 h-10 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">Welcome to CookMate</h2>
-            <p className="text-stone-600 mb-6 leading-relaxed">Please sign in to start chatting and save your cooking conversations.</p>
-            <div className="space-y-3">
-              <a href="/signin" className="relative block w-full py-3 px-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                Sign In
-              </a>
-              <a href="/signup" className="block w-full py-3 px-4 border border-stone-300 text-stone-700 rounded-2xl font-medium hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 transition-all duration-200 hover:scale-105">
-                Create Account
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Allow anonymous users to use chat functionality
+  // Authentication is only required for favorites and collections
 
   // Show loading while setting up session
   if (sessionsLoading && sessions.length === 0 && !currentSessionId) {
@@ -506,7 +499,7 @@ export default function Home() {
               messages.map((message) => (
                 <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${message.isUser ? 'bg-stone-800 text-white' : 'bg-white border border-stone-200 text-orange-600'}`}>
-                    {message.isUser ? user.displayName?.[0]?.toUpperCase() || user.email[0].toUpperCase() : <Flame className="w-5 h-5 fill-orange-500" />}
+                    {message.isUser ? user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A' : <Flame className="w-5 h-5 fill-orange-500" />}
                   </div>
                   <div className={`flex flex-col max-w-[85%] lg:max-w-[75%] ${message.isUser ? 'items-end' : 'items-start'}`}>
                     <div className={`px-5 py-4 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${message.isUser ? 'bg-orange-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-700 rounded-2xl rounded-tl-sm'}`}>
@@ -529,6 +522,8 @@ export default function Home() {
                             onAddToFavorites={handleAddToFavoritesCallback}
                             onAddToCollection={handleAddToCollectionCallback}
                             fetchRecipeDetails={handleFetchRecipeDetails}
+                            user={user}
+                            requireAuth={requireAuth}
                           />
                         ))}
                       </div>
@@ -696,6 +691,8 @@ export default function Home() {
                         onAddToFavorites={handleAddToFavoritesCallback}
                         onAddToCollection={handleAddToCollectionCallback}
                         fetchRecipeDetails={handleFetchRecipeDetails}
+                        user={user}
+                        requireAuth={requireAuth}
                       />
                     ))}
                   </div>
@@ -706,6 +703,55 @@ export default function Home() {
         )}
       </div>
       
+      {/* Login Prompt Modal */}
+      {showLoginPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
+            onClick={handleLoginPromptClose}
+          />
+          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full transition-all duration-500 ease-out">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-700 text-white p-6 rounded-t-2xl relative overflow-hidden">
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none"></div>
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-3">
+                  <ChefHat className="w-8 h-8 fill-white" />
+                  <h2 className="text-2xl font-bold tracking-wide">Sign In Required</h2>
+                </div>
+                <button
+                  onClick={handleLoginPromptClose}
+                  className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200 hover:scale-110"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-stone-600 mb-6 leading-relaxed">{loginPromptMessage}</p>
+              <div className="space-y-3">
+                <a href="/signin" className="relative block w-full py-3 px-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  Sign In
+                </a>
+                <a href="/signup" className="block w-full py-3 px-4 border border-stone-300 text-stone-700 rounded-2xl font-medium hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 transition-all duration-200 hover:scale-105">
+                  Create Account
+                </a>
+                <button 
+                  onClick={handleLoginPromptClose}
+                  className="block w-full py-2 px-4 text-stone-500 hover:text-stone-700 rounded-2xl font-medium hover:bg-stone-50 transition-all duration-200 hover:scale-105 text-sm"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Dialogs */}
       <DeleteDialog />
       <LogoutDialog />

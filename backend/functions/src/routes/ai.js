@@ -673,9 +673,25 @@ function isValidRecipe(text) {
     'global inspirations', 'quick and easy', 'veggie delights'
   ];
   
+  // Section headers and ingredient instruction phrases to exclude
+  const sectionHeaders = [
+    'for the salmon', 'for the chicken', 'for the beef', 'for the fish', 'for the pork',
+    'for the vegetables', 'for the sauce', 'for the garnish', 'for the seasoning',
+    'to the salmon', 'to the chicken', 'to the beef', 'to the fish', 'to the pork',
+    'the salmon', 'the chicken', 'the beef', 'the fish', 'the pork',
+    'for salmon', 'for chicken', 'for beef', 'for fish', 'for pork',
+    'season the salmon', 'season the chicken', 'season the beef', 'season the fish', 'season the pork'
+  ];
+  
   // Check for generic terms first (highest priority to exclude)
   if (genericTerms.some(term => lowerText.includes(term))) {
     console.log('❌ [VALIDATION] Failed: contains generic terms');
+    return false;
+  }
+  
+  // Check for section headers and instruction phrases (high priority exclusion)
+  if (sectionHeaders.some(header => lowerText.includes(header))) {
+    console.log('❌ [VALIDATION] Failed: contains section header or instruction phrase');
     return false;
   }
   

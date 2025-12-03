@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle } from 'lucide-react';
 import { 
   addToFavorites, 
-  removeFromFavorites, 
-  getFavorites, 
   addRecipeToCollection 
 } from '../../../utils/api.js';
 
@@ -15,9 +13,10 @@ const RecipeCard = ({
   onAddToFavorites,
   onAddToCollection,
   collections = [],
-  fetchRecipeDetails
+  fetchRecipeDetails,
+  user = null,
+  requireAuth = null
 }) => {
-  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [localIsFavorited, setLocalIsFavorited] = useState(isFavorited);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [showCollectionsDropdown, setShowCollectionsDropdown] = useState(false);
@@ -34,6 +33,14 @@ const RecipeCard = ({
   const handleAddToFavorites = async (e) => {
     e?.stopPropagation();
     if (!recipe || favoritesLoading) return;
+    
+    // Check authentication
+    if (!user) {
+      if (requireAuth) {
+        requireAuth('add recipes to favorites');
+      }
+      return;
+    }
     
     setFavoritesLoading(true);
     try {
@@ -69,6 +76,14 @@ const RecipeCard = ({
   const handleAddToCollection = async (collectionId, e) => {
     e?.stopPropagation();
     if (!recipe || !collectionId) return;
+    
+    // Check authentication
+    if (!user) {
+      if (requireAuth) {
+        requireAuth('add recipes to collections');
+      }
+      return;
+    }
     
     try {
       let recipeData = recipe;
@@ -156,8 +171,8 @@ const RecipeCard = ({
           </div>
         </div>
         
-        {/* Action Buttons - Only show if collections are provided */}
-        {(collections && collections.length > 0) && (
+        {/* Action Buttons - Only show if user is authenticated and collections are provided */}
+        {(user && collections && collections.length > 0) && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             {/* Favorites Button */}
             <button

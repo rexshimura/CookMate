@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Users, DollarSign, ChefHat, Play, Info, CheckCircle, Heart, Folder, Plus, ChevronDown, Timer, Scale, AlertCircle, Award } from 'lucide-react';
+import { X, Clock, Users, DollarSign, ChefHat, Play, Info, CheckCircle, Heart, Folder, Plus, ChevronDown, Timer, Scale, AlertCircle, Award, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../hooks/useAuth';
 import { 
   addToFavorites, 
   removeFromFavorites, 
@@ -10,6 +12,9 @@ import {
 } from '../../../utils/api.js';
 
 const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, onAddToFavorites = null }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [recipeData, setRecipeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -41,8 +46,12 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     }
   };
 
-  // Load user's favorite recipes
+  // Load user's favorite recipes (only if authenticated)
   const loadFavoriteRecipes = async () => {
+    if (!user) {
+      setFavoriteRecipes([]);
+      return;
+    }
     try {
       const result = await getFavorites();
       if (result.success) {
@@ -56,8 +65,12 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     }
   };
 
-  // Load user's collections
+  // Load user's collections (only if authenticated)
   const loadCollections = async () => {
+    if (!user) {
+      setCollections([]);
+      return;
+    }
     try {
       const result = await getCollections();
       if (result.success) {
@@ -83,9 +96,15 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     }
   };
 
-  // Add to favorites
+  // Add to favorites (with auth check)
   const handleAddToFavorites = async () => {
     if (!recipeData) return;
+    
+    // Check if user is authenticated
+    if (!user) {
+      setShowAuthPrompt(true);
+      return;
+    }
     
     setFavoritesLoading(true);
     try {
@@ -131,9 +150,16 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     }
   };
 
-  // Add recipe to collection
+  // Add recipe to collection (with auth check)
   const handleAddToCollection = async (collectionId) => {
     if (!recipeData || !collectionId) return;
+    
+    // Check if user is authenticated
+    if (!user) {
+      setShowAuthPrompt(true);
+      setShowCollectionsDropdown(false);
+      return;
+    }
     
     try {
       const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -733,6 +759,58 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
           ) : null}
         </div>
       </div>
+
+      {/* Authentication Prompt Modal */}
+      {showAuthPrompt && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-stone-900/70 backdrop-blur-sm"
+            onClick={() => setShowAuthPrompt(false)}
+          />
+          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/20 border border-stone-200/60 max-w-md w-full p-8 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-200/60 shadow-lg shadow-orange-200/30">
+              <LogIn className="w-8 h-8 text-orange-600" />
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-3 tracking-wide">Sign In Required</h3>
+            <p className="text-stone-600 mb-6 leading-relaxed">
+              To save recipes to your favorites or collections, please sign in to your account or create a new one.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                  onClose();
+                  navigate('/sign-in');
+                }}
+                className="relative w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl hover:from-orange-700 hover:to-red-700 transition-all duration-300 font-semibold overflow-hidden group hover:scale-105"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <LogIn className="w-5 h-5" />
+                  Sign In
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                  onClose();
+                  navigate('/sign-up');
+                }}
+                className="relative w-full px-6 py-3 bg-gradient-to-r from-stone-100 to-stone-200 text-stone-700 rounded-2xl hover:from-stone-200 hover:to-stone-300 transition-all duration-300 font-semibold overflow-hidden group hover:scale-105 border border-stone-300"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                <span className="relative z-10">Create Account</span>
+              </button>
+              <button
+                onClick={() => setShowAuthPrompt(false)}
+                className="text-stone-500 hover:text-stone-700 font-medium transition-colors mt-2"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

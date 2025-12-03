@@ -42,7 +42,13 @@ export const useSessions = () => {
   // Load user sessions
   const loadSessions = async () => {
     if (!user) {
-      setSessions([]);
+      // For anonymous users, check for existing local session
+      const localSession = localStorage.getItem('anonymous_session');
+      if (localSession) {
+        setSessions([JSON.parse(localSession)]);
+      } else {
+        setSessions([]);
+      }
       return;
     }
 
@@ -65,13 +71,27 @@ export const useSessions = () => {
 
   // Create new session
   const createNewSession = async (title) => {
-    if (!user) {
-      setError('User not authenticated');
-      return null;
-    }
-
     try {
       setError(null);
+      
+      if (!user) {
+        // Create anonymous session
+        const anonymousSession = {
+          id: `anon_${Date.now()}`,
+          title: title || 'Anonymous Chat',
+          lastMessage: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isAnonymous: true
+        };
+        
+        // Store in localStorage
+        localStorage.setItem('anonymous_session', JSON.stringify(anonymousSession));
+        
+        // Add to local state
+        setSessions([anonymousSession]);
+        return anonymousSession;
+      }
       
       const result = await createSession(user.uid, title);
       if (result.success) {
@@ -175,7 +195,7 @@ export const useSessionChat = (sessionId) => {
 
   // Load session messages
   const loadMessages = async (sessionIdToLoad = sessionId) => {
-    if (!sessionIdToLoad || !user) {
+    if (!sessionIdToLoad) {
       setMessages([]);
       return;
     }
@@ -183,6 +203,13 @@ export const useSessionChat = (sessionId) => {
     try {
       setLoading(true);
       setError(null);
+      
+      // For anonymous sessions, load from localStorage
+      if (!user || sessionIdToLoad.startsWith('anon_')) {
+        const localMessages = localStorage.getItem(`messages_${sessionIdToLoad}`);
+        setMessages(localMessages ? JSON.parse(localMessages) : []);
+        return;
+      }
       
       const result = await getSessionMessages(sessionIdToLoad);
       if (result.success) {
@@ -199,7 +226,7 @@ export const useSessionChat = (sessionId) => {
 
   // Send message and get AI response
   const sendMessage = async (messageText) => {
-    if (!sessionId || !user || !messageText.trim()) {
+    if (!sessionId || !messageText.trim()) {
       return;
     }
 
@@ -218,8 +245,15 @@ export const useSessionChat = (sessionId) => {
       // Add user message to UI immediately
       setMessages(prev => [...prev, userMessage]);
 
-      // Save user message to database
-      await saveMessage(sessionId, userMessage);
+      // Save user message (localStorage for anonymous users)
+      if (!user || sessionId.startsWith('anon_')) {
+        const localMessages = localStorage.getItem(`messages_${sessionId}`);
+        const messagesArray = localMessages ? JSON.parse(localMessages) : [];
+        messagesArray.push(userMessage);
+        localStorage.setItem(`messages_${sessionId}`, JSON.stringify(messagesArray));
+      } else {
+        await saveMessage(sessionId, userMessage);
+      }
 
       // Prepare short conversation history for context (last 10 messages)
       const history = [...messages, userMessage].slice(-10).map(m => ({
@@ -250,18 +284,34 @@ export const useSessionChat = (sessionId) => {
           return [...prev, aiMessage];
         });
 
-        // Save AI message to database
-        await saveMessage(sessionId, aiMessage);
-
-        // Update session title if it's the first message
-        if (messages.length === 0) {
-          const sessionTitle = generateSessionTitle(messageText);
-          const updateResult = await updateSession(sessionId, { title: sessionTitle });
+        // Save AI message (localStorage for anonymous users)
+        if (!user || sessionId.startsWith('anon_')) {
+          const localMessages = localStorage.getItem(`messages_${sessionId}`);
+          const messagesArray = localMessages ? JSON.parse(localMessages) : [];
+          messagesArray.push(aiMessage);
+          localStorage.setItem(`messages_${sessionId}`, JSON.stringify(messagesArray));
           
-          // Also trigger a global event to update sessions list
-          window.dispatchEvent(new CustomEvent('sessionUpdated', { 
-            detail: { sessionId, updates: { title: sessionTitle } }
-          }));
+          // Update anonymous session with last message
+          const localSession = localStorage.getItem('anonymous_session');
+          if (localSession) {
+            const session = JSON.parse(localSession);
+            session.lastMessage = messageText.substring(0, 100) + (messageText.length > 100 ? '...' : '');
+            session.updatedAt = new Date();
+            localStorage.setItem('anonymous_session', JSON.stringify(session));
+          }
+        } else {
+          await saveMessage(sessionId, aiMessage);
+
+          // Update session title if it's the first message
+          if (messages.length === 0) {
+            const sessionTitle = generateSessionTitle(messageText);
+            const updateResult = await updateSession(sessionId, { title: sessionTitle });
+            
+            // Also trigger a global event to update sessions list
+            window.dispatchEvent(new CustomEvent('sessionUpdated', { 
+              detail: { sessionId, updates: { title: sessionTitle } }
+            }));
+          }
         }
 
         return aiMessage;
@@ -281,7 +331,16 @@ export const useSessionChat = (sessionId) => {
       };
       
       setMessages(prev => [...prev, errorMessage]);
-      await saveMessage(sessionId, errorMessage);
+      
+      // Save error message
+      if (!user || sessionId.startsWith('anon_')) {
+        const localMessages = localStorage.getItem(`messages_${sessionId}`);
+        const messagesArray = localMessages ? JSON.parse(localMessages) : [];
+        messagesArray.push(errorMessage);
+        localStorage.setItem(`messages_${sessionId}`, JSON.stringify(messagesArray));
+      } else {
+        await saveMessage(sessionId, errorMessage);
+      }
     } finally {
       setSending(false);
     }
