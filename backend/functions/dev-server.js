@@ -40,12 +40,16 @@ app.get('/api/health', (req, res) => {
 // Import the routes
 const aiRouter = require('./src/routes/ai');
 const userRouter = require('./src/routes/users');
+const collectionsRouter = require('./src/routes/collections');
 
 // Use AI routes
 app.use('/api/ai', mockAuth, aiRouter);
 
 // Use user routes (for favorites functionality)
 app.use('/api/users', mockAuth, userRouter);
+
+// Use collections routes
+app.use('/api/collections', mockAuth, collectionsRouter);
 
 // Mock user endpoints
 app.get('/api/users/profile', mockAuth, (req, res) => {

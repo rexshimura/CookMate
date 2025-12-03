@@ -26,39 +26,20 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-### Option 2: Automated Startup (Recommended - No Port Conflicts!)
+### Option 2: Single Startup Script (Recommended)
 
 #### For Windows:
 ```bash
-# Automatic port cleanup + startup
-start-dev.bat
+start.bat
 ```
 
 #### For Mac/Linux:
 ```bash
-# Make script executable and run
-chmod +x start-dev.sh
-./start-dev.sh
+chmod +x start.sh
+./start.sh
 ```
 
-**What it does:** Automatically cleans up conflicting ports and starts both servers!
-
-### Option 3: Simple Mode (Express Server)
-
-If you prefer to avoid Firebase emulators entirely:
-
-#### For Windows:
-```bash
-start-dev-simple.bat
-```
-
-#### For Mac/Linux:
-```bash
-chmod +x start-dev-simple.sh
-./start-dev-simple.sh
-```
-
-**Benefits:** Uses Express dev server instead of Firebase - more reliable for development!
+**What it does:** Starts both frontend (http://localhost:5173) and backend (http://localhost:5001) automatically!
 
 ### Option 4: Manual Setup
 
@@ -115,16 +96,20 @@ npm run dev:frontend   # Terminal 2
 - **Solution**: Install Node.js from https://nodejs.org/ (LTS version recommended)
 - **Verify**: Run `node --version` and `npm --version` to confirm installation
 
-#### 2. **Port 5001 or 5173 already in use**
-- **Problem**: Another process is using the required ports
+#### 2. **Port 5000, 5001, or 8080 already in use**
+- **Problem**: Another process is using the required ports for Firebase emulators
 - **Solution**: 
   ```bash
   # Windows
+  netstat -ano | findstr :5000
   netstat -ano | findstr :5001
+  netstat -ano | findstr :8080
   taskkill /PID <PID_NUMBER> /F
   
   # Mac/Linux  
+  lsof -ti:5000 | xargs kill -9
   lsof -ti:5001 | xargs kill -9
+  lsof -ti:8080 | xargs kill -9
   ```
 
 #### 3. **"Cannot find module" errors**

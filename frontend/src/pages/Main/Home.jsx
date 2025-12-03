@@ -1,14 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
-import { getRecipeDetails, getFavorites } from '../../utils/api.js';
+import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.js';
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
+import Sidebar from '../Components/Utility/Sidebar.jsx';
+import { useDeleteConfirmation, useLogoutConfirmation } from '../Components/UI/useConfirmation.jsx';
 
-export default function CookMateChat() {
+export default function Home() {
   const { user, logout } = useAuth();
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
+  const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
+  const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -31,7 +36,7 @@ export default function CookMateChat() {
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const [inputMessage, setInputMessage] = useState('');
-  const [showScrollButton, setShowScrollButton] = useState(true); // Force to true for testing
+  const [showScrollButton, setShowScrollButton] = useState(false);
   
   // Recipe modal state
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -42,6 +47,10 @@ export default function CookMateChat() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+
+  // Collections state
+  const [collections, setCollections] = useState([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -59,55 +68,51 @@ export default function CookMateChat() {
   }, [messages, isTyping]);
 
   useEffect(() => {
-    console.log('useEffect triggered, ref current:', messagesContainerRef.current);
+    let lastScrollY = 0;
     
     const handleScroll = () => {
-      console.log('Scroll event fired!');
       if (messagesContainerRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
         const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-        // Show button if scrolled up more than 20px from bottom
+        const isScrollingUp = scrollTop < lastScrollY;
+        
+        // Show button when user is scrolled up more than 20px from bottom
         const shouldShow = distanceFromBottom > 20;
-        console.log('Scroll detection:', { 
-          scrollTop, 
-          scrollHeight, 
-          clientHeight, 
-          distanceFromBottom, 
-          shouldShow 
-        });
+        
         setShowScrollButton(shouldShow);
+        lastScrollY = scrollTop;
       }
     };
 
-    const container = messagesContainerRef.current;
-    console.log('Container check:', container);
-    
-    if (container) {
-      console.log('Adding scroll listener to container');
-      container.addEventListener('scroll', handleScroll);
-      // Check initial scroll position
-      handleScroll();
-      
-      return () => {
-        console.log('Cleaning up scroll listener');
-        if (container) {
-          container.removeEventListener('scroll', handleScroll);
-        }
-      };
-    } else {
-      console.log('Container is null, setting up delayed check');
-      // Try again after component mounts
-      setTimeout(() => {
-        const delayedContainer = messagesContainerRef.current;
-        console.log('Delayed container check:', delayedContainer);
-        if (delayedContainer) {
-          console.log('Adding scroll listener with delay');
-          delayedContainer.addEventListener('scroll', handleScroll);
-          handleScroll();
-        }
-      }, 100);
+    // Try multiple times to get the container
+    const setupScrollListener = () => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        console.log('✅ [SCROLL] Adding scroll listener to container');
+        container.addEventListener('scroll', handleScroll);
+        handleScroll(); // Check initial position
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (!setupScrollListener()) {
+      // Try after component mount
+      setTimeout(setupScrollListener, 100);
+      // Try again after more time
+      setTimeout(setupScrollListener, 500);
+      // Try one more time
+      setTimeout(setupScrollListener, 1000);
     }
-  }, []); // Remove dependency on messagesContainerRef to prevent infinite loops
+
+    return () => {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -120,6 +125,20 @@ export default function CookMateChat() {
       setCurrentSessionId(sessions[0].id);
     }
   }, [sessions, currentSessionId, sessionsLoading]);
+
+  // Load collections when user is authenticated
+  useEffect(() => {
+    if (user) {
+      loadCollections();
+    }
+  }, [user]);
+
+  // Load favorites when showing favorites modal
+  useEffect(() => {
+    if (showFavorites) {
+      loadFavoriteRecipes();
+    }
+  }, [showFavorites]);
 
   const focusInput = () => {
     // Small delay to ensure the DOM is ready after re-render
@@ -166,7 +185,10 @@ export default function CookMateChat() {
   const handleDeleteSession = async (sessionId, e) => {
     e.stopPropagation();
     
-    if (window.confirm('Are you sure you want to delete this chat?')) {
+    const session = sessions.find(s => s.id === sessionId);
+    const confirmed = await confirmDelete(session ? `"${session.title}"` : 'this chat');
+    
+    if (confirmed) {
       try {
         await deleteExistingSession(sessionId);
         
@@ -180,6 +202,8 @@ export default function CookMateChat() {
             clearMessages();
           }
         }
+        
+
       } catch (error) {
         console.error('Failed to delete session:', error);
       }
@@ -187,13 +211,19 @@ export default function CookMateChat() {
   };
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      // Clear local state
-      setCurrentSessionId(null);
-      clearMessages();
-    } catch (error) {
-      console.error('Failed to logout:', error);
+    const confirmed = await confirmLogout();
+    
+    if (confirmed) {
+      try {
+        await logout();
+        // Clear local state
+        setCurrentSessionId(null);
+        clearMessages();
+        
+
+      } catch (error) {
+        console.error('Failed to logout:', error);
+      }
     }
   };
 
@@ -242,10 +272,42 @@ export default function CookMateChat() {
     }
   };
 
+  const loadCollections = async () => {
+    setCollectionsLoading(true);
+    try {
+      const result = await getCollections();
+      if (result.success) {
+        setCollections(result.collections || []);
+      }
+    } catch (error) {
+      console.error('Failed to load collections:', error);
+    } finally {
+      setCollectionsLoading(false);
+    }
+  };
+
   const handleFavoriteRecipeClick = (recipe) => {
+    // Close favorites modal first, then open recipe details
+    setShowFavorites(false);
+    
     // For favorites, we need to fetch the full recipe details since we only have basic info
     setSelectedRecipe(recipe.title || recipe.name);
     setRecipeModalOpen(true);
+  };
+
+  // Handle add to favorites callback
+  const handleAddToFavoritesCallback = (recipeData) => {
+    setFavoriteRecipes(prev => [...prev, recipeData]);
+  };
+
+  // Handle add to collection callback
+  const handleAddToCollectionCallback = (collectionId, recipeData) => {
+    // Update the specific collection's recipe count locally
+    setCollections(prev => prev.map(collection => 
+      collection.id === collectionId 
+        ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
+        : collection
+    ));
   };
 
   // Helper function to check if a recipe is favorited
@@ -271,18 +333,31 @@ export default function CookMateChat() {
   // If user is not logged in, show login prompt
   if (!user) {
     return (
-      <div className="flex h-screen bg-stone-50 font-sans text-slate-800 items-center justify-center">
-        <div className="text-center p-8 bg-white rounded-xl shadow-lg border border-stone-200 max-w-md">
-          <ChefHat className="w-16 h-16 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-stone-800 mb-2">Welcome to CookMate</h2>
-          <p className="text-stone-600 mb-6">Please sign in to start chatting and save your cooking conversations.</p>
-          <div className="space-y-3">
-            <a href="/signin" className="block w-full py-3 px-4 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors">
-              Sign In
-            </a>
-            <a href="/signup" className="block w-full py-3 px-4 border border-stone-300 text-stone-700 rounded-xl font-medium hover:bg-stone-50 transition-colors">
-              Create Account
-            </a>
+      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 items-center justify-center relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
+        </div>
+        
+        <div className="relative text-center p-8 bg-gradient-to-b from-white via-stone-50/80 to-stone-100/80 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md">
+          {/* Shimmer effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none rounded-2xl"></div>
+          
+          <div className="relative z-10">
+            <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-200/50">
+              <ChefHat className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">Welcome to CookMate</h2>
+            <p className="text-stone-600 mb-6 leading-relaxed">Please sign in to start chatting and save your cooking conversations.</p>
+            <div className="space-y-3">
+              <a href="/signin" className="relative block w-full py-3 px-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                Sign In
+              </a>
+              <a href="/signup" className="block w-full py-3 px-4 border border-stone-300 text-stone-700 rounded-2xl font-medium hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 transition-all duration-200 hover:scale-105">
+                Create Account
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -292,10 +367,18 @@ export default function CookMateChat() {
   // Show loading while setting up session
   if (sessionsLoading && sessions.length === 0 && !currentSessionId) {
     return (
-      <div className="flex h-screen bg-stone-50 font-sans text-slate-800 items-center justify-center">
-        <div className="text-center">
-          <ChefHat className="w-16 h-16 text-orange-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-stone-600">Loading your cooking sessions...</p>
+      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 items-center justify-center relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
+        </div>
+        
+        <div className="relative text-center">
+          <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-orange-200/60 shadow-lg shadow-orange-200/30">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-1000 rounded-2xl"></div>
+            <ChefHat className="w-10 h-10 text-orange-600 relative z-10 animate-pulse" />
+          </div>
+          <p className="text-stone-600 font-medium tracking-wide">Loading your cooking sessions...</p>
         </div>
       </div>
     );
@@ -304,76 +387,64 @@ export default function CookMateChat() {
   // If no current session and not creating one, show empty state
   if (!currentSessionId && !sessionsLoading) {
     return (
-      <div className="flex h-screen bg-stone-50 font-sans text-slate-800 overflow-hidden">
-        {/* Mobile Sidebar Overlay */}
-        {isMobile && <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-          <div className={`absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setSidebarOpen(false)} />
-          <div className={`absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="p-5 flex items-center justify-between border-b border-stone-100">
-              <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>
-              <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4 space-y-3">
-            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
-              <Plus className="w-5 h-5" />
-              <span>{sessionsLoading ? 'Creating...' : 'New Chat'}</span>
-            </button>
-            <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
-              <Heart className="w-5 h-5" />
-              <span>My Favorites</span>
-            </button>
-          </div>
-            <div className="flex-1" />
-            <UserAccountFooter collapsed={false} user={user} onLogout={handleLogout} />
-          </div>
-        </div>}
-
-        {/* Desktop Sidebar */}
-        {!isMobile && (
-          <div className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-stone-200 flex flex-col transition-all duration-300 relative z-20`}>
-            <div className="h-16 flex items-center justify-between px-5 border-b border-stone-100">
-              {!sidebarCollapsed && <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>}
-              {sidebarCollapsed && <div className="w-full flex justify-center text-orange-600"><ChefHat className="w-6 h-6" /></div>}
-              <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg"><Menu className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4 space-y-3">
-              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
-                <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{sessionsLoading ? 'Creating...' : 'New Chat'}</span>}
-              </button>
-              <button onClick={handleShowFavorites} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm ${sidebarCollapsed ? 'bg-pink-50 text-pink-600 hover:bg-pink-100' : 'bg-pink-600 text-white hover:bg-pink-700'}`}>
-                <Heart className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">My Favorites</span>}
-              </button>
-            </div>
-            <div className="flex-1" />
-            <UserAccountFooter collapsed={sidebarCollapsed} user={user} onLogout={handleLogout} />
-          </div>
-        )}
+      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
+        </div>
+        
+        {/* Enhanced Sidebar */}
+        <Sidebar
+          isOpen={sidebarOpen}
+          isCollapsed={sidebarCollapsed}
+          isMobile={isMobile}
+          user={user}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onClose={() => setSidebarOpen(false)}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onCreateSession={handleCreateNewChat}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
+          onShowFavorites={handleShowFavorites}
+          onLogout={handleLogout}
+          sessionsLoading={sessionsLoading}
+          collapsed={sidebarCollapsed}
+        />
 
         {/* Main Content Area - Empty State */}
-        <div className="flex-1 flex flex-col min-w-0 bg-stone-50/50 relative">
-          <div className="lg:hidden h-16 bg-white/80 backdrop-blur-md border-b border-stone-200 flex items-center justify-between px-4 sticky top-0 z-10">
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
+          <div className="lg:hidden h-16 bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 flex items-center justify-between px-4 sticky top-0 z-10">
             <div className="flex items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600"><Menu className="w-6 h-6" /></button>
+              <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors duration-200"><Menu className="w-6 h-6" /></button>
               <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
             </div>
             <div className="flex items-center gap-2">
               <button 
                 onClick={handleShowFavorites}
-                className="p-2 text-pink-600 bg-pink-50 rounded-full hover:bg-pink-100 transition-colors"
+                className="p-2 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-full transition-all duration-200 hover:scale-105"
                 title="My Favorites"
               >
                 <Heart className="w-5 h-5" />
               </button>
-              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center max-w-md">
-              <MessageSquare className="w-16 h-16 text-orange-600 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-stone-800 mb-2">Start a New Cooking Conversation</h2>
-              <p className="text-stone-600 mb-6">Create your first chat session and let CookMate help you with your culinary adventures!</p>
-              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="px-6 py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors disabled:opacity-50">
+            <div className="relative text-center max-w-md">
+              <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-200/60 shadow-lg shadow-orange-200/30">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-2000 rounded-2xl"></div>
+                <MessageSquare className="w-10 h-10 text-orange-600 relative z-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">Start a New Cooking Conversation</h2>
+              <p className="text-stone-600 mb-6 leading-relaxed">Create your first chat session and let CookMate help you with your culinary adventures!</p>
+              <button 
+                onClick={handleCreateNewChat} 
+                disabled={sessionsLoading} 
+                className="relative px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                 {sessionsLoading ? 'Creating Chat...' : 'Start New Chat'}
               </button>
             </div>
@@ -385,72 +456,39 @@ export default function CookMateChat() {
 
   // Render the full chat interface
   return (
-    <div className="flex h-screen bg-stone-50 font-sans text-slate-800 overflow-hidden">
-      {/* Mobile Sidebar Overlay */}
-      {isMobile && <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-        <div className={`absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`} onClick={() => setSidebarOpen(false)} />
-        <div className={`absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="p-5 flex items-center justify-between border-b border-stone-100">
-            <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>
-            <button onClick={() => setSidebarOpen(false)} className="p-2 text-stone-400"><X className="w-5 h-5" /></button>
-          </div>
-          <div className="p-4 space-y-3">
-            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 text-white rounded-xl shadow-md font-medium disabled:opacity-50">
-              <Plus className="w-5 h-5" />
-              <span>{sessionsLoading ? 'Creating...' : 'New Chat'}</span>
-            </button>
-            <button onClick={handleShowFavorites} className="w-full flex items-center gap-3 px-4 py-3 bg-pink-600 text-white rounded-xl shadow-md font-medium hover:bg-pink-700 transition-colors">
-              <Heart className="w-5 h-5" />
-              <span>My Favorites</span>
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <SessionList 
-              sessions={sessions} 
-              currentSessionId={currentSessionId}
-              onSelectSession={handleSelectSession}
-              onDeleteSession={handleDeleteSession}
-              collapsed={false}
-            />
-          </div>
-          <UserAccountFooter collapsed={false} user={user} onLogout={handleLogout} />
-        </div>
-      </div>}
-
-      {/* Desktop Sidebar */}
-      {!isMobile && (
-        <div className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-stone-200 flex flex-col transition-all duration-300 relative z-20`}>
-          <div className="h-16 flex items-center justify-between px-5 border-b border-stone-100">
-            {!sidebarCollapsed && <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-6 h-6" /><span className="font-bold text-xl">CookMate</span></div>}
-            {sidebarCollapsed && <div className="w-full flex justify-center text-orange-600"><ChefHat className="w-6 h-6" /></div>}
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg"><Menu className="w-5 h-5" /></button>
-          </div>
-          <div className="p-4">
-            <button onClick={handleCreateNewChat} disabled={sessionsLoading} className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 ${sidebarCollapsed ? 'bg-orange-50 text-orange-600' : 'bg-orange-600 text-white'}`}>
-              <Plus className="w-5 h-5" />{!sidebarCollapsed && <span className="font-medium">{sessionsLoading ? 'Creating...' : 'New Chat'}</span>}
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <SessionList 
-              sessions={sessions} 
-              currentSessionId={currentSessionId}
-              onSelectSession={handleSelectSession}
-              onDeleteSession={handleDeleteSession}
-              collapsed={sidebarCollapsed}
-            />
-          </div>
-          <UserAccountFooter collapsed={sidebarCollapsed} user={user} onLogout={handleLogout} />
-        </div>
-      )}
+    <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
+      </div>
+      
+      {/* Enhanced Sidebar */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        isCollapsed={sidebarCollapsed}
+        isMobile={isMobile}
+        user={user}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onClose={() => setSidebarOpen(false)}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onCreateSession={handleCreateNewChat}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onShowFavorites={handleShowFavorites}
+        onLogout={handleLogout}
+        sessionsLoading={sessionsLoading}
+        collapsed={sidebarCollapsed}
+      />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-stone-50/50 relative">
-        <div className="lg:hidden h-16 bg-white/80 backdrop-blur-md border-b border-stone-200 flex items-center justify-between px-4 sticky top-0 z-10">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+        <div className="lg:hidden h-16 bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 flex items-center justify-between px-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600"><Menu className="w-6 h-6" /></button>
+            <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors duration-200"><Menu className="w-6 h-6" /></button>
             <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
           </div>
-          <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 rounded-full disabled:opacity-50"><Plus className="w-5 h-5" /></button>
+          <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
         </div>
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
@@ -479,6 +517,7 @@ export default function CookMateChat() {
                     {!message.isUser && message.detectedRecipes && message.detectedRecipes.length > 0 && (
                       <div className="mt-4 space-y-3 w-full">
                         <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
+                        {console.log('🍳 [FRONTEND] Rendering', message.detectedRecipes.length, 'recipe cards for message:', message.detectedRecipes)}
                         {message.detectedRecipes.map((recipe, index) => (
                           <RecipeCard
                             key={index}
@@ -486,10 +525,15 @@ export default function CookMateChat() {
                             onClick={handleRecipeClick}
                             isLoading={recipeDetailsLoading}
                             isFavorited={isRecipeFavorited(recipe)}
+                            collections={collections}
+                            onAddToFavorites={handleAddToFavoritesCallback}
+                            onAddToCollection={handleAddToCollectionCallback}
+                            fetchRecipeDetails={handleFetchRecipeDetails}
                           />
                         ))}
                       </div>
                     )}
+                   
                     
                     <span className="text-[11px] text-stone-400 mt-1.5 px-1 font-medium">{formatTime(message.timestamp)}</span>
                   </div>
@@ -517,16 +561,47 @@ export default function CookMateChat() {
         </div>
         
         {/* Scroll Down Button */}
-        {console.log('Rendering button, showScrollButton:', showScrollButton)}
         {showScrollButton && (
-          <div className="fixed bottom-24 right-8 z-50" style={{ position: 'fixed', bottom: '6rem', right: '2rem', zIndex: 9999 }}>
+          <div
+            className={`
+              fixed bottom-6 right-6 z-50 transition-all duration-500 ease-in-out transform
+              ${showScrollButton ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}
+            `}
+          >
             <button
               onClick={scrollToBottom}
-              className="bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-full shadow-2xl transition-all duration-200 hover:shadow-xl group border-2 border-white"
-              title="Scroll to bottom"
+              className="
+                group relative overflow-hidden
+                bg-gradient-to-br from-blue-600 to-blue-700 
+                hover:from-blue-500 hover:to-blue-600 
+                text-white p-4 rounded-2xl shadow-xl 
+                transform hover:scale-105 hover:-translate-y-1 
+                transition-all duration-300 ease-out
+                focus:outline-none focus:ring-4 focus:ring-blue-300 focus:ring-opacity-50
+                backdrop-blur-sm border border-blue-400/20
+              "
+              aria-label="Scroll to bottom"
             >
-              <ArrowDown className="w-6 h-6 group-hover:animate-bounce" />
+              {/* Animated background shimmer */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
+              
+              {/* Button content */}
+              <div className="relative z-10 flex items-center space-x-2">
+                <ArrowDown className="w-5 h-5 transition-transform group-hover:translate-y-0.5" />
+                <span className="text-sm font-medium hidden sm:block">Bottom</span>
+              </div>
+
+              {/* Ripple effect on click */}
+              <div className="absolute inset-0 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity duration-150">
+                <div className="absolute inset-0 bg-white/20 rounded-2xl animate-ping"></div>
+              </div>
             </button>
+
+            {/* Tooltip */}
+            <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+              Scroll to bottom
+              <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
           </div>
         )}
 
@@ -561,26 +636,29 @@ export default function CookMateChat() {
           isOpen={recipeModalOpen}
           onClose={handleCloseRecipeModal}
           fetchRecipeDetails={handleFetchRecipeDetails}
+          onAddToFavorites={handleAddToFavoritesCallback}
         />
 
         {/* Favorites Modal/View */}
         {showFavorites && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div 
-              className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
               onClick={handleHideFavorites}
             />
-            <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-4xl w-full max-h-[90vh] overflow-hidden transition-all duration-500 ease-out">
               {/* Favorites Header */}
-              <div className="bg-gradient-to-r from-pink-600 to-red-600 text-white p-6 relative">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-r from-pink-600 via-red-600 to-pink-700 text-white p-6 relative overflow-hidden">
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none"></div>
+                <div className="flex items-center justify-between relative z-10">
                   <div className="flex items-center gap-3">
                     <Heart className="w-8 h-8 fill-white" />
-                    <h2 className="text-2xl font-bold">My Favorite Recipes</h2>
+                    <h2 className="text-2xl font-bold tracking-wide">My Favorite Recipes</h2>
                   </div>
                   <button
                     onClick={handleHideFavorites}
-                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200 hover:scale-110"
                   >
                     <X className="w-6 h-6" />
                   </button>
@@ -592,26 +670,32 @@ export default function CookMateChat() {
                 {favoritesLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="w-8 h-8 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="ml-3 text-stone-600">Loading favorites...</span>
+                    <span className="ml-3 text-stone-600 font-medium">Loading favorites...</span>
                   </div>
                 ) : favoriteRecipes.length === 0 ? (
                   <div className="text-center py-8">
-                    <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-stone-700 mb-2">No favorites yet</h3>
-                    <p className="text-stone-500">Start saving recipes you love by clicking the heart icon!</p>
+                    <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-pink-200/60">
+                      <Heart className="w-10 h-10 text-stone-300" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-stone-700 mb-2 tracking-wide">No favorites yet</h3>
+                    <p className="text-stone-500 leading-relaxed">Start saving recipes you love by clicking the heart icon!</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-stone-700 mb-4">
+                    <h3 className="text-lg font-semibold text-stone-700 mb-4 tracking-wide">
                       You have {favoriteRecipes.length} favorite recipe{favoriteRecipes.length !== 1 ? 's' : ''}
                     </h3>
                     {favoriteRecipes.map((recipe, index) => (
                       <RecipeCard
                         key={index}
-                        recipe={recipe.title || recipe.name || 'Unknown Recipe'}
+                        recipe={recipe}
                         onClick={handleFavoriteRecipeClick}
                         isLoading={false}
                         isFavorited={true}
+                        collections={collections}
+                        onAddToFavorites={handleAddToFavoritesCallback}
+                        onAddToCollection={handleAddToCollectionCallback}
+                        fetchRecipeDetails={handleFetchRecipeDetails}
                       />
                     ))}
                   </div>
@@ -621,90 +705,11 @@ export default function CookMateChat() {
           </div>
         )}
       </div>
+      
+      {/* Confirmation Dialogs */}
+      <DeleteDialog />
+      <LogoutDialog />
     </div>
   );
 }
 
-// Session List Component
-const SessionList = ({ sessions, currentSessionId, onSelectSession, onDeleteSession, collapsed }) => {
-  if (sessions.length === 0) {
-    return (
-      <div className="p-4 text-center text-stone-500 text-sm">
-        {collapsed ? 'No chats' : 'No chat sessions yet'}
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-2">
-      {sessions.map((session) => (
-        <div
-          key={session.id}
-          onClick={() => onSelectSession(session)}
-          className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all mb-1 ${
-            session.id === currentSessionId 
-              ? 'bg-orange-50 border border-orange-200' 
-              : 'hover:bg-stone-50'
-          }`}
-        >
-          <div className="flex-shrink-0">
-            <MessageSquare className={`w-5 h-5 ${session.id === currentSessionId ? 'text-orange-600' : 'text-stone-400'}`} />
-          </div>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium truncate ${
-                session.id === currentSessionId ? 'text-orange-700' : 'text-stone-700'
-              }`}>
-                {session.title}
-              </p>
-              <p className="text-xs text-stone-500 truncate">
-                {formatLastMessage(session.lastMessage)}
-              </p>
-            </div>
-          )}
-          {!collapsed && (
-            <button
-              onClick={(e) => onDeleteSession(session.id, e)}
-              className="opacity-0 group-hover:opacity-100 p-1 text-stone-400 hover:text-red-500 transition-all"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// User Account Footer Component
-const UserAccountFooter = ({ collapsed, user, onLogout }) => (
-  <div className="p-4 border-t border-stone-100 mt-auto bg-stone-50/50">
-    <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} w-full p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all`}>
-      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-medium text-xs shadow-sm flex-shrink-0 bg-gradient-to-tr from-orange-400 to-red-500 text-white`}>
-        {user.displayName?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
-      </div>
-      {!collapsed && (
-        <>
-          <div className="text-left flex-1 overflow-hidden">
-            <p className="text-sm font-semibold text-stone-700 truncate">
-              {user.displayName || 'User'}
-            </p>
-            <p className="text-xs text-stone-500 truncate">{user.email}</p>
-          </div>
-          <button 
-            onClick={onLogout}
-            className="p-2 text-stone-400 hover:text-stone-600 rounded-lg hover:bg-stone-100 transition-all"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </>
-      )}
-    </div>
-  </div>
-);
-
-function formatLastMessage(lastMessage) {
-  if (!lastMessage) return 'New chat session';
-  return lastMessage.length > 40 ? lastMessage.substring(0, 40) + '...' : lastMessage;
-}

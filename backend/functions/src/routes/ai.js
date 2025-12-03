@@ -361,100 +361,257 @@ function isOffTopic(message) {
 // Function to detect and extract recipe lists from AI response
 function extractRecipesFromResponse(response) {
   const recipes = [];
+  const uniqueRecipes = new Set(); // Prevent duplicates
   
-  console.log('[DEBUG] Starting recipe extraction from response');
-  console.log('[DEBUG] Response length:', response.length);
-  console.log('[DEBUG] Response preview:', response.substring(0, 200) + '...');
+  console.log('🍳 [RECIPE DETECTION] Starting extraction from response');
+  console.log('🍳 [RECIPE DETECTION] Response length:', response.length);
+  console.log('🍳 [RECIPE DETECTION] Response preview:', response.substring(0, 300) + '...');
+  
+  // Helper function to add recipe if valid and unique
+  const addRecipe = (recipeName, source = 'unknown') => {
+    const cleaned = recipeName.trim();
+    console.log(`🔍 [ADD_RECIPE] Attempting to add recipe from ${source}: "${cleaned}"`);
+    
+    if (!cleaned) {
+      console.log(`❌ [ADD_RECIPE] Empty recipe name`);
+      return false;
+    }
+    
+    if (uniqueRecipes.has(cleaned.toLowerCase())) {
+      console.log(`❌ [ADD_RECIPE] Duplicate recipe: "${cleaned}"`);
+      return false;
+    }
+    
+    const validationResult = isValidRecipe(cleaned);
+    console.log(`🔍 [ADD_RECIPE] Validation result for "${cleaned}":`, validationResult);
+    
+    if (validationResult) {
+      recipes.push(cleaned);
+      uniqueRecipes.add(cleaned.toLowerCase());
+      console.log(`✅ [RECIPE DETECTION] Added recipe from ${source}: "${cleaned}"`);
+      return true;
+    } else {
+      console.log(`❌ [RECIPE DETECTION] Rejected recipe from ${source}: "${cleaned}" (validation failed)`);
+    }
+    return false;
+  };
   
   // Pattern 1: Bold recipe names at the beginning of the response (highest priority)
   const leadingBoldPattern = /^\s*\*\*([^*]+)\*\*/m;
   const leadingMatch = response.match(leadingBoldPattern);
+  console.log('🔍 [PATTERN_1] Leading bold match attempt:', leadingMatch ? leadingMatch[1] : 'NO_MATCH');
+  console.log('🔍 [PATTERN_1] Full match object:', leadingMatch);
+  
   if (leadingMatch) {
     const recipeName = leadingMatch[1].trim();
-    console.log('[DEBUG] Pattern 1 match (leading bold):', recipeName);
-    if (isValidRecipe(recipeName)) {
-      recipes.push(recipeName);
-    }
-  }
-  
-  // Pattern 2: Bold recipe names with colon (**: ...:) - only if not already found
-  if (recipes.length === 0) {
-    const boldColonPattern = /\*\*([^*:]+)\*\s*:/g;
-    let match;
+    console.log('🔍 [PATTERN_1] Attempting to add recipe:', recipeName);
+    console.log('🔍 [PATTERN_1] Recipe name length:', recipeName.length);
+    console.log('🔍 [PATTERN_1] First 50 chars of recipe name:', recipeName.substring(0, 50));
+    addRecipe(recipeName, 'pattern_1_leading_bold');
+  } else {
+    console.log('🔍 [PATTERN_1] No leading bold pattern found, checking if response starts with bold...');
+    console.log('🔍 [PATTERN_1] Response starts with:', response.substring(0, 100));
     
-    while ((match = boldColonPattern.exec(response)) !== null) {
-      const recipeName = match[1].trim();
-      console.log('[DEBUG] Pattern 2 match (bold colon):', recipeName);
-      if (isValidRecipe(recipeName)) {
-        recipes.push(recipeName);
-      }
+    // Direct debug for the specific case that failed
+    if (response.startsWith('**')) {
+      console.log('🔍 [PATTERN_1] Response DOES start with **, but pattern failed!');
+      const lines = response.split('\n');
+      console.log('🔍 [PATTERN_1] First line:', lines[0]);
+      const boldMatch = lines[0].match(/^\s*\*\*([^*]+)\*\*/);
+      console.log('🔍 [PATTERN_1] Manual pattern match on first line:', boldMatch ? boldMatch[1] : 'NO_MATCH');
     }
   }
   
-  // Pattern 3: Numbered bold recipe names with colon (1. **Recipe**:)
-  if (recipes.length === 0) {
-    const numberedBoldPattern = /^\s*\d+\.\s*\*\*([^*:]+)\*\*/gm;
-    while ((match = numberedBoldPattern.exec(response)) !== null) {
-      const recipeName = match[1].trim();
-      console.log('[DEBUG] Pattern 3 match (numbered bold):', recipeName);
-      if (isValidRecipe(recipeName)) {
-        recipes.push(recipeName);
-      }
+  // Pattern 2: Bold recipe names with colon (**: ...:)
+  const boldColonPattern = /\*\*([^*:]+)\*\s*:/g;
+  let match;
+  
+  console.log('🔍 [PATTERN_2] Testing bold colon pattern...');
+  while ((match = boldColonPattern.exec(response)) !== null) {
+    const recipeName = match[1].trim();
+    console.log('🔍 [PATTERN_2] Found bold colon recipe:', recipeName);
+    addRecipe(recipeName, 'pattern_2_bold_colon');
+  }
+  
+  // Pattern 3: Numbered bold recipe names (1. **Recipe**: description)
+  const numberedBoldPattern = /^\s*(\d+)\.\s*\*\*([^*]+)\*\*\s*:?/gm;
+  while ((match = numberedBoldPattern.exec(response)) !== null) {
+    const recipeName = match[2].trim(); // Get the bold text between **
+    console.log('🔍 [PATTERN_3] Found numbered bold recipe:', recipeName);
+    addRecipe(recipeName, 'pattern_3_numbered_bold');
+  }
+  
+  // Pattern 3b: General numbered recipes with colons
+  const generalNumberedPattern = /^\s*(\d+)\.\s*([A-Z][^.!?\n]{10,80})(?=:)/gm;
+  while ((match = generalNumberedPattern.exec(response)) !== null) {
+    const recipeName = match[2].trim();
+    console.log('🔍 [PATTERN_3B] Found general numbered recipe:', recipeName);
+    addRecipe(recipeName, 'pattern_3b_general_numbered');
+  }
+  
+  // Pattern 3c: Universal numbered recipe format (more restrictive)
+  const universalNumberedPattern = /^\s*(\d+)\.\s*\*?\*?([A-Z][^.!?\n]{5,80})\*?\*?\s*:?/gm;
+  while ((match = universalNumberedPattern.exec(response)) !== null) {
+    let recipeName = match[2].trim();
+    console.log('🔍 [PATTERN_3C] Raw numbered text:', recipeName);
+    
+    // Only accept if it looks like a proper recipe name
+    if (recipeName.length >= 5 && recipeName.length <= 80 && 
+        /^[A-Z][a-z\s]+[a-zA-Z]$/.test(recipeName) &&
+        !recipeName.toLowerCase().includes('ingredient') &&
+        !recipeName.toLowerCase().includes('instruction') &&
+        !recipeName.toLowerCase().includes('step') &&
+        !recipeName.toLowerCase().includes('direction')) {
+      console.log('🔍 [PATTERN_3C] Valid recipe name:', recipeName);
+      addRecipe(recipeName, 'pattern_3c_universal_numbered');
     }
   }
   
-  // Pattern 4: Simple bold recipe names that are standalone and substantial
-  if (recipes.length === 0) {
-    // More strict pattern - only match bold text that's standalone and meaningful
-    const boldPattern = /\*\*([^*]{10,80})\*\s*(?=\n\n|\n[0-9]|\n\*|\n-|Ingredients|Instructions|Here's)/g;
-    while ((match = boldPattern.exec(response)) !== null) {
-      const recipeName = match[1].trim();
-      console.log('[DEBUG] Pattern 4 match (standalone bold):', recipeName);
-      // Additional validation - should contain common recipe words
-      if (isValidRecipe(recipeName) && recipeName.split(' ').length >= 2) {
-        recipes.push(recipeName);
-      }
+  // Pattern 4: Standalone bold recipe names (more restrictive)
+  const boldPattern = /\*\*([A-Z][^*]{4,50}[A-Za-z])\*\s*(?=\n\n|\n\d+|\n[A-Z]|$)/g;
+  while ((match = boldPattern.exec(response)) !== null) {
+    const recipeName = match[1].trim();
+    // Only accept if it looks like a proper recipe name
+    if (recipeName.split(' ').length >= 2 && recipeName.length <= 60 &&
+        !recipeName.toLowerCase().includes('ingredient') &&
+        !recipeName.toLowerCase().includes('instruction') &&
+        !recipeName.toLowerCase().includes('step') &&
+        !recipeName.toLowerCase().includes('direction') &&
+        !recipeName.toLowerCase().includes('tip') &&
+        !recipeName.toLowerCase().includes('safety')) {
+      console.log('🔍 [PATTERN_4] Found standalone bold recipe:', recipeName);
+      addRecipe(recipeName, 'pattern_4_standalone_bold');
     }
   }
   
-  // Pattern 5: Numbered lists with recipe names (1. Recipe Name:) - only for substantial names
-  if (recipes.length === 0) {
-    const numberedPattern = /^\s*\d+\.\s*([^*:]{10,80})(?=:)/gm;
-    while ((match = numberedPattern.exec(response)) !== null) {
-      const recipeName = match[1].trim();
-      console.log('[DEBUG] Pattern 5 match (numbered):', recipeName);
-      if (isValidRecipe(recipeName) && recipeName.length > 8) {
-        recipes.push(recipeName);
-      }
-    }
+  // Pattern 5: Numbered lists with recipe names (1. Recipe Name:)
+  const numberedPattern = /^\s*\d+\.\s*([A-Z][^.\n:]{5,80})(?=:)/gm;
+  while ((match = numberedPattern.exec(response)) !== null) {
+    console.log('🔍 [PATTERN_5] Found numbered recipe:', match[1].trim());
+    addRecipe(match[1].trim(), 'pattern_5_numbered');
   }
   
   // Pattern 6: Recipe names from bullet points at section starts
+  const sectionPattern = /^\s*[*-]\s*([A-Z][^.\n:]{5,80})(?=[:\n])/gm;
+  while ((match = sectionPattern.exec(response)) !== null) {
+    console.log('🔍 [PATTERN_6] Found bullet recipe:', match[1].trim());
+    addRecipe(match[1].trim(), 'pattern_6_section_bullet');
+  }
+  
+  // Pattern 7: Recipe names from headers or titles (## Recipe Name)
+  const headerPattern = /^#{1,6}\s*(.+)$/gm;
+  while ((match = headerPattern.exec(response)) !== null) {
+    const header = match[1].trim();
+    if (header.length > 5 && header.length < 80 && isValidRecipe(header)) {
+      console.log('🔍 [PATTERN_7] Found header recipe:', header);
+      addRecipe(header, 'pattern_7_header');
+    }
+  }
+  
+  // Pattern 8: Catch-all for any bold text followed by colon (universal pattern)
+  const catchAllPattern = /\*\*([^*]+)\*\*\s*:/g;
+  while ((match = catchAllPattern.exec(response)) !== null) {
+    const recipeName = match[1].trim();
+    console.log('🔍 [PATTERN_8] Found catch-all bold recipe:', recipeName);
+    addRecipe(recipeName, 'pattern_8_catch_all');
+  }
+  
+  // FALLBACK: If no recipes found with patterns, try intelligent extraction
   if (recipes.length === 0) {
-    const sectionPattern = /^\s*[*-]\s*([A-Z][^.\n:]{10,80})(?=[:\n])/gm;
-    while ((match = sectionPattern.exec(response)) !== null) {
-      const recipeName = match[1].trim();
-      console.log('[DEBUG] Pattern 6 match (section):', recipeName);
-      if (isValidRecipe(recipeName) && recipeName.length > 8) {
-        recipes.push(recipeName);
+    console.log('🍳 [RECIPE DETECTION] No recipes found with patterns, trying fallback extraction...');
+    
+    // Look for lines that contain recipe indicators
+    const lines = response.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Skip empty lines and common non-recipe indicators
+      if (!line || 
+          line.toLowerCase().includes('ingredients') ||
+          line.toLowerCase().includes('instructions') ||
+          line.toLowerCase().includes('directions') ||
+          line.toLowerCase().includes('steps') ||
+          line.toLowerCase().includes('method') ||
+          line.length < 5 ||
+          line.length > 100) {
+        continue;
+      }
+      
+      // Look for lines that might be recipe names (contain cooking words and start with capital)
+      const cookingWords = /\b(recipe|chicken|beef|pork|fish|salmon|shrimp|pasta|rice|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|vanilla|almond|coconut|chocolate|honey|oats|quinoa|cheese|mozzarella|parmesan|cheddar|tomato|potato|onion|garlic|pepper|broccoli|carrots|spinach|kale|basil|oregano|thyme|rosemary)\b/i;
+      
+      if (line.match(/^[A-Z][^.!?]{5,80}$/) && cookingWords.test(line)) {
+        addRecipe(line, 'fallback_intelligent');
+        if (recipes.length >= 3) break; // Limit fallback results
       }
     }
   }
   
-  console.log('[DEBUG] Final extracted recipes:', recipes);
+  // ULTIMATE FALLBACK: If still no recipes, look for any substantial lines with food words
+  if (recipes.length === 0) {
+    console.log('🍳 [RECIPE DETECTION] No recipes found, trying ultimate fallback...');
+    
+    const foodWordPattern = /\b(chicken|beef|pork|fish|salmon|shrimp|pasta|rice|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|vanilla|almond|coconut|chocolate|honey|oats|quinoa|cheese|mozzarella|parmesan|cheddar|tomato|potato|onion|garlic|pepper|broccoli|carrots|spinach|kale|basil|oregano|thyme|rosemary)\w*/gi;
+    
+    const matches = response.match(foodWordPattern);
+    if (matches && matches.length > 0) {
+      // Take the most common food words and create recipe suggestions
+      const wordCounts = {};
+      matches.forEach(word => {
+        const cleanWord = word.toLowerCase();
+        wordCounts[cleanWord] = (wordCounts[cleanWord] || 0) + 1;
+      });
+      
+      // Sort by frequency and take top candidates
+      const sortedWords = Object.entries(wordCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3)
+        .map(([word]) => word);
+      
+      // Create simple recipe suggestions
+      sortedWords.forEach(word => {
+        const recipeName = word.charAt(0).toUpperCase() + word.slice(1);
+        if (recipeName.length > 3) {
+          addRecipe(recipeName, 'ultimate_fallback');
+        }
+      });
+    }
+  }
+  
+  console.log('🍳 [RECIPE DETECTION] Final extracted recipes:', recipes);
+  console.log('🍳 [RECIPE DETECTION] Total count:', recipes.length);
+  
   return recipes;
 }
 
 // Helper function to validate if extracted text is actually a recipe (not a category)
 function isValidRecipe(text) {
   if (!text || text.length === 0) {
-    console.log('[DEBUG] Recipe validation FAILED: empty text');
+    console.log('❌ [VALIDATION] Failed: empty text');
     return false;
   }
   
-  const lowerText = text.toLowerCase();
+  const lowerText = text.toLowerCase().trim();
   
-  console.log('[DEBUG] Validating recipe:', text);
+  console.log('🔍 [VALIDATION] Checking:', text);
+  
+  // Basic length check - more restrictive
+  if (text.length < 5 || text.length > 60) {
+    console.log('❌ [VALIDATION] Failed: invalid length (' + text.length + ')');
+    return false;
+  }
+  
+  // Must start with capital letter
+  if (!/^[A-Z]/.test(text.trim())) {
+    console.log('❌ [VALIDATION] Failed: does not start with capital letter');
+    return false;
+  }
+  
+  // Must not end with common non-recipe endings
+  if (/[.!?]$/.test(text.trim())) {
+    console.log('❌ [VALIDATION] Failed: ends with punctuation');
+    return false;
+  }
   
   // Safety and instruction content to exclude
   const excludeSafetyItems = [
@@ -470,17 +627,18 @@ function isValidRecipe(text) {
   
   // Check for safety/instruction content first
   if (excludeSafetyItems.some(item => lowerText.includes(item))) {
-    console.log('[DEBUG] Recipe validation FAILED: contains safety/instruction content');
+    console.log('❌ [VALIDATION] Failed: contains safety/instruction content');
     return false;
   }
   
   // Specific items to exclude (these are ingredients, not recipes)
+  // NOTE: Only exclude exact matches or clear instruction references
   const excludeItems = [
-    'salt and pepper', 'salt', 'pepper', 'seasoning', 'seasonings', 'to taste',
+    'salt and pepper', 'seasoning', 'seasonings', 'to taste',
     'garlic powder', 'onion powder', 'paprika', 'cumin', 'oregano', 'thyme',
     'basil', 'parsley', 'cilantro', 'dill', 'chives', 'marjoram', 'tarragon',
     'lemon juice', 'lime juice', 'vinegar', 'olive oil', 'vegetable oil',
-    'butter', 'oil', 'water', 'sugar', 'flour', 'baking powder',
+    'oil', 'water', 'sugar', 'flour', 'baking powder',
     'baking soda', 'yeast', 'vanilla', 'almond extract', 'lemon zest',
     'ingredients', 'instructions', 'directions', 'method', 'steps',
     'degree', '°f', '°c', '°celsius', '°fahrenheit', 'minutes', 'hours',
@@ -488,9 +646,21 @@ function isValidRecipe(text) {
     'ounce', 'ounces', 'gram', 'grams', 'kilogram', 'kilograms', 'liter', 'liters'
   ];
   
-  // Check for excluded items first
-  if (excludeItems.some(item => lowerText.includes(item))) {
-    console.log('[DEBUG] Recipe validation FAILED: contains excluded item');
+  // Check for excluded items first (simple contains check for now)
+  const containsExcludedItem = excludeItems.some(item => lowerText.includes(item));
+  console.log('🔍 [VALIDATION] Checking excluded items for "' + text + '":', containsExcludedItem);
+  if (containsExcludedItem) {
+    console.log('❌ [VALIDATION] Failed: contains excluded item');
+    return false;
+  }
+  
+  // Should not contain cooking measurements or instructions
+  const containsMeasurements = /\d+\s*(cup|cups|tbsp|tsp|tablespoon|teaspoon|pound|pounds|oz|ounce|gram|grams|lb|lbs)/i.test(text);
+  const containsTemperatures = /\d+°?f|°c|\d+\s*(degrees?|minutes?|hours?)/i.test(text);
+  const containsInstructions = /(step|cook|heat|add|mix|stir|bake|fry|boil)/i.test(text);
+  
+  if (containsMeasurements || containsTemperatures || containsInstructions) {
+    console.log('❌ [VALIDATION] Failed: contains cooking instructions/measurements');
     return false;
   }
   
@@ -503,6 +673,12 @@ function isValidRecipe(text) {
     'global inspirations', 'quick and easy', 'veggie delights'
   ];
   
+  // Check for generic terms first (highest priority to exclude)
+  if (genericTerms.some(term => lowerText.includes(term))) {
+    console.log('❌ [VALIDATION] Failed: contains generic terms');
+    return false;
+  }
+  
   // Category patterns to exclude (more specific patterns to avoid false positives)
   const categoryPatterns = [
     /^(italian|mexican|asian|french|indian|thai|chinese|japanese|korean|mediterranean|american|bbq)\s+(cuisine|food|style|cooking|dishes)/,
@@ -512,41 +688,40 @@ function isValidRecipe(text) {
     /^(cooking|tips|advice|methods|techniques|inspiration)$/
   ];
   
-  // Check for generic terms first (highest priority to exclude)
-  if (genericTerms.some(term => lowerText.includes(term))) {
-    console.log('[DEBUG] Recipe validation FAILED: contains generic terms');
-    return false;
-  }
-  
   // Check for category patterns
   if (categoryPatterns.some(pattern => pattern.test(lowerText))) {
-    console.log('[DEBUG] Recipe validation FAILED: matches category pattern');
+    console.log('❌ [VALIDATION] Failed: matches category pattern');
     return false;
   }
   
   // Check if it looks like temperature or measurement information
   const tempOrMeasurePattern = /\d+°?f|°c|\d+\s*(cup|cups|tbsp|tsp|tablespoon|teaspoon|pound|pounds|oz|ounce|gram|grams|lb|lbs)/i;
   if (tempOrMeasurePattern.test(text)) {
-    console.log('[DEBUG] Recipe validation FAILED: contains temperature or measurement');
+    console.log('❌ [VALIDATION] Failed: contains temperature or measurement');
     return false;
   }
   
-  // Must contain specific main ingredients or dishes - EXPANDED LIST
-  const hasSpecificIngredients = /\b(chicken|beef|pork|lamb|fish|salmon|shrimp|tuna|tofu|eggs?|pasta|rice|spaghetti|pizza|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|lime|lemon|orange|apple|banana|berries|vanilla|almond|coconut|chocolate|cocoa|honey|oats|quinoa|cheese|mozzarella|parmesan|cheddar|milk|cream|yogurt|tomato|potato|onion|garlic|pepper|broccoli|cauliflower|carrots|spinach|kale|basil|oregano|thyme|rosemary|sage|mint|cilantro|curry|masala|tikka|vindaloo|korma|biryani|pulao|naan|roti|paratha|dosa|idli|vada|sambhar|rasam|paneer|fettuccine|alfredo|carbonara|minestrone|bruschetta|caprese|napoletana|penne|rigatoni|farfalle|linguine|conchiglie|orzo|couscous|barley|bulgur|farro|polenta|grits|oatmeal|porridge|cereal|muesli|granola|heavy cream|half and half|evaporated milk|condensed milk|coconut milk|almond milk|soy milk|oat milk|rice milk|all-purpose flour|whole wheat flour|almond flour|coconut flour|oat flour|cornmeal|cornstarch|arrowroot|tapioca|baking powder|baking soda|yeast|brown sugar|powdered sugar|maple syrup|agave|molasses|coconut sugar|stevia|artificial sweetener|vanilla extract|lemon extract|orange extract|unsweetened chocolate|dark chocolate|milk chocolate|semi-sweet chocolate|white chocolate|chocolate chips|cocoa nibs|canola oil|sesame oil|avocado oil|grapeseed oil|sunflower oil|corn oil|soybean oil|peanut oil|walnut oil|almond oil|pistachio oil|hazelnut oil|castor oil|lard|shortening|margarine|ghee|clarified butter|portobello|shiitake|cremini|oyster|king oyster|chanterelle|porcini|matsutake|enoki|wood ear|snow peas|sugar snap peas|green beans|lima beans|fava beans|black-eyed peas|split peas|yellow squash|acorn squash|butternut squash|spaghetti squash|pumpkin|arugula|romaine|lettuce|iceberg|boston butter|cress|watercress|dandelion|collard greens|mustard greens|turnip greens|swiss chard|radish|daikon|turnip|beet|parsnip|rutabaga|celeriac|celery|fennel|artichoke|asparagus|bamboo shoots|bean sprouts|broccolini|broccoli rabe|brussels sprouts|napa cabbage|savoy cabbage|red cabbage|green cabbage|leek|scallion|green onion|shallot|yellow onion|red onion|white onion|sweet onion|vidalias|wallas|pearl onion|white pepper|pink peppercorns|green peppercorns|peppercorns|whole peppercorns|cracked pepper|lemongrass|curry leaves|holy basil|thai basil|genovese basil|sweet basil|dried basil|dried oregano|dried thyme|dried rosemary|dried sage|dried mint|dried parsley|dried cilantro|dried dill|dried chives|dried marjoram|dried tarragon|lemon zest|lime zest|orange zest|grapefruit|tangerine|clementine|mandarin|calamansi|kumquat|pomelo|yuzu|finger lime|blood orange|bergamot|ugli fruit|citrus|passion fruit|dragon fruit|starfruit|lychee|rambutan|longan|mangosteen|jackfruit|durian|papaya|mango|peach|nectarine|apricot|plum|prune|cherry|blueberry|strawberry|raspberry|blackberry|cranberry|gooseberry|elderberry|currant|goji berry|açaí berry|kiwi|guava|pineapple|plantain|pear|quince|fig|date|raisin|cashew|pecan|walnut|hazelnut|brazil nut|macadamia nut|pine nut|chestnut|sunflower seed|pumpkin seed|sesame seed|flax seed|chia seed|hemp seed|poppy seed|safflower seed|cardamom|cinnamon|clove|nutmeg|mace|allspice|ginger|turmeric|paprika|sweet paprika|smoked paprika|cayenne|chili powder|chipotle|ancho|pasilla|guajillo|new mexico|cascade|shishito|poblano|jalapeño|habanero|scotch bonnet|ghost pepper|carolina reaper|bhut jolokia|bird's eye|malagueta|pimenta|sambal oelek|sriracha|harissa|gochujang|douchi|black bean sauce|hoisin sauce|oyster sauce|fish sauce|soy sauce|tamari|coconut aminos|vegan worcestershire|vegetarian worcestershire|anchovy|anchovy paste|fish paste|crab paste|shrimp paste|miso|edamame|creamy|sauce|flavor|savory|aroma|tender|juicy|succulent|golden|brown|crispy|soft|chewy|rich|hearty|light|fresh|homemade|homestyle)\b/i;
+  // Must contain food-related keywords - more focused list
+  const foodKeywords = /\b(chicken|beef|pork|lamb|fish|salmon|shrimp|tuna|tofu|eggs?|pasta|rice|spaghetti|pizza|salad|soup|stew|cake|bread|cookie|curry|taco|burrito|sandwich|omelette|pancake|waffle|muffin|brownie|pie|risotto|noodles|lasagna|gnocchi|tortellini|quesadilla|nachos|tamale|enchilada|lobster|crab|cod|haddock|tilapia|catfish|mushroom|zucchini|eggplant|avocado|lime|lemon|orange|apple|banana|berries|vanilla|almond|coconut|chocolate|honey|oats|quinoa|cheese|mozzarella|parmesan|cheddar|milk|cream|yogurt|tomato|potato|onion|garlic|pepper|broccoli|carrots|spinach|kale|basil|oregano|thyme|rosemary|sage|mint|cilantro|curry|masala|tikka|vindaloo|korma|biryani|pulao|naan|roti|paratha|dosa|idli|vada|sambhar|rasam|paneer|fettuccine|alfredo|carbonara|minestrone|bruschetta|caprese|napoletana|penne|rigatoni|farfalle|linguine|conchiglie|orzo|couscous|barley|bulgur|farro|polenta|grits|oatmeal|porridge|cereal|muesli|granola|heavy cream|half and half|evaporated milk|condensed milk|coconut milk|almond milk|soy milk|oat milk|rice milk|all-purpose flour|whole wheat flour|almond flour|coconut flour|oat flour|cornmeal|cornstarch|arrowroot|tapioca|baking powder|baking soda|yeast|brown sugar|powdered sugar|maple syrup|agave|molasses|coconut sugar|stevia|artificial sweetener|vanilla extract|lemon extract|orange extract|unsweetened chocolate|dark chocolate|milk chocolate|semi-sweet chocolate|white chocolate|chocolate chips|cocoa nibs|canola oil|sesame oil|avocado oil|grapeseed oil|sunflower oil|corn oil|soybean oil|peanut oil|walnut oil|almond oil|pistachio oil|hazelnut oil|castor oil|lard|shortening|margarine|ghee|clarified butter|portobello|shiitake|cremini|oyster|king oyster|chanterelle|porcini|matsutake|enoki|wood ear|snow peas|sugar snap peas|green beans|lima beans|fava beans|black-eyed peas|split peas|yellow squash|acorn squash|butternut squash|spaghetti squash|pumpkin|arugula|romaine|lettuce|iceberg|boston butter|cress|watercress|dandelion|collard greens|mustard greens|turnip greens|swiss chard|radish|daikon|turnip|beet|parsnip|rutabaga|celeriac|celery|fennel|artichoke|asparagus|bamboo shoots|bean sprouts|broccolini|broccoli rabe|brussels sprouts|napa cabbage|savoy cabbage|red cabbage|green cabbage|leek|scallion|green onion|shallot|yellow onion|red onion|white onion|sweet onion|vidalias|wallas|pearl onion|white pepper|pink peppercorns|green peppercorns|peppercorns|whole peppercorns|cracked pepper|lemongrass|curry leaves|holy basil|thai basil|genovese basil|sweet basil|dried basil|dried oregano|dried thyme|dried rosemary|dried sage|dried mint|dried parsley|dried cilantro|dried dill|dried chives|dried marjoram|dried tarragon|lemon zest|lime zest|orange zest|grapefruit|tangerine|clementine|mandarin|calamansi|kumquat|pomelo|yuzu|finger lime|blood orange|bergamot|ugli fruit|citrus|passion fruit|dragon fruit|starfruit|lychee|rambutan|longan|mangosteen|jackfruit|durian|papaya|mango|peach|nectarine|apricot|plum|prune|cherry|blueberry|strawberry|raspberry|blackberry|cranberry|gooseberry|elderberry|currant|goji berry|açaí berry|kiwi|guava|pineapple|plantain|pear|quince|fig|date|raisin|cashew|pecan|walnut|hazelnut|brazil nut|macadamia nut|pine nut|chestnut|sunflower seed|pumpkin seed|sesame seed|flax seed|chia seed|hemp seed|poppy seed|safflower seed|cardamom|cinnamon|clove|nutmeg|mace|allspice|ginger|turmeric|paprika|sweet paprika|smoked paprika|cayenne|chili powder|chipotle|ancho|pasilla|guajillo|new mexico|cascade|shishito|poblano|jalapeño|habanero|scotch bonnet|ghost pepper|carolina reaper|bhut jolokia|bird's eye|malagueta|pimenta|sambal oelek|sriracha|harissa|gochujang|douchi|black bean sauce|hoisin sauce|oyster sauce|fish sauce|soy sauce|tamari|coconut aminos|vegan worcestershire|vegetarian worcestershire|anchovy|anchovy paste|fish paste|crab paste|shrimp paste|miso|edamame|recipe|dish|meal|kitchen|cook|cooking|chef|skillet|frying pan|pot|oven|stove|grill)\b/i;
   
-  // Must contain specific ingredients or dishes
-  if (!hasSpecificIngredients.test(lowerText)) {
-    console.log('[DEBUG] Recipe validation FAILED: no specific ingredients found');
+  // Check for food keywords - this is the key requirement
+  const foodKeywordMatch = foodKeywords.test(lowerText);
+  console.log('🔍 [VALIDATION] Food keywords check for "' + text + '":', foodKeywordMatch);
+  
+  if (!foodKeywordMatch) {
+    console.log('❌ [VALIDATION] Failed: no food-related keywords found');
+    console.log('🔍 [VALIDATION] Would have checked against:', lowerText);
     return false;
   }
   
-  // Additional validation: must be a meaningful recipe name (not too short)
-  if (text.length < 5) {
-    console.log('[DEBUG] Recipe validation FAILED: text too short');
+  // Must be a proper recipe name format (not a category or generic term)
+  const properRecipePattern = /^(?!.*(recipe|suggestion|ideas?|tips?|help|variations?|inspiration|cooking|methods|techniques|meal ideas|food ideas|global inspirations|quick and easy|veggie delights)).+$/i;
+  if (!properRecipePattern.test(text)) {
+    console.log('❌ [VALIDATION] Failed: matches generic category pattern');
     return false;
   }
   
-  console.log('[DEBUG] Recipe validation PASSED');
+  console.log('✅ [VALIDATION] Passed - valid recipe detected');
   return true;
 }
 
@@ -712,10 +887,14 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     }
     
     // Generate AI response using Groq
+    console.log('🍳 [CHAT] Generating AI response for message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
     const aiReply = await callGroqAI(message, history);
+    console.log('🍳 [CHAT] AI response generated, length:', aiReply.length);
     
     // Extract recipes from the AI response
+    console.log('🍳 [CHAT] Starting recipe extraction...');
     const detectedRecipes = extractRecipesFromResponse(aiReply);
+    console.log('🍳 [CHAT] Recipe extraction completed. Found', detectedRecipes.length, 'recipes:', detectedRecipes);
     
     // Store detected recipes for consistency
     if (detectedRecipes.length > 0) {
@@ -728,11 +907,16 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
         console.warn('⚠️ Failed to store some detected recipes:', storeError);
         // Continue without storing - don't block the response
       }
+    } else {
+      console.log('⚠️ [CHAT] No recipes detected - this may be the source of the bug!');
+      console.log('⚠️ [CHAT] This is what the AI response looked like:');
+      console.log('⚠️ [CHAT] Response preview:', aiReply.substring(0, 500) + (aiReply.length > 500 ? '...' : ''));
     }
     
-    console.log('[DEBUG] Full AI Response:', aiReply);
-    console.log('[DEBUG] Extracted recipes:', detectedRecipes);
-    console.log('[DEBUG] Number of recipes found:', detectedRecipes.length);
+    console.log('🍳 [CHAT] Full AI Response (for debugging):');
+    console.log(aiReply);
+    console.log('🍳 [CHAT] Extracted recipes:', detectedRecipes);
+    console.log('🍳 [CHAT] Number of recipes found:', detectedRecipes.length);
     
     res.status(200).json({
       response: {

@@ -138,9 +138,10 @@ export const getFavorites = async () => {
   return apiCall('/api/users/favorites');
 };
 
-export const addToFavorites = async (recipeId) => {
+export const addToFavorites = async (recipeId, recipeData = null) => {
   return apiCall(`/api/users/favorites/${recipeId}`, {
     method: 'POST',
+    body: JSON.stringify({ recipeData }),
   });
 };
 
@@ -148,6 +149,48 @@ export const removeFromFavorites = async (recipeId) => {
   return apiCall(`/api/users/favorites/${recipeId}`, {
     method: 'DELETE',
   });
+};
+
+// Collections API
+export const getCollections = async () => {
+  return apiCall('/api/collections');
+};
+
+export const createCollection = async (collectionData) => {
+  return apiCall('/api/collections', {
+    method: 'POST',
+    body: JSON.stringify(collectionData),
+  });
+};
+
+export const updateCollection = async (collectionId, updates) => {
+  return apiCall(`/api/collections/${collectionId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+};
+
+export const deleteCollection = async (collectionId) => {
+  return apiCall(`/api/collections/${collectionId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const addRecipeToCollection = async (collectionId, recipeId, recipeData = null) => {
+  return apiCall(`/api/collections/${collectionId}/recipes`, {
+    method: 'POST',
+    body: JSON.stringify({ recipeId, recipeData }),
+  });
+};
+
+export const removeRecipeFromCollection = async (collectionId, recipeId) => {
+  return apiCall(`/api/collections/${collectionId}/recipes/${recipeId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const getCollectionRecipes = async (collectionId) => {
+  return apiCall(`/api/collections/${collectionId}/recipes`);
 };
 
 // Health check
@@ -165,5 +208,12 @@ export default {
   getFavorites,
   addToFavorites,
   removeFromFavorites,
+  getCollections,
+  createCollection,
+  updateCollection,
+  deleteCollection,
+  addRecipeToCollection,
+  removeRecipeFromCollection,
+  getCollectionRecipes,
   healthCheck,
 };

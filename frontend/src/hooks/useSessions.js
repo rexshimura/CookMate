@@ -228,19 +228,27 @@ export const useSessionChat = (sessionId) => {
       }));
 
       // Get AI response with conversation history for better context
+      console.log('🍳 [FRONTEND] Sending message to AI:', messageText.substring(0, 100) + (messageText.length > 100 ? '...' : ''));
       const aiResponse = await chatWithAI(messageText, sessionId, history);
+      console.log('🍳 [FRONTEND] AI response received:', aiResponse);
       
       if (aiResponse && aiResponse.response) {
+        const detectedRecipes = aiResponse.response.detectedRecipes || [];
+        console.log('🍳 [FRONTEND] Processing AI response with', detectedRecipes.length, 'detected recipes:', detectedRecipes);
+        
         const aiMessage = {
           id: `ai_${Date.now()}`,
           text: aiResponse.response.message,
           isUser: false,
           timestamp: new Date(),
-          detectedRecipes: aiResponse.response.detectedRecipes || []
+          detectedRecipes: detectedRecipes
         };
 
         // Add AI response to UI
-        setMessages(prev => [...prev, aiMessage]);
+        setMessages(prev => {
+          console.log('🍳 [FRONTEND] Adding message to chat with', detectedRecipes.length, 'recipes');
+          return [...prev, aiMessage];
+        });
 
         // Save AI message to database
         await saveMessage(sessionId, aiMessage);
@@ -258,6 +266,7 @@ export const useSessionChat = (sessionId) => {
 
         return aiMessage;
       } else {
+        console.error('🍳 [FRONTEND] No response from AI or malformed response:', aiResponse);
         throw new Error('No response from AI');
       }
     } catch (error) {

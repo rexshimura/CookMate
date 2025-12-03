@@ -72,13 +72,36 @@ router.put('/profile', verifyAuthToken, async (req, res) => {
 router.post('/favorites/:recipeId', verifyAuthToken, async (req, res) => {
   try {
     const { recipeId } = req.params;
+    const { recipeData } = req.body; // Optional full recipe data
 
-    // arrayUnion adds the item only if it doesn't already exist (no duplicates)
+    const favoriteRecipe = {
+      id: recipeId,
+      addedAt: new Date().toISOString(),
+      ...(recipeData && { data: recipeData })
+    };
+
+    // Get current user document
+    const userDoc = await db.collection('users').doc(req.userId).get();
+    const currentFavorites = userDoc.data()?.favorites || [];
+    
+    // Check if recipe already exists
+    const recipeExists = currentFavorites.some(fav => fav.id === recipeId);
+    
+    if (recipeExists) {
+      return res.status(400).json({ error: 'Recipe already exists in favorites' });
+    }
+
+    // Add new favorite recipe with full data
+    const updatedFavorites = [...currentFavorites, favoriteRecipe];
+    
     await db.collection('users').doc(req.userId).update({
-      favorites: admin.firestore.FieldValue.arrayUnion(recipeId)
+      favorites: updatedFavorites
     });
 
-    res.status(200).json({ message: 'Recipe added to favorites' });
+    res.status(200).json({ 
+      message: 'Recipe added to favorites successfully',
+      success: true
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -89,12 +112,24 @@ router.delete('/favorites/:recipeId', verifyAuthToken, async (req, res) => {
   try {
     const { recipeId } = req.params;
 
-    // arrayRemove deletes the specific item from the array
+    // Get current user document
+    const userDoc = await db.collection('users').doc(req.userId).get();
+    const currentFavorites = userDoc.data()?.favorites || [];
+    
+    // Remove recipe by ID (handle both old string format and new object format)
+    const updatedFavorites = currentFavorites.filter(fav => 
+      (typeof fav === 'string' && fav !== recipeId) || 
+      (typeof fav === 'object' && fav.id !== recipeId)
+    );
+    
     await db.collection('users').doc(req.userId).update({
-      favorites: admin.firestore.FieldValue.arrayRemove(recipeId)
+      favorites: updatedFavorites
     });
 
-    res.status(200).json({ message: 'Recipe removed from favorites' });
+    res.status(200).json({ 
+      message: 'Recipe removed from favorites successfully',
+      success: true
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -103,26 +138,43 @@ router.delete('/favorites/:recipeId', verifyAuthToken, async (req, res) => {
 // 5. Get All Favorite Recipes (Full Details)
 router.get('/favorites', verifyAuthToken, async (req, res) => {
   try {
-    // 1. Get user doc to find favorite IDs
+    // Get user doc to find favorites
     const userDoc = await db.collection('users').doc(req.userId).get();
-    const favIds = userDoc.data()?.favorites || [];
+    const favorites = userDoc.data()?.favorites || [];
 
-    console.log('Favorites for user:', req.userId, 'Favorite IDs:', favIds);
+    console.log('Favorites for user:', req.userId, 'Count:', favorites.length);
 
-    if (favIds.length === 0) {
-      return res.status(200).json({ favorites: [] });
+    if (favorites.length === 0) {
+      return res.status(200).json({ favorites: [], success: true });
     }
 
-    // For now, just return the favorite IDs as simple recipe objects
-    // In a real app, you'd fetch the actual recipe documents
-    const favorites = favIds.map(id => ({
-      id: id,
-      title: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-    }));
+    // Return favorites with full data if available, or generate from ID
+    const processedFavorites = favorites.map(fav => {
+      // Handle both old string format and new object format for backward compatibility
+      if (typeof fav === 'string') {
+        return {
+          id: fav,
+          title: fav.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        };
+      } else if (typeof fav === 'object' && fav.data) {
+        // New format with full recipe data
+        return {
+          ...fav.data,
+          id: fav.id,
+          savedId: fav.id
+        };
+      } else {
+        // Object format without data (fallback)
+        return fav;
+      }
+    });
 
-    console.log('Returning favorites:', favorites);
+    console.log('Returning favorites:', processedFavorites);
 
-    res.status(200).json({ favorites });
+    res.status(200).json({ 
+      favorites: processedFavorites,
+      success: true 
+    });
   } catch (error) {
     console.error('Favorites error:', error);
     res.status(500).json({ error: error.message });
