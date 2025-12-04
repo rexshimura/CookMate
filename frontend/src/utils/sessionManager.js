@@ -235,6 +235,45 @@ export const deleteSessionMessages = async (sessionId) => {
   }
 };
 
+// Clean up orphaned localStorage data (for anonymous users)
+export const cleanupOrphanedData = () => {
+  try {
+    console.log('🍳 [SessionManager] Cleaning up orphaned localStorage data...');
+    
+    // Get all localStorage keys
+    const allKeys = Object.keys(localStorage);
+    
+    // Find all messages keys
+    const messageKeys = allKeys.filter(key => key.startsWith('messages_'));
+    
+    // Get current sessions to check against
+    const currentSessionsKey = localStorage.getItem('anonymous_sessions');
+    const currentSessions = currentSessionsKey ? JSON.parse(currentSessionsKey) : [];
+    const sessionIds = new Set(currentSessions.map(session => session.id));
+    
+    console.log('🍳 [SessionManager] Found', messageKeys.length, 'message entries');
+    console.log('🍳 [SessionManager] Current sessions:', Array.from(sessionIds));
+    
+    // Remove orphaned message entries
+    let removedCount = 0;
+    messageKeys.forEach(key => {
+      const sessionId = key.replace('messages_', '');
+      if (!sessionIds.has(sessionId)) {
+        console.log('🍳 [SessionManager] Removing orphaned message entry:', key);
+        localStorage.removeItem(key);
+        removedCount++;
+      }
+    });
+    
+    console.log('🍳 [SessionManager] Cleaned up', removedCount, 'orphaned message entries');
+    
+    return { success: true, removedCount };
+  } catch (error) {
+    console.error('🍳 [SessionManager] Error cleaning up orphaned data:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 // Generate session title from first message
 export const generateSessionTitle = (firstMessage) => {
   if (!firstMessage || firstMessage.trim().length === 0) {
@@ -304,4 +343,5 @@ export default {
   getSessionMessages,
   deleteSessionMessages,
   generateSessionTitle,
+  cleanupOrphanedData,
 };

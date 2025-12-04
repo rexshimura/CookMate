@@ -191,7 +191,7 @@ export default function SignupPage() {
             </form>
 
             <div className="mt-8 text-center animate-slideUp delay-250">
-              <p className="text-sm text-stone-600">
+              <div className="text-sm text-stone-600">
                 Already have an account?{' '}
                 <Link 
                   to="/signin" 
@@ -200,7 +200,7 @@ export default function SignupPage() {
                   Log in
                   <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 group-hover:w-full transition-all duration-300"></div>
                 </Link>
-              </p>
+              </div>
             </div>
           </div>
         </div>

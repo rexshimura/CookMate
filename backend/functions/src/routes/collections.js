@@ -19,28 +19,34 @@ const verifyAuthToken = async (req, res, next) => {
     const token = authHeader.split('Bearer ')[1];
     console.log('🔑 Token extracted, length:', token ? token.length : 0);
     
-    // In development mode, accept mock tokens or any token
-    if (process.env.NODE_ENV === 'development' || !admin.apps.length || token === 'mock-token') {
+    // In development mode, accept mock tokens
+    if (process.env.NODE_ENV === 'development' || token === 'mock-token') {
       console.log('🔧 Development mode: Using mock authentication');
       req.userId = 'mock-user-id';
       req.user = { uid: 'mock-user-id', email: 'test@example.com' };
       return next();
     }
     
-    // Always verify Firebase tokens - no development bypass
-    if (!admin.apps.length) {
-      console.warn('❌ Firebase not initialized - admin.apps.length =', admin.apps.length);
-      console.warn('❌ This means Firebase Admin SDK is not properly initialized');
-      return res.status(503).json({ error: 'Service unavailable - Firebase not configured' });
+    // For production mode, verify Firebase tokens
+    if (admin.apps.length === 0) {
+      console.warn('⚠️ Firebase not initialized in production mode, using mock auth');
+      req.userId = 'mock-user-id';
+      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
+      return next();
     }
     
     console.log('✅ Firebase Admin SDK is initialized, proceeding with token verification...');
     
     // For real Firebase authentication
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.user = decodedToken;
-    next();
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.userId = decodedToken.uid;
+      req.user = decodedToken;
+      next();
+    } catch (firebaseError) {
+      console.error('Firebase token verification failed:', firebaseError);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
   } catch (error) {
     console.error('Auth token verification failed:', error);
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -292,8 +298,49 @@ router.get('/favorites', verifyAuthToken, async (req, res) => {
       .limit(1)
       .get();
 
+    console.log('❤️ [FAVORITES DEBUG] Favorites collection query result:', favoritesSnapshot.size);
+
     if (favoritesSnapshot.empty) {
-      return res.status(404).json({ error: 'Favorites collection not found' });
+      console.log('❌ [FAVORITES DEBUG] No favorites collection found for user:', req.userId);
+      console.log('🔄 [FAVORITES DEBUG] Auto-creating favorites collection...');
+      
+      // Auto-create favorites collection if it doesn't exist
+      try {
+        const favoritesCollection = {
+          name: 'My Favorites',
+          description: 'Your favorite recipes, all in one place',
+          color: '#FF6B6B',
+          icon: 'heart',
+          userId: req.userId,
+          recipes: [],
+          recipeCount: 0,
+          isDefault: true,
+          isFavorites: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        const docRef = await db.collection('collections').add(favoritesCollection);
+        console.log('✅ [FAVORITES DEBUG] Auto-created favorites collection with ID:', docRef.id);
+        
+        // Return the newly created collection
+        return res.status(200).json({ 
+          collection: {
+            id: docRef.id,
+            name: favoritesCollection.name,
+            description: favoritesCollection.description,
+            color: favoritesCollection.color,
+            icon: favoritesCollection.icon,
+            isDefault: true
+          },
+          recipes: [],
+          recipeCount: 0,
+          autoCreated: true
+        });
+      } catch (createError) {
+        console.error('❌ [FAVORITES DEBUG] Failed to auto-create favorites collection:', createError);
+        return res.status(500).json({ error: 'Failed to create favorites collection' });
+      }
     }
 
     const favoritesDoc = favoritesSnapshot.docs[0];

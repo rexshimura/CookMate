@@ -129,7 +129,9 @@ const Collections = () => {
     if (!formData.name.trim()) return;
 
     try {
+      console.log('🍳 [Collections] Creating collection with data:', formData);
       const result = await createCollection(formData);
+      console.log('🍳 [Collections] Create collection result:', result);
       
       // Backend returns { message, collection } - check for collection field instead of success
       if (result && result.collection) {
@@ -145,9 +147,20 @@ const Collections = () => {
         console.log('✅ Collection created successfully:', result.message);
       } else {
         console.error('❌ Unexpected response format:', result);
+        // Show user-friendly error without crashing
+        alert('Failed to create collection: Unexpected response from server');
       }
     } catch (error) {
       console.error('❌ Failed to create collection:', error);
+      console.error('❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      // Show user-friendly error without crashing the page
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`Failed to create collection: ${errorMessage}`);
     }
   };
 
@@ -315,6 +328,9 @@ const Collections = () => {
     // Load recipes for the initially selected collection (if any)
     if (selectedCollectionId) {
       loadCollectionRecipes(selectedCollectionId);
+    } else {
+      // Load "All Recipes" view when no specific collection is selected
+      loadCollectionRecipes(null);
     }
   }, [selectedCollectionId]);
 
@@ -389,9 +405,25 @@ const Collections = () => {
     console.log('Added to favorites:', recipeData);
   };
 
+  // Handle remove from favorites callback
+  const handleRemoveFromFavoritesCallback = (recipeData) => {
+    console.log('Removed from favorites:', recipeData);
+  };
+
   // Handle add to collection callback  
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
     console.log('Added to collection:', collectionId, recipeData);
+  };
+
+  // Handle remove from collection callback
+  const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
+    console.log('Removed from collection:', collectionId, recipeData);
+    // Refresh the current collection to show updated recipes
+    if (selectedCollectionId) {
+      loadCollectionRecipes(selectedCollectionId);
+    }
+    // Also refresh collections to update recipe counts
+    loadCollections();
   };
 
   // Handle create collection callback
@@ -516,14 +548,17 @@ const Collections = () => {
                       {collectionRecipes.map((recipe, index) => (
                         <RecipeCard
                           key={recipe.id || index}
-                          recipe={recipe.title || recipe.name || `Recipe ${index + 1}`}
+                          recipe={recipe}
                           onClick={handleRecipeClick}
                           isFavorited={true}
                           user={user}
                           collections={collections}
                           requireAuth={requireAuth}
+                          collectionId={currentCollection?.id}
                           onAddToFavorites={handleAddToFavoritesCallback}
+                          onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                           onAddToCollection={handleAddToCollectionCallback}
+                          onRemoveFromCollection={handleRemoveFromCollectionCallback}
                           onCreateCollection={handleCreateCollectionCallback}
                           fetchRecipeDetails={handleFetchRecipeDetails}
                         />

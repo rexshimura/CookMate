@@ -408,6 +408,7 @@ function extractRecipesFromResponse(response) {
       .replace(/^recipe\s*:?\s*/i, '') // Remove "Recipe: "
       .replace(/^ingredients?\s*:?\s*/i, '') // Remove "Ingredient: "
       .replace(/^instructions?\s*:?\s*/i, '') // Remove "Instructions: "
+      .replace(/^(?:dish|food|meal)\s*:?\s*/i, '') // Remove "Dish: ", "Food: ", "Meal: "
       .trim();
     
     if (cleaned.length >= 3) {
@@ -500,7 +501,7 @@ function extractRecipesFromResponse(response) {
   return recipes;
 }
 
-// Simplified recipe validation function
+// Improved recipe validation function with better international support
 function isValidRecipe(text) {
   if (!text || text.length === 0) {
     console.log('❌ [VALIDATION] Failed: empty text');
@@ -524,60 +525,68 @@ function isValidRecipe(text) {
     return false;
   }
   
-  // Must not end with common non-recipe endings
+  // Must not end with common non-recipe endings (but allow certain dish types)
   if (/[.!?]$/.test(text.trim())) {
     console.log('❌ [VALIDATION] Failed: ends with punctuation');
     return false;
   }
   
-  // Exclude obvious non-recipe content (more specific to avoid false positives)
+  // More precise exclusion list - avoid rejecting legitimate recipe sections and dish names
   const excludeTerms = [
-    'ingredients', 'instructions', 'directions', 'method', 'steps',
-    'cooking time', 'prep time', 'servings', 'difficulty', 'nutrition',
-    'safety', 'tips', 'temperature', 'degrees', 'minutes', 'hours',
-    'cup', 'cups', 'tablespoon', 'teaspoon', 'pound', 'ounce',
-    'recipe suggestions', 'recipe ideas', 'cooking tips', 'food suggestions',
+    // Only exclude complete phrases that are clearly not dish names
+    'step ', 'steps ', 'ingredients:', 'instructions:', 'directions:', 'method:',
+    'cooking time', 'prep time', 'servings:', 'difficulty:', 'nutrition:',
+    'safety:', 'temperature', 'degrees', 'minutes', 'hours',
+    'cup ', 'cups ', 'tablespoon', 'teaspoon', 'pound', 'ounce',
+    // Don't exclude 'tips' alone as it could be part of dish names
+    // Only exclude full phrases that are clearly instructional
     'brush the mixture', 'brush both sides', 'season with salt', 'serve hot', 'serve warm',
-    'preheat the oven', 'heat the oil', 'cook until', 'bake until', 'fry until', 'mix the', 'combine the',
-    'add the', 'place the', 'put the', 'transfer to', 'pour the',
-    'simmer until', 'boil the', 'saute until', 'stir the', 'whisk the', 'beat the',
-    'chop the', 'dice the', 'slice the', 'cut the', 'mince the', 'crush the', 'mash the', 'blend the',
-    'drain the', 'rinse the', 'pat dry', 'trim the', 'peel the', 'core the', 'seed the',
-    'marinate the', 'chill the', 'freeze the', 'refrigerate the', 'cover the', 'uncover the',
-    'until golden brown', 'until tender', 'until cooked', 'when', 'while', 'then', 'next', 'after', 'before',
-    'both sides of', 'all sides of', 'to taste', 'as needed', 'optional',
-    'serve with', 'garnish with', 'top with', 'sprinkle with',
-    'minutes until', 'cook until done', 'bake until done', 'until golden',
-    'dripping', 'cooked through', 'flaky', 'lightly browned'
+    'preheat the oven', 'heat the oil', 'cook until', 'bake until', 'fry until'
   ];
   
-  // Check for excluded terms
-  if (excludeTerms.some(term => lowerText.includes(term))) {
+  // Check for excluded terms (only full matches to avoid false positives)
+  if (excludeTerms.some(term => lowerText === term || lowerText.includes(term + ' ') || lowerText.includes(' ' + term))) {
     console.log('❌ [VALIDATION] Failed: contains excluded term');
     return false;
   }
   
-  // Must contain food-related keywords (expanded list)
-  const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|rice|pasta|noodles|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|chocolate|vanilla|cheese|tomato|potato|onion|garlic|pepper|broccoli|carrot|spinach|mushroom|basil|oregano|thyme|rosemary|lemon|lime|avocado|apple|banana|berries|quinoa|oats|yogurt|milk|cream|butter|oil|sugar|honey|flour|egg|eggs|tofu|lamb|turkey|zucchini|eggplant|cucumber|celery|lettuce|kale|corn|peas|beans|spaghetti|macaroni|korean|chinese|italian|mexican|indian|thai|french|mediterranean|bbq|grilled|roasted|braised|stir.?fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant.?style|street.?food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient)\b/i;
+  // Expanded food keywords with international dishes
+  const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta|bake|broil|simmer|saute|grill|roast|steam|blanch|braise|stew|poach|fry)\b/i;
   
   const foodKeywordMatch = foodKeywords.test(lowerText);
   console.log('🔍 [VALIDATION] Food keywords check for "' + text + '":', foodKeywordMatch);
   
+  // If no direct food keywords found, apply additional validation for legitimate dish names
   if (!foodKeywordMatch) {
+    // Check if it looks like a legitimate dish name (proper case, reasonable length, not instructional)
+    const looksLikeDishName = (
+      /^[A-Z][a-z]+(?:-[A-Z][a-z]+)*(?:\s+[A-Z][a-z]+)*(?:\s*[A-Z][a-z]+)*$/.test(text) && // Proper capitalization
+      !/\d/.test(text) && // No numbers (which often indicate steps)
+      text.split(' ').length <= 4 && // Not too many words (likely not a full instruction)
+      !/^(the|a|an|and|or|but|to|for|with|of|in|on|at|by|from)\s/i.test(text) // Doesn't start with articles/prepositions
+    );
+    
+    if (looksLikeDishName) {
+      console.log('✅ [VALIDATION] Passed - looks like legitimate dish name without common keywords');
+      return true;
+    }
+    
     console.log('❌ [VALIDATION] Failed: no food-related keywords found');
     return false;
   }
   
-  // Aggressive instruction pattern check - exclude cooking instructions
+  // Less aggressive instruction pattern check - only exclude clear cooking instructions
   const instructionPatterns = [
-    /\b(step|cook|heat|add|mix|stir|bake|fry|boil|minutes?|hours?|degrees?|°[fc])\b/i,
-    /\b(brush|season|serve|preheat|transfer|pour|combine|whisk|beat|chop|dice|slice|cut|mince)\b/i,
-    /\b(drain|rinse|pat dry|trim|peel|core|seed|marinate|chill|freeze|cover|uncover)\b/i,
-    /\b(simmer until|roast|grill|saute|caramelize|baste|glaze|toss|massage)\b/i,
-    /\b(both sides|all sides|to taste|as needed|optional|until|when|while|then|next)\b/i,
-    /\b(serve with|garnish with|top with|sprinkle with|minutes until|cook until|bake until)\b/i,
-    /\b(dripping|tender|cooked through|juicy|flaky|golden brown|lightly browned)\b/i,
-    /\b(on both sides|on all sides|until cooked|until tender|until golden)\b/i
+    // Only match clear instruction patterns at the beginning of text
+    /^(?:step\s*\d+|ingredients?|instructions?|directions?|method):/i,
+    // Only match full phrases that are clearly instructional
+    /^(?:preheat|heat|cook|bake|fry|mix|stir|combine|add|place|put|transfer|pour)\s+(?:the\s+)?/i,
+    /^(?:drain|rinse|pat\s+dry|trim|peel|core|seed|marinate|chill|freeze|cover|uncover)\s+(?:the\s+)?/i,
+    /^(?:brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend)\s+(?:the\s+)?/i,
+    // Only match complete instruction phrases
+    /^(?:simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage)\s+(?:until|for)\s+/i,
+    /^(?:cook|bake)\s+until\s+(?:tender|done|golden|cooked)/i,
+    /^(?:serve|garnish|top|sprinkle)\s+(?:with|on)/i
   ];
   
   if (instructionPatterns.some(pattern => pattern.test(text))) {
@@ -585,15 +594,15 @@ function isValidRecipe(text) {
     return false;
   }
   
-  // Additional check: recipe names should not be complete sentences or clauses
-  // They should be phrases or titles, not full instructions
-  if (text.includes(',') && text.split(',').length > 2) {
+  // Less restrictive checks - only flag obvious issues
+  // Recipe names shouldn't be complete sentences with multiple clauses
+  if (text.includes(',') && text.split(',').length > 3) {
     console.log('❌ [VALIDATION] Failed: too many commas (likely instruction)');
     return false;
   }
   
-  // Recipe names shouldn't end with common verb forms or prepositions
-  const problematicEndings = ['ing', 'ed', 'ly', 'to', 'for', 'with', 'on', 'in', 'at', 'by'];
+  // Only reject endings that are clearly problematic
+  const problematicEndings = ['ly', 'ing']; // Removed many problematic endings
   const lastWord = lowerText.split(' ').pop();
   if (problematicEndings.includes(lastWord)) {
     console.log('❌ [VALIDATION] Failed: ends with problematic word:', lastWord);
@@ -774,15 +783,50 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       });
     }
     
-    // Generate AI response using Groq
+    // Generate AI response using Groq with fallback handling
     console.log('🍳 [CHAT] Generating AI response for message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
-    const aiReply = await callGroqAI(message, history);
-    console.log('🍳 [CHAT] AI response generated, length:', aiReply.length);
     
-    // Extract recipes from the AI response
-    console.log('🍳 [CHAT] Starting recipe extraction...');
+    let aiReply;
+    try {
+      aiReply = await callGroqAI(message, history);
+      console.log('🍳 [CHAT] AI response generated, length:', aiReply.length);
+    } catch (aiError) {
+      console.error('❌ [CHAT] AI service failed, using fallback response:', aiError.message);
+      
+      // Create a helpful fallback response based on the message content
+      const ingredientList = extractIngredients(message);
+      
+      if (ingredientList.length > 0) {
+        aiReply = `I'm having trouble connecting to my AI brain right now, but I can still help you cook! 🌟
+
+Based on what you mentioned (${ingredientList.join(', ')}), here are some cooking ideas:
+• Try combining your ingredients in a simple stir-fry
+• Make a hearty soup or stew 
+• Create a fresh salad with protein
+• Grill or roast for flavorful results
+
+**Some delicious recipes to try:**
+• **Quick Stir-Fry** - Combine your ingredients with oil, garlic, and your favorite seasonings
+• **Simple Soup** - Start with a base of broth, add your ingredients, and simmer until tender
+• **Grilled Delight** - Season and grill your main ingredient with vegetables
+
+I'm experiencing technical difficulties at the moment, but I'll be back to full strength soon! In the meantime, feel free to ask me about cooking techniques, food safety, or ingredient substitutions.`;
+      } else {
+        aiReply = `I'm having trouble connecting to my brain right now. 🌟 
+
+But I'm still here to help! Try asking me about:
+• What ingredients you have available
+• Cooking techniques and methods
+• Food safety and storage tips
+• Recipe substitutions
+• Kitchen equipment recommendations
+
+I should be back to full AI functionality shortly. Thanks for your patience! 🍳`;
+      }
+    }
+    
+    // Extract recipes from AI response for consistency
     const detectedRecipes = extractRecipesFromResponse(aiReply);
-    console.log('🍳 [CHAT] Recipe extraction completed. Found', detectedRecipes.length, 'recipes:', detectedRecipes);
     
     // Store detected recipes for consistency
     if (detectedRecipes.length > 0) {

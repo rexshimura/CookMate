@@ -84,8 +84,28 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, user: firebaseUser };
     } catch (error) {
-      setError(error.message);
-      return { success: false, error: error.message };
+      console.error('Sign up error:', error);
+      let errorMessage = 'Account creation failed';
+      
+      // Provide user-friendly error messages based on Firebase error codes
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account with this email already exists. Please try signing in instead';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use at least 6 characters with a mix of letters and numbers';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Account creation is currently disabled. Please try again later';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many requests. Please wait a moment before trying again';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters long';
+      }
+      
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -100,8 +120,28 @@ export const AuthProvider = ({ children }) => {
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: firebaseUser };
     } catch (error) {
-      setError(error.message);
-      return { success: false, error: error.message };
+      console.error('Sign in error:', error);
+      let errorMessage = 'Sign in failed';
+      
+      // Provide user-friendly error messages based on Firebase error codes
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please wait a moment before trying again';
+      } else if (error.code === 'auth/invalid-login-credentials') {
+        errorMessage = 'Invalid email or password. Please check your credentials';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection';
+      }
+      
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -111,11 +151,33 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setError(null);
+      console.log('🔄 [Auth] Starting logout process...');
+      
+      // Clear local storage and session data first
+      localStorage.removeItem('firebase:authUser');
+      localStorage.removeItem('cookmate_session_data');
+      
+      // Sign out from Firebase
       await signOut(auth);
+      console.log('✅ [Auth] Firebase signOut completed successfully');
+      
       return { success: true };
     } catch (error) {
-      setError(error.message);
-      return { success: false, error: error.message };
+      console.error('❌ [Auth] Logout failed:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Sign out failed. Please try again.';
+      
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many requests. Please wait a moment before trying again.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      }
+      
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
   };
 

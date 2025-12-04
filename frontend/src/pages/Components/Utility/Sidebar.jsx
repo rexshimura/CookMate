@@ -30,6 +30,7 @@ const Sidebar = ({
   onShowCollections,
   onLogout,
   sessionsLoading,
+  isLoggingOut,
   collapsed 
 }) => {
   const formatTime = (date) => {
@@ -307,10 +308,17 @@ const Sidebar = ({
               {user && (
                 <button 
                   onClick={onLogout}
-                  className={`${isMobile ? 'p-2.5' : 'p-2'} text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group`}
-                  title="Sign Out"
+                  disabled={isLoggingOut}
+                  className={`${isMobile ? 'p-2.5' : 'p-2'} text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                 >
-                  <LogOut className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'} transition-transform duration-200 group-hover:scale-110`} />
+                  {isLoggingOut ? (
+                    <div className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'} animate-spin`}>
+                      <div className="w-full h-full border-2 border-red-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  ) : (
+                    <LogOut className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'} transition-transform duration-200 group-hover:scale-110`} />
+                  )}
                 </button>
               )}
             </>

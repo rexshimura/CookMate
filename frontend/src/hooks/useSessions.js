@@ -161,6 +161,10 @@ export const useSessions = () => {
       if (sessionId.startsWith('anon_')) {
         console.log('🍳 [useSessions] Deleting anonymous session:', sessionId);
         
+        // Remove messages from localStorage first
+        console.log('🍳 [useSessions] Cleaning up session messages from localStorage');
+        localStorage.removeItem(`messages_${sessionId}`);
+        
         // Remove from localStorage
         const existingSessions = localStorage.getItem('anonymous_sessions');
         const sessionsArray = existingSessions ? JSON.parse(existingSessions) : [];

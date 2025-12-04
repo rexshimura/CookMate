@@ -140,24 +140,41 @@ const initializeFirebase = () => {
           mockData.set(`${name}/${id}`, data);
           return Promise.resolve({ id: id });
         },
-        where: () => ({
-          in: (field, ids) => {
-            const results = [];
-            for (const [key, value] of mockData.entries()) {
-              if (key.startsWith(name + '/') && ids.includes(value[field])) {
+        where: (field, operator, value) => {
+          const results = [];
+          for (const [key, docData] of mockData.entries()) {
+            if (key.startsWith(name + '/')) {
+              const docValue = docData[field];
+              
+              if (operator === '==' && docValue === value) {
                 results.push({
-                  data: () => value,
+                  data: () => docData,
+                  id: key.split('/')[1]
+                });
+              } else if (operator === 'in' && Array.isArray(value) && value.includes(docValue)) {
+                results.push({
+                  data: () => docData,
                   id: key.split('/')[1]
                 });
               }
             }
-            return Promise.resolve({
-              docs: results,
-              map: (fn) => results.map(fn)
-            });
-          },
-          get: () => Promise.resolve({ docs: [] })
-        }),
+          }
+          return Promise.resolve({
+            docs: results,
+            map: (fn) => results.map(fn),
+            empty: results.length === 0,
+            size: results.length,
+            limit: (n) => {
+              const limited = results.slice(0, n);
+              return Promise.resolve({
+                docs: limited,
+                map: (fn) => limited.map(fn),
+                empty: limited.length === 0,
+                size: limited.length
+              });
+            }
+          });
+        },
         orderBy: () => ({
           get: () => Promise.resolve({ docs: [] })
         })

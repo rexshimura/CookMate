@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle } from 'lucide-react';
+import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle, Trash2 } from 'lucide-react';
 import { 
   addToFavorites, 
   removeFromFavorites,
   checkIsFavorite,
-  addRecipeToCollection 
+  addRecipeToCollection,
+  removeRecipeFromCollection
 } from '../../../utils/api.js';
 import { useModal } from '../../../App.jsx';
 
@@ -14,12 +15,18 @@ const RecipeCard = ({
   isLoading, 
   isFavorited = false,
   onAddToFavorites,
+  onRemoveFromFavorites,
   onAddToCollection,
+  onRemoveFromCollection,
   collections = [],
   fetchRecipeDetails,
   user = null,
   requireAuth = null,
   onCreateCollection = null
+  ,
+  // Optional: when viewing a specific collection (or favorites), pass its id so
+  // the card can show a direct "remove" button for that collection.
+  collectionId = null
 }) => {
   const [localIsFavorited, setLocalIsFavorited] = useState(isFavorited);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
@@ -27,18 +34,19 @@ const RecipeCard = ({
   const { showCollectionsModal } = useModal();
 
   // Get recipe ID for consistency
-  const getRecipeId = () => {
-    if (!recipe) return '';
-    if (typeof recipe === 'string') {
-      return recipe.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const getRecipeId = (recipeObj = recipe) => {
+    if (!recipeObj) return '';
+    if (typeof recipeObj === 'string') {
+      return recipeObj.toLowerCase().replace(/[^a-z0-9]/g, '_');
     }
-    return recipe.savedId || recipe.title?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    // Check for various ID field possibilities
+    return recipeObj.id || recipeObj.savedId || recipeObj.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
   };
 
   // Check if the recipe is already in a specific collection
   const isRecipeInCollection = (collectionId) => {
     if (!recipe || typeof recipe === 'string') return false;
-    const recipeId = recipe.savedId || recipe.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || recipe.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const recipeId = getRecipeId(recipe);
     const collection = collections.find(col => col.id === collectionId);
     return collection?.recipes?.some(r => r.id === recipeId);
   };
@@ -61,32 +69,68 @@ const RecipeCard = ({
       let recipeData = recipe;
       let recipeId;
       
-      // If recipe is just a string, we need to fetch full details
+      // Get recipe ID and data - handle both string and object recipes
       if (typeof recipe === 'string') {
+        // If recipe is just a string, we need to fetch full details
         if (fetchRecipeDetails) {
           const result = await fetchRecipeDetails(recipe);
           if (result.success) {
             recipeData = result.recipe;
           }
         }
-        recipeId = recipe.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        recipeId = getRecipeId(recipe);
       } else {
-        recipeId = recipe.savedId || recipe.title?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        // For object recipes, use the improved ID generation
+        recipeId = getRecipeId(recipe);
+        recipeData = recipe;
       }
+      
+      console.log('🗑️ [RecipeCard] Final computed recipeId:', recipeId);
       
       // Toggle favorite status
       const isCurrentlyFavorited = localIsFavorited || isFavorited;
       
       if (isCurrentlyFavorited) {
         // Remove from favorites
+        console.log('🗑️ [RecipeCard] Starting favorites removal for recipeId:', recipeId);
+        console.log('🗑️ [RecipeCard] Recipe data:', recipeData || recipe);
+        
+        // Validate recipe ID before making API call
+        if (!recipeId) {
+          console.error('🗑️ [RecipeCard] ERROR: No valid recipeId found');
+          alert('Unable to remove recipe: Invalid recipe identifier');
+          return;
+        }
+        
         try {
           const result = await removeFromFavorites(recipeId);
+          console.log('🗑️ [RecipeCard] Remove from favorites API result:', result);
           if (result.success !== false) { // Collections API doesn't return success flag
             setLocalIsFavorited(false);
-            if (onAddToFavorites) onAddToFavorites(recipeData || recipe);
+            if (onRemoveFromFavorites) {
+              console.log('🗑️ [RecipeCard] Calling remove from favorites callback');
+              onRemoveFromFavorites(recipeData || recipe);
+            }
+            
+            // Force a brief delay to allow backend to update before potential reload
+            setTimeout(() => {
+              console.log('🔄 [RecipeCard] Triggering favorites reload after removal');
+            }, 100);
+          } else {
+            console.error('🗑️ [RecipeCard] Remove from favorites failed:', result.error);
           }
         } catch (error) {
           console.error('Failed to remove from favorites:', error);
+          // Show user-friendly error feedback
+          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            alert('Please sign in again to manage your favorites.');
+          } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+            alert('This recipe is no longer available in your favorites.');
+          } else {
+            alert(`Failed to remove from favorites: ${error.message}`);
+          }
+          // Revert UI state on error
+          setLocalIsFavorited(true);
         }
       } else {
         // Add to favorites
@@ -98,6 +142,14 @@ const RecipeCard = ({
           }
         } catch (error) {
           console.error('Failed to add to favorites:', error);
+          // Show user-friendly error feedback
+          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            alert('Please sign in again to manage your favorites.');
+          } else {
+            alert(`Failed to add to favorites: ${error.message}`);
+          }
+          // Revert UI state on error
+          setLocalIsFavorited(false);
         }
       }
     } catch (error) {
@@ -142,7 +194,7 @@ const RecipeCard = ({
       let recipeData = recipe;
       let recipeId;
       
-      // If recipe is just a string, we need to fetch full details
+      // Get recipe ID and data - handle both string and object recipes
       if (typeof recipe === 'string') {
         console.log('📝 [RecipeCard] Recipe is string, fetching details...');
         if (fetchRecipeDetails) {
@@ -152,9 +204,10 @@ const RecipeCard = ({
             recipeData = result.recipe;
           }
         }
-        recipeId = recipe.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        recipeId = getRecipeId(recipe);
       } else {
-        recipeId = recipe.savedId || recipe.title?.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        recipeId = getRecipeId(recipe);
+        recipeData = recipe;
       }
       
       console.log('📦 [RecipeCard] Final recipe data:', recipeData);
@@ -172,6 +225,61 @@ const RecipeCard = ({
       }
     } catch (error) {
       console.error('❌ [RecipeCard] Failed to add to collection:', error);
+    }
+  };
+
+  // Remove from collection
+  const handleRemoveFromCollection = async (collectionId) => {
+    console.log('🗑️ [RecipeCard] Remove from collection initiated');
+    console.log('🗑️ [RecipeCard] Collection ID:', collectionId);
+    console.log('🗑️ [RecipeCard] Recipe:', recipe);
+    
+    if (!recipe) {
+      console.error('❌ [RecipeCard] No recipe provided');
+      return;
+    }
+    
+    if (!collectionId) {
+      console.error('❌ [RecipeCard] No collection ID provided');
+      return;
+    }
+    
+    // Check authentication
+    if (!user) {
+      console.log('⚠️ [RecipeCard] User not authenticated, showing auth prompt');
+      if (requireAuth) {
+        requireAuth('remove recipes from collections');
+      }
+      return;
+    }
+    
+    console.log('✅ [RecipeCard] User authenticated, proceeding with collection removal');
+    
+    try {
+      let recipeId = getRecipeId(recipe);
+      
+      console.log('🆔 [RecipeCard] Final recipe ID:', recipeId);
+      console.log('🚀 [RecipeCard] Calling removeRecipeFromCollection API...');
+      
+      const result = await removeRecipeFromCollection(collectionId, recipeId);
+      console.log('📡 [RecipeCard] API result:', result);
+      
+      if (result.success !== false) {
+        console.log('✅ [RecipeCard] Successfully removed from collection');
+        if (onRemoveFromCollection) onRemoveFromCollection(collectionId, recipe);
+      } else {
+        console.error('❌ [RecipeCard] API returned failure:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ [RecipeCard] Failed to remove from collection:', error);
+      // Show user-friendly error feedback
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        alert('Please sign in again to manage your collections.');
+      } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+        alert('This collection is no longer available.');
+      } else {
+        alert(`Failed to remove from collection: ${error.message}`);
+      }
     }
   };
 
@@ -200,7 +308,8 @@ const RecipeCard = ({
     if (typeof recipe === 'string') {
       return recipe;
     }
-    return recipe?.title || recipe?.name || 'Delicious Recipe';
+    // Check for recipe name in various locations (direct properties or nested in data)
+    return recipe?.title || recipe?.name || recipe?.data?.title || recipe?.data?.name || 'Delicious Recipe';
   };
 
   // Get recipe description with fallbacks
@@ -208,7 +317,7 @@ const RecipeCard = ({
     if (typeof recipe === 'string') {
       return 'Click on the recipe card to get detailed ingredients and instructions';
     }
-    return recipe?.description || 'A delicious recipe to try';
+    return recipe?.description || recipe?.data?.description || 'A delicious recipe to try';
   };
 
   // Get cooking time with fallbacks
@@ -216,7 +325,7 @@ const RecipeCard = ({
     if (typeof recipe === 'string') {
       return 'Varies';
     }
-    return recipe?.cookingTime || recipe?.prepTime || '30 minutes';
+    return recipe?.cookingTime || recipe?.prepTime || recipe?.data?.cookingTime || recipe?.data?.prepTime || '30 minutes';
   };
 
   // Get servings with fallbacks
@@ -224,7 +333,7 @@ const RecipeCard = ({
     if (typeof recipe === 'string') {
       return '4';
     }
-    return recipe?.servings || '4';
+    return recipe?.servings || recipe?.data?.servings || '4';
   };
 
   // Get difficulty with fallbacks
@@ -232,7 +341,7 @@ const RecipeCard = ({
     if (typeof recipe === 'string') {
       return 'Medium';
     }
-    return recipe?.difficulty || 'Medium';
+    return recipe?.difficulty || recipe?.data?.difficulty || 'Medium';
   };
 
   return (
@@ -316,6 +425,7 @@ const RecipeCard = ({
                     user,
                     requireAuth,
                     onAddToCollection: handleAddToCollection,
+                    onRemoveFromCollection: handleRemoveFromCollection,
                     onCreateCollection,
                     triggerRef: collectionsButtonRef
                   });
@@ -326,6 +436,16 @@ const RecipeCard = ({
                 <Folder className="w-4 h-4" />
               </button>
             </div>
+            {/* Direct Remove From Collection Button (visible when card is shown inside a specific collection) */}
+            {collectionId && isRecipeInCollection(collectionId) && (
+              <button
+                onClick={(e) => { e?.stopPropagation(); handleRemoveFromCollection(collectionId); }}
+                className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all hover:scale-110"
+                title="Remove from this collection"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
           
           <div className="flex-shrink-0">

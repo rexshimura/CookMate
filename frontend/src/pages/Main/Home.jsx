@@ -7,8 +7,27 @@ import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
+import ErrorMessage from '../../components/ErrorMessage.jsx';
 import { useModal } from '../../App.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from '../Components/UI/useConfirmation.jsx';
+
+// Simple markdown parser for bold text
+const parseMarkdownText = (text) => {
+  if (!text) return '';
+  
+  // Split text by ** patterns and wrap bold parts in JSX
+  const parts = text.split(/(\*\*[^*]+\*\*)/);
+  
+  return parts.map((part, index) => {
+    // Check if this part is bold markdown
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const boldText = part.slice(2, -2); // Remove ** from both ends
+      return <strong key={index} className="font-semibold">{boldText}</strong>;
+    }
+    // Return regular text as-is
+    return part;
+  });
+};
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -47,10 +66,20 @@ export default function Home() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoriteCollectionId, setFavoriteCollectionId] = useState(null);
 
   // Collections state
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+
+  // Error state management
+  const [error, setError] = useState(null);
+  const [showError, setShowError] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  
+  // Logout state management
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -135,7 +164,9 @@ export default function Home() {
 
   // Load favorites when showing favorites modal
   useEffect(() => {
+    console.log('🔄 [Home] Favorites modal state changed, showFavorites:', showFavorites);
     if (showFavorites) {
+      console.log('🔄 [Home] Loading fresh favorites data because modal opened');
       loadFavoriteRecipes();
     }
   }, [showFavorites]);
@@ -149,7 +180,29 @@ export default function Home() {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !currentSessionId) return;
+    
+    // Clear any previous errors
+    setError(null);
+    setShowError(false);
+
+    // Input validation
+    if (!inputMessage.trim()) {
+      setError('Please type a message before sending.');
+      setShowError(true);
+      return;
+    }
+
+    if (inputMessage.length < 2) {
+      setError('Message is too short. Please enter at least 2 characters.');
+      setShowError(true);
+      return;
+    }
+
+    if (!currentSessionId) {
+      setError('No active chat session. Please create a new chat.');
+      setShowError(true);
+      return;
+    }
 
     const messageText = inputMessage;
     setInputMessage('');
@@ -160,6 +213,8 @@ export default function Home() {
       focusInput();
     } catch (error) {
       console.error('Failed to send message:', error);
+      setError(error.message || 'Failed to send message. Please try again.');
+      setShowError(true);
     }
   };
 
@@ -214,15 +269,49 @@ export default function Home() {
     const confirmed = await confirmLogout();
     
     if (confirmed) {
+      console.log('🔄 [Home] User confirmed logout, starting process...');
+      
+      // Set loading state
+      setIsLoggingOut(true);
+      setError(null);
+      setShowError(false);
+      setShowSuccessMessage(false);
+      
       try {
-        await logout();
-        // Clear local state
-        setCurrentSessionId(null);
-        clearMessages();
+        const result = await logout();
         
-
+        if (result.success) {
+          console.log('✅ [Home] Logout successful, clearing local state...');
+          
+          // Clear local state
+          setCurrentSessionId(null);
+          clearMessages();
+          setCurrentSessionId(null);
+          
+          // Clear any modal states
+          setShowFavorites(false);
+          
+          // Show success feedback
+          setShowSuccessMessage(true);
+          console.log('🎉 [Home] Logout completed successfully');
+          
+          // Redirect to landing page after successful logout
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 2000);
+          
+        } else {
+          console.error('❌ [Home] Logout failed:', result.error);
+          setError(result.error || 'Failed to sign out. Please try again.');
+          setShowError(true);
+        }
+        
       } catch (error) {
-        console.error('Failed to logout:', error);
+        console.error('❌ [Home] Unexpected logout error:', error);
+        setError('An unexpected error occurred. Please try again.');
+        setShowError(true);
+      } finally {
+        setIsLoggingOut(false);
       }
     }
   };
@@ -285,13 +374,18 @@ export default function Home() {
   };
 
   const loadFavoriteRecipes = async () => {
+    console.log('🔄 [Home] Loading fresh favorites data...');
     setFavoritesLoading(true);
     try {
       const result = await getFavorites();
+      console.log('🔄 [Home] Fresh favorites data received:', result);
       // The new collections-based API returns { collection: {...}, recipes: [...] }
       if (result && result.recipes) {
+        console.log('🔄 [Home] Setting favorites recipes:', result.recipes.length, 'recipes');
         setFavoriteRecipes(result.recipes || []);
+        setFavoriteCollectionId(result.collection?.id || null);
       } else {
+        console.log('🔄 [Home] No favorites found, setting empty array');
         setFavoriteRecipes([]);
       }
     } catch (error) {
@@ -334,18 +428,54 @@ export default function Home() {
     }
   };
 
-  const handleFavoriteRecipeClick = (recipe) => {
-    // Close favorites modal first, then open recipe details
+  const handleFavoriteRecipeClick = (recipeName) => {
+    // Close favorites modal first, then open recipe details using the modal system
     setShowFavorites(false);
     
-    // For favorites, we need to fetch the full recipe details since we only have basic info
-    setSelectedRecipe(recipe.title || recipe.name);
-    setRecipeModalOpen(true);
+    // Use the centralized modal system to show recipe details
+    showRecipeDetail({
+      recipeName,
+      fetchRecipeDetails: handleFetchRecipeDetails,
+      onAddToFavorites: handleAddToFavoritesCallback
+    });
   };
 
   // Handle add to favorites callback
   const handleAddToFavoritesCallback = (recipeData) => {
     setFavoriteRecipes(prev => [...prev, recipeData]);
+  };
+
+  // Handle remove from favorites callback
+  const handleRemoveFromFavoritesCallback = (recipeData) => {
+    console.log('🗑️ [Home] Remove from favorites callback triggered:', recipeData);
+    
+    // First remove from local state for immediate UI feedback
+    setFavoriteRecipes(prev => {
+      if (!recipeData) {
+        console.log('🗑️ [Home] No recipe data provided, returning previous state');
+        return prev;
+      }
+      
+      const recipeId = recipeData.id || recipeData.title || recipeData.name;
+      console.log('🗑️ [Home] Removing recipe with ID:', recipeId);
+      console.log('🗑️ [Home] Previous favorites count:', prev.length);
+      
+      const newState = prev.filter(recipe => {
+        const existingRecipeId = recipe.id || recipe.title || recipe.name;
+        return existingRecipeId !== recipeId;
+      });
+      
+      console.log('🗑️ [Home] New favorites count:', newState.length);
+      return newState;
+    });
+    
+    // Then reload favorites from backend to ensure sync
+    // This handles cases where local and backend states might be out of sync
+    console.log('🗑️ [Home] Scheduling favorites reload in 500ms...');
+    setTimeout(() => {
+      console.log('🗑️ [Home] Executing delayed favorites reload');
+      loadFavoriteRecipes();
+    }, 500);
   };
 
   // Handle add to collection callback
@@ -354,6 +484,16 @@ export default function Home() {
     setCollections(prev => prev.map(collection => 
       collection.id === collectionId 
         ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
+        : collection
+    ));
+  };
+
+  // Handle remove from collection callback
+  const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
+    // Update the specific collection's recipe count locally
+    setCollections(prev => prev.map(collection => 
+      collection.id === collectionId 
+        ? { ...collection, recipeCount: Math.max((collection.recipeCount || 0) - 1, 0) }
         : collection
     ));
   };
@@ -371,6 +511,48 @@ export default function Home() {
       fav.name === recipeName ||
       fav.id === recipeName
     );
+  };
+
+  // Error handling functions
+  const handleDismissError = () => {
+    setShowError(false);
+    setError(null);
+  };
+
+  const handleRetrySendMessage = async () => {
+    if (!error || !inputMessage.trim()) {
+      handleDismissError();
+      return;
+    }
+
+    setIsRetrying(true);
+    setShowError(false);
+    
+    try {
+      await sendMessage(inputMessage);
+      setInputMessage('');
+      setError(null);
+    } catch (retryError) {
+      console.error('Retry failed:', retryError);
+      setError(retryError.message || 'Failed to send message. Please try again.');
+      setShowError(true);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // Determine error type for styling
+  const getErrorType = (errorMessage) => {
+    if (errorMessage.includes('Network') || errorMessage.includes('connection') || errorMessage.includes('fetch')) {
+      return 'network';
+    } else if (errorMessage.includes('auth') || errorMessage.includes('sign in') || errorMessage.includes('unauthorized')) {
+      return 'auth';
+    } else if (errorMessage.includes('server') || errorMessage.includes('500')) {
+      return 'server';
+    } else if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('too short')) {
+      return 'validation';
+    }
+    return 'general';
   };
 
   const formatTime = (date) => {
@@ -433,6 +615,7 @@ export default function Home() {
           onShowCollections={handleShowCollections}
           onLogout={handleLogout}
           sessionsLoading={sessionsLoading}
+          isLoggingOut={isLoggingOut}
           collapsed={sidebarCollapsed}
         />
 
@@ -486,6 +669,19 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
       </div>
       
+      {/* Logout Loading Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+            <p className="text-stone-600">Please wait while we sign you out...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Enhanced Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -503,6 +699,7 @@ export default function Home() {
         onShowCollections={handleShowCollections}
         onLogout={handleLogout}
         sessionsLoading={sessionsLoading}
+        isLoggingOut={isLoggingOut}
         collapsed={sidebarCollapsed}
       />
 
@@ -518,6 +715,34 @@ export default function Home() {
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
+            {/* Error Message Display */}
+            {showError && error && (
+              <ErrorMessage
+                error={error}
+                type={getErrorType(error)}
+                onRetry={inputMessage.trim() ? handleRetrySendMessage : undefined}
+                onDismiss={handleDismissError}
+                showRetry={!!inputMessage.trim()}
+                showDismiss={true}
+                isRetrying={isRetrying}
+              />
+            )}
+
+            {/* Success Message Display */}
+            {showSuccessMessage && (
+              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl animate-slideUp">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-green-800 font-semibold">Successfully signed out!</h4>
+                  <p className="text-green-700 text-sm">Redirecting to home page...</p>
+                </div>
+              </div>
+            )}
+
             {messagesLoading ? (
               <div className="flex items-center justify-center py-8">
                 <ChefHat className="w-8 h-8 text-orange-600 animate-pulse" />
@@ -535,7 +760,7 @@ export default function Home() {
                   </div>
                   <div className={`flex flex-col max-w-[85%] lg:max-w-[75%] ${message.isUser ? 'items-end' : 'items-start'}`}>
                     <div className={`px-5 py-4 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${message.isUser ? 'bg-orange-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-700 rounded-2xl rounded-tl-sm'}`}>
-                      {message.text}
+                      {message.isUser ? message.text : parseMarkdownText(message.text)}
                     </div>
                     
                     {/* Render Recipe Cards if detectedRecipes exist */}
@@ -552,7 +777,9 @@ export default function Home() {
                             isFavorited={isRecipeFavorited(recipe)}
                             collections={collections}
                             onAddToFavorites={handleAddToFavoritesCallback}
+                            onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                             onAddToCollection={handleAddToCollectionCallback}
+                            onRemoveFromCollection={handleRemoveFromCollectionCallback}
                             onCreateCollection={handleCreateCollectionCallback}
                             fetchRecipeDetails={handleFetchRecipeDetails}
                             user={user}
@@ -710,13 +937,16 @@ export default function Home() {
                       <RecipeCard
                         key={`favorites_recipe_${index}_${recipe.id || recipe.title || recipe.name}`}
                         recipe={recipe}
-                        onClick={handleFavoriteRecipeClick}
+                        onClick={(recipeName) => handleFavoriteRecipeClick(recipeName)}
                         isLoading={false}
                         isFavorited={true}
                         collections={collections}
                         onAddToFavorites={handleAddToFavoritesCallback}
+                        onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                         onAddToCollection={handleAddToCollectionCallback}
+                        onRemoveFromCollection={handleRemoveFromCollectionCallback}
                         onCreateCollection={handleCreateCollectionCallback}
+                        collectionId={favoriteCollectionId}
                         fetchRecipeDetails={handleFetchRecipeDetails}
                         user={user}
                         requireAuth={requireAuth}

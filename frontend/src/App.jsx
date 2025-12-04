@@ -2,6 +2,7 @@ import React, { useState, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Import all modal components
 import AuthPromptModal from './components/AuthPromptModal.jsx';
@@ -96,6 +97,7 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
         user={collectionsModalState.user}
         requireAuth={collectionsModalState.requireAuth}
         onAddToCollection={collectionsModalState.onAddToCollection}
+        onRemoveFromCollection={collectionsModalState.onRemoveFromCollection}
         onCreateCollection={collectionsModalState.onCreateCollection}
         triggerRef={collectionsModalState.triggerRef}
       />
@@ -131,6 +133,7 @@ function App() {
     user: null,
     requireAuth: false,
     onAddToCollection: null,
+    onRemoveFromCollection: null,
     onCreateCollection: null,
     triggerRef: null
   });
@@ -203,39 +206,41 @@ function App() {
   };
 
   return (
-    <AuthProvider>
-      <Router>
-        <ModalManager modalStates={{
-          authPromptState,
-          collectionsModalState,
-          confirmationState,
-          recipeDetailModalState
-        }} modalActions={modalActions}>
-          <div className="App">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/home" element={<Home />} />
-              <Route path="/collections" element={
-                <ProtectedRoute requireAuth={true}>
-                  <Collections />
-                </ProtectedRoute>
-              } />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <ModalManager modalStates={{
+            authPromptState,
+            collectionsModalState,
+            confirmationState,
+            recipeDetailModalState
+          }} modalActions={modalActions}>
+            <div className="App">
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={<Home />} />
+                <Route path="/collections" element={
+                  <ProtectedRoute requireAuth={true}>
+                    <Collections />
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/signin" element={
-                <ProtectedRoute requireAuth={false}>
-                  <SigninPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/signup" element={
-                <ProtectedRoute requireAuth={false}>
-                  <SignupPage />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </div>
-        </ModalManager>
-      </Router>
-    </AuthProvider>
+                <Route path="/signin" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <SigninPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/signup" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <SignupPage />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </div>
+          </ModalManager>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
