@@ -64,7 +64,7 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      const { error, retryCount } = this.state;
+      const { error, errorInfo, retryCount } = this.state;
       const maxRetries = 3;
       const canRetry = retryCount < maxRetries;
 

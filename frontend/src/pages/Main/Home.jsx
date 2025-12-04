@@ -357,12 +357,6 @@ export default function Home() {
     window.location.href = '/collections';
   };
 
-  // Login prompt handlers
-  const handleLoginPromptClose = () => {
-    setShowLoginPrompt(false);
-    setLoginPromptMessage('');
-  };
-
   const requireAuth = (featureName) => {
     if (!user) {
       showAuthPrompt(`Please sign in to use ${featureName}.`);
@@ -429,11 +423,19 @@ export default function Home() {
   const handleFavoriteRecipeClick = (recipeName) => {
     // Close favorites modal first, then open recipe details using the modal system
     setShowFavorites(false);
-    handleRecipeClick(recipe.title || recipe.name);
+    handleRecipeClick(recipeName);
   };
 
   const handleAddToFavoritesCallback = (recipeData) => {
     setFavoriteRecipes(prev => [...prev, recipeData]);
+  };
+
+  const handleRemoveFromFavoritesCallback = (recipeData) => {
+    setFavoriteRecipes(prev => prev.filter(fav => 
+      fav.id !== recipeData.id && 
+      fav.title !== recipeData.title && 
+      fav.name !== recipeData.name
+    ));
   };
 
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
