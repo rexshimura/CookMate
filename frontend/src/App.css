@@ -191,8 +191,10 @@
   opacity: 1;
 }
 
-/* Mobile-specific enhancements */
-@media (max-width: 1024px) {
+/* Mobile and Tablet Responsive Enhancements */
+
+/* Mobile devices (up to 640px) */
+@media (max-width: 640px) {
   .mobile-sidebar {
     backdrop-filter: blur(20px);
     background: rgba(255, 255, 255, 0.95);
@@ -200,6 +202,56 @@
   
   .mobile-overlay {
     backdrop-filter: blur(4px);
+  }
+  
+  /* Enhanced touch targets for mobile */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Improved mobile scrolling */
+  .sidebar-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Tablet devices (641px to 1024px) */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .tablet-sidebar {
+    backdrop-filter: blur(16px);
+    background: rgba(255, 255, 255, 0.92);
+  }
+  
+  .tablet-overlay {
+    backdrop-filter: blur(3px);
+  }
+}
+
+/* Large desktop (1024px+) */
+@media (min-width: 1024px) {
+  .desktop-sidebar {
+    backdrop-filter: blur(24px);
+    background: rgba(255, 255, 255, 0.88);
+  }
+}
+
+/* General responsive adjustments */
+@media (max-width: 768px) {
+  /* Improve accessibility on small screens */
+  .session-item,
+  .sidebar-button,
+  .user-avatar {
+    min-height: 48px;
+  }
+  
+  /* Better focus indicators for touch devices */
+  .session-item:focus,
+  .sidebar-button:focus,
+  .user-avatar:focus {
+    outline: 2px solid rgba(251, 146, 60, 0.5);
+    outline-offset: 2px;
   }
 }
 

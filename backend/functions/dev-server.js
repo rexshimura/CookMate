@@ -37,6 +37,45 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// 🔍 Firebase Health Check Endpoint
+app.get('/api/health/firebase', (req, res) => {
+  console.log('🔍 Firebase Health Check Request');
+  
+  try {
+    const { admin } = require('./src/config/firebase');
+    
+    const healthStatus = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      firebase: {
+        adminInitialized: admin.apps.length > 0,
+        adminAppsCount: admin.apps.length,
+        environment: {
+          FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ? 'SET' : 'MISSING',
+          FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'SET' : 'MISSING',
+          FIREBASE_PRIVATE_KEY_ID: process.env.FIREBASE_PRIVATE_KEY_ID ? 'SET' : 'MISSING',
+          FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL ? 'SET' : 'MISSING',
+          FIREBASE_CLIENT_ID: process.env.FIREBASE_CLIENT_ID ? 'SET' : 'MISSING',
+          FIREBASE_CLIENT_X509_CERT_URL: process.env.FIREBASE_CLIENT_X509_CERT_URL ? 'SET' : 'MISSING',
+          NODE_ENV: process.env.NODE_ENV,
+          PORT: process.env.PORT
+        }
+      }
+    };
+    
+    console.log('✅ Firebase Health Check Response:', healthStatus);
+    res.json(healthStatus);
+  } catch (error) {
+    console.error('❌ Firebase Health Check Error:', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Import the routes
 const aiRouter = require('./src/routes/ai');
 const userRouter = require('./src/routes/users');

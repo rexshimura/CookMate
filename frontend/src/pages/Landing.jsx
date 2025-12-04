@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ChefHat, Sparkles, ArrowRight, Clock, Leaf, BookOpen, CheckCircle2, Menu, X } from 'lucide-react';
 import ScrollToBottomButton from "./Components/Utility/ScrollToBottomButton.jsx";
 
@@ -63,13 +64,13 @@ export default function CookMateLanding() {
             </div>
 
             <div className="hidden md:flex items-center gap-6">
-              <a
-                href="/signin"
+              <Link
+                to="/signin"
                 className="relative px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl hover:from-orange-700 hover:to-red-700 transition-all duration-300 overflow-hidden group shadow-lg shadow-orange-200/50 hover:scale-105"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                 Sign In
-              </a>
+              </Link>
             </div>
 
             <div className="md:hidden">
@@ -84,7 +85,7 @@ export default function CookMateLanding() {
           <div className="md:hidden bg-gradient-to-b from-white via-stone-50 to-stone-100 border-b border-stone-200/60 backdrop-blur-xl px-4 py-4 space-y-3">
              <button className="block w-full text-left px-4 py-3 text-sm font-medium text-stone-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 rounded-xl transition-all duration-200">How it works</button>
               <button className="block w-full text-left px-4 py-3 text-sm font-medium text-stone-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 rounded-xl transition-all duration-200">Features</button>
-              <a href="/signin" className="block w-full px-4 py-3 text-sm font-semibold text-center text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200">Sign In</a>
+              <Link to="/signin" className="block w-full px-4 py-3 text-sm font-semibold text-center text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200">Sign In</Link>
           </div>
         )}
       </nav>

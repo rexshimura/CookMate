@@ -1,28 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Users, DollarSign, ChefHat, Play, Info, CheckCircle, Heart, Folder, Plus, ChevronDown, Timer, Scale, AlertCircle, Award, LogIn } from 'lucide-react';
+import { X, Clock, Users, DollarSign, ChefHat, Play, Info, CheckCircle, Heart, Folder, Plus, ChevronDown, Timer, Scale, AlertCircle, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { 
   addToFavorites, 
-  removeFromFavorites, 
-  getFavorites, 
+  removeFromFavorites,
+  checkIsFavorite,
   getCollections, 
   addRecipeToCollection,
   removeRecipeFromCollection 
 } from '../../../utils/api.js';
+import { useModal } from '../../../App.jsx';
 
 const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, onAddToFavorites = null }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const { showAuthPrompt } = useModal();
   const [recipeData, setRecipeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
-  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [collections, setCollections] = useState([]);
-  const [showCollectionsDropdown, setShowCollectionsDropdown] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState({});
   const [completedSteps, setCompletedSteps] = useState({});
 
@@ -33,37 +32,48 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     setError(null);
 
     try {
+      console.log('🔍 [RECIPE-DETAIL-MODAL] Fetching details for:', recipeName);
       const result = await fetchRecipeDetails(recipeName);
-      if (result.success) {
-        setRecipeData(result.recipe);
+      console.log('📡 [RECIPE-DETAIL-MODAL] Fetch result:', result);
+      
+      if (result.success && result.recipe) {
+        // Validate and sanitize recipe data before setting
+        const sanitizedRecipe = {
+          ...result.recipe,
+          title: typeof result.recipe.title === 'string' ? result.recipe.title : recipeName,
+          description: typeof result.recipe.description === 'string' ? result.recipe.description : `A delicious ${recipeName} recipe`,
+          ingredients: Array.isArray(result.recipe.ingredients) ? result.recipe.ingredients.filter(ing => typeof ing === 'string') : [],
+          instructions: Array.isArray(result.recipe.instructions) ? result.recipe.instructions.filter(inst => typeof inst === 'string') : [],
+          cookingTime: typeof result.recipe.cookingTime === 'string' ? result.recipe.cookingTime : 'Varies',
+          servings: typeof result.recipe.servings === 'string' ? result.recipe.servings : '4',
+          difficulty: typeof result.recipe.difficulty === 'string' ? result.recipe.difficulty : 'Medium',
+          estimatedCost: typeof result.recipe.estimatedCost === 'string' ? result.recipe.estimatedCost : 'Moderate',
+          nutritionInfo: typeof result.recipe.nutritionInfo === 'object' && result.recipe.nutritionInfo ? result.recipe.nutritionInfo : {},
+          tips: Array.isArray(result.recipe.tips) ? result.recipe.tips : [],
+          youtubeUrl: typeof result.recipe.youtubeUrl === 'string' ? result.recipe.youtubeUrl : null,
+          youtubeSearchQuery: typeof result.recipe.youtubeSearchQuery === 'string' ? result.recipe.youtubeSearchQuery : `${recipeName} recipe tutorial`
+        };
+        
+        console.log('✅ [RECIPE-DETAIL-MODAL] Sanitized recipe data:', {
+          title: sanitizedRecipe.title,
+          ingredientsCount: sanitizedRecipe.ingredients.length,
+          instructionsCount: sanitizedRecipe.instructions.length
+        });
+        
+        setRecipeData(sanitizedRecipe);
       } else {
+        console.error('❌ [RECIPE-DETAIL-MODAL] Failed to fetch recipe:', result.error);
         setError(result.error || 'Failed to fetch recipe details');
       }
     } catch (err) {
+      console.error('❌ [RECIPE-DETAIL-MODAL] Exception during fetch:', err);
       setError(err.message || 'Failed to fetch recipe details');
     } finally {
       setLoading(false);
     }
   };
 
-  // Load user's favorite recipes (only if authenticated)
-  const loadFavoriteRecipes = async () => {
-    if (!user) {
-      setFavoriteRecipes([]);
-      return;
-    }
-    try {
-      const result = await getFavorites();
-      if (result.success) {
-        const favorites = result.favorites || [];
-        setFavoriteRecipes(favorites);
-      } else {
-        setFavoriteRecipes([]);
-      }
-    } catch (error) {
-      setFavoriteRecipes([]);
-    }
-  };
+
 
   // Load user's collections (only if authenticated)
   const loadCollections = async () => {
@@ -83,68 +93,66 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
 
   // Check if current recipe is favorited
   const checkIfFavorited = () => {
-    if (recipeData && favoriteRecipes.length > 0) {
-      const isFav = favoriteRecipes.some(fav => {
-        return fav.title === recipeData.title || 
-          fav.id === recipeData.title ||
-          fav.id === recipeData.savedId ||
-          fav.savedId === recipeData.savedId;
-      });
-      setIsFavorited(isFav);
+    if (recipeData && collections.length > 0) {
+      try {
+        const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        // Find the favorites collection (should be the first one with isFavorites = true)
+        const favoritesCollection = collections.find(col => col.isFavorites === true);
+        if (favoritesCollection && favoritesCollection.recipes) {
+          const isFav = favoritesCollection.recipes.some(recipe => recipe.id === recipeId);
+          setIsFavorited(isFav);
+        } else {
+          setIsFavorited(false);
+        }
+      } catch (error) {
+        setIsFavorited(false);
+      }
     } else if (recipeData) {
       setIsFavorited(false);
     }
   };
 
-  // Add to favorites (with auth check)
-  const handleAddToFavorites = async () => {
+  // Toggle favorite status (add/remove from favorites)
+  const handleToggleFavorites = async () => {
     if (!recipeData) return;
     
     // Check if user is authenticated
     if (!user) {
-      setShowAuthPrompt(true);
+      showAuthPrompt();
       return;
     }
     
     setFavoritesLoading(true);
     try {
       const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      const result = await addToFavorites(recipeId, recipeData);
       
-      if (result.success) {
-        setIsFavorited(true);
-        setFavoriteRecipes(prev => [...prev, { ...recipeData, id: recipeId, savedId: recipeId }]);
-        
-        if (onAddToFavorites) {
-          onAddToFavorites({ ...recipeData, id: recipeId, savedId: recipeId });
+      if (isFavorited) {
+        // Remove from favorites
+        try {
+          await removeFromFavorites(recipeId);
+          setIsFavorited(false);
+          // Refresh collections to update counts
+          loadCollections();
+        } catch (error) {
+          console.error('Failed to remove from favorites:', error);
+        }
+      } else {
+        // Add to favorites
+        try {
+          await addToFavorites(recipeId, recipeData);
+          setIsFavorited(true);
+          // Refresh collections to update counts
+          loadCollections();
+          
+          if (onAddToFavorites) {
+            onAddToFavorites({ ...recipeData, id: recipeId, savedId: recipeId });
+          }
+        } catch (error) {
+          console.error('Failed to add to favorites:', error);
         }
       }
     } catch (error) {
-      // Silent error handling for professional interface
-    } finally {
-      setFavoritesLoading(false);
-    }
-  };
-
-  // Remove from favorites
-  const handleRemoveFromFavorites = async () => {
-    if (!recipeData) return;
-    
-    setFavoritesLoading(true);
-    try {
-      const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      const result = await removeFromFavorites(recipeId);
-      
-      if (result.success) {
-        setIsFavorited(false);
-        setFavoriteRecipes(prev => prev.filter(fav => 
-          fav.title !== recipeData.title && 
-          fav.id !== recipeId && 
-          fav.savedId !== recipeId
-        ));
-      }
-    } catch (error) {
-      // Silent error handling for professional interface
+      console.error('Failed to toggle favorite status:', error);
     } finally {
       setFavoritesLoading(false);
     }
@@ -156,8 +164,7 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     
     // Check if user is authenticated
     if (!user) {
-      setShowAuthPrompt(true);
-      setShowCollectionsDropdown(false);
+      showAuthPrompt();
       return;
     }
     
@@ -166,7 +173,7 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
       const result = await addRecipeToCollection(collectionId, recipeId, recipeData);
       
       if (result.success) {
-        setShowCollectionsDropdown(false);
+        // Collections modal will be closed by the centralized system
       }
     } catch (error) {
       console.error('Failed to add recipe to collection:', error);
@@ -184,24 +191,32 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
 
   useEffect(() => {
     if (isOpen && recipeName) {
-      // Reset recipe data when recipeName changes to prevent stale content
+      console.log('🔍 [RECIPE-DETAIL-MODAL] Recipe changed or modal opened:', recipeName);
+      
+      // Complete reset of all state to prevent stale data
       setRecipeData(null);
       setError(null);
       setLoading(true);
-      handleFetchDetails();
+      setCheckedIngredients({});
+      setCompletedSteps({});
+      setIsFavorited(false);
+      
+      // Small delay to ensure state is reset before fetching
+      setTimeout(() => {
+        handleFetchDetails();
+      }, 50);
     }
   }, [isOpen, recipeName]);
 
   useEffect(() => {
     if (isOpen) {
-      loadFavoriteRecipes();
       loadCollections();
     }
   }, [isOpen]);
 
   useEffect(() => {
     checkIfFavorited();
-  }, [recipeData, favoriteRecipes]);
+  }, [recipeData, collections]);
 
   if (!isOpen) return null;
 
@@ -212,7 +227,6 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
         className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
         onClick={() => {
           onClose();
-          setShowCollectionsDropdown(false);
         }}
       />
       
@@ -238,94 +252,6 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Favorite Button */}
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (favoritesLoading || !recipeData) return;
-                  isFavorited ? handleRemoveFromFavorites() : handleAddToFavorites();
-                }}
-                disabled={favoritesLoading || !recipeData}
-                className={`relative p-3 rounded-full transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-white focus:ring-opacity-30 flex items-center justify-center ${
-                  isFavorited 
-                    ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 border-2 border-red-400' 
-                    : 'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/30 border-2 border-orange-300'
-                } ${favoritesLoading ? 'opacity-60 cursor-not-allowed animate-pulse' : 'cursor-pointer'}`}
-                title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-                style={{ 
-                  zIndex: 60, 
-                  pointerEvents: 'auto',
-                  minWidth: '48px',
-                  minHeight: '48px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Heart 
-                  className={`w-6 h-6 transition-all duration-300 ${
-                    isFavorited 
-                      ? 'fill-white text-white scale-110' 
-                      : 'text-white stroke-2'
-                  } ${favoritesLoading ? 'animate-pulse' : ''}`} 
-                />
-                {favoritesLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </button>
-
-              {/* Collections Dropdown */}
-              {recipeData && collections.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowCollectionsDropdown(!showCollectionsDropdown)}
-                    className="p-3 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-full transition-all"
-                    title="Add to collection"
-                  >
-                    <Folder className="w-6 h-6 text-white" />
-                  </button>
-
-                  {/* Collections Dropdown Menu */}
-                  {showCollectionsDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl z-[66] transition-all duration-300">
-                      <div className="p-4 border-b border-stone-200/60">
-                        <h4 className="font-semibold text-stone-800 text-sm tracking-wide">Add to Collection</h4>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto">
-                        {collections.map(collection => (
-                          <button
-                            key={collection.id}
-                            onClick={() => handleAddToCollection(collection.id)}
-                            className="w-full flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 transition-all duration-300 text-left hover:scale-[1.02] group"
-                          >
-                            <div 
-                              className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: collection.color }}
-                            >
-                              <Folder className="w-3 h-3 text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-stone-800 text-sm truncate">
-                                {collection.name}
-                              </p>
-                              <p className="text-xs text-stone-500">
-                                {collection.recipeCount || 0} recipes
-                              </p>
-                            </div>
-                            {isRecipeInCollection(collection.id) && (
-                              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
@@ -458,52 +384,63 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {recipeData.ingredients.map((ingredient, index) => {
-                      const isChecked = checkedIngredients[index] || false;
-                      return (
-                        <div key={index} className="group">
-                          <div className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer hover:scale-[1.01] ${
-                            isChecked 
-                              ? 'bg-gradient-to-r from-green-100 via-emerald-50 to-green-150 border-green-300 shadow-lg shadow-green-200/30' 
-                              : 'bg-gradient-to-r from-green-50 via-emerald-50 to-green-100 border-green-200/60 hover:border-green-300'
-                          } overflow-hidden`}>
-                            {/* Shimmer effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
-                            
-                            {/* Checkbox */}
-                            <button
-                              onClick={() => setCheckedIngredients(prev => ({
-                                ...prev,
-                                [index]: !prev[index]
-                              }))}
-                              className={`relative flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 mt-0.5 ${
-                                isChecked 
-                                  ? 'bg-green-500 border-green-500 shadow-lg shadow-green-500/30' 
-                                  : 'bg-white border-green-300 hover:border-green-500'
-                              }`}
-                            >
-                              {isChecked && (
-                                <CheckCircle className="w-4 h-4 text-white" />
-                              )}
-                            </button>
-                            
-                            {/* Ingredient text */}
-                            <span className={`text-stone-700 font-medium leading-relaxed relative z-10 ${
-                              isChecked ? 'line-through text-stone-500' : ''
-                            }`}>
-                              {ingredient}
-                            </span>
+                    {Array.isArray(recipeData.ingredients) ? (
+                      recipeData.ingredients.map((ingredient, index) => {
+                        // Validate ingredient is a safe string
+                        const safeIngredient = typeof ingredient === 'string' ? ingredient : String(ingredient);
+                        const isChecked = checkedIngredients[index] || false;
+                        
+                        return (
+                          <div key={index} className="group">
+                            <div className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer hover:scale-[1.01] ${
+                              isChecked 
+                                ? 'bg-gradient-to-r from-green-100 via-emerald-50 to-green-150 border-green-300 shadow-lg shadow-green-200/30' 
+                                : 'bg-gradient-to-r from-green-50 via-emerald-50 to-green-100 border-green-200/60 hover:border-green-300'
+                            } overflow-hidden`}>
+                              {/* Shimmer effect */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
+                              
+                              {/* Checkbox */}
+                              <button
+                                onClick={() => setCheckedIngredients(prev => ({
+                                  ...prev,
+                                  [index]: !prev[index]
+                                }))}
+                                className={`relative flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 mt-0.5 ${
+                                  isChecked 
+                                    ? 'bg-green-500 border-green-500 shadow-lg shadow-green-500/30' 
+                                    : 'bg-white border-green-300 hover:border-green-500'
+                                }`}
+                              >
+                                {isChecked && (
+                                  <CheckCircle className="w-4 h-4 text-white" />
+                                )}
+                              </button>
+                              
+                              {/* Ingredient text - with safety check */}
+                              <span className={`text-stone-700 font-medium leading-relaxed relative z-10 ${
+                                isChecked ? 'line-through text-stone-500' : ''
+                              }`}>
+                                {safeIngredient}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    ) : (
+                      <div className="text-stone-500 text-center py-4">
+                        No ingredients available. Please refresh the recipe details.
+                      </div>
+                    )}
                   </div>
                   
                   {/* Ingredient Summary */}
                   <div className="mt-4 p-3 bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl border border-green-200/60">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-stone-600 font-medium">Total Ingredients:</span>
-                      <span className="font-semibold text-stone-800">{recipeData.ingredients.length}</span>
+                      <span className="font-semibold text-stone-800">
+                        {Array.isArray(recipeData.ingredients) ? recipeData.ingredients.length : 0}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -523,67 +460,82 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
                     </button>
                   </div>
                   <div className="space-y-4">
-                    {recipeData.instructions.map((instruction, index) => {
-                      const isCompleted = completedSteps[index] || false;
-                      return (
-                        <div key={index} className="group">
-                          <div className={`relative flex gap-4 p-5 rounded-xl border-2 transition-all duration-300 hover:scale-[1.01] ${
-                            isCompleted 
-                              ? 'bg-gradient-to-r from-blue-100 via-indigo-50 to-blue-150 border-blue-300 shadow-lg shadow-blue-200/30' 
-                              : 'bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 border-blue-200/60 hover:border-blue-300'
-                          } overflow-hidden`}>
-                            {/* Shimmer effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
-                            
-                            {/* Step number and checkbox */}
-                            <div className="flex items-start gap-3 relative z-10">
-                              <button
-                                onClick={() => setCompletedSteps(prev => ({
-                                  ...prev,
-                                  [index]: !prev[index]
-                                }))}
-                                className={`flex-shrink-0 w-8 h-8 rounded-xl border-2 flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                                  isCompleted 
-                                    ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30' 
-                                    : 'bg-white border-blue-300 hover:border-blue-500 text-blue-600'
-                                }`}
-                              >
-                                {isCompleted ? (
-                                  <CheckCircle className="w-5 h-5" />
-                                ) : (
-                                  index + 1
+                    {Array.isArray(recipeData.instructions) ? (
+                      recipeData.instructions.map((instruction, index) => {
+                        // Validate instruction is a safe string and not malformed JSON
+                        const safeInstruction = typeof instruction === 'string' ? instruction : String(instruction);
+                        const isCompleted = completedSteps[index] || false;
+                        
+                        // Skip if instruction looks like JSON or malformed data
+                        if (safeInstruction.includes('{') && safeInstruction.includes('}')) {
+                          console.warn('⚠️ [RECIPE-DETAIL-MODAL] Skipping malformed instruction:', safeInstruction);
+                          return null;
+                        }
+                        
+                        return (
+                          <div key={index} className="group">
+                            <div className={`relative flex gap-4 p-5 rounded-xl border-2 transition-all duration-300 hover:scale-[1.01] ${
+                              isCompleted 
+                                ? 'bg-gradient-to-r from-blue-100 via-indigo-50 to-blue-150 border-blue-300 shadow-lg shadow-blue-200/30' 
+                                : 'bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 border-blue-200/60 hover:border-blue-300'
+                            } overflow-hidden`}>
+                              {/* Shimmer effect */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
+                              
+                              {/* Step number and checkbox */}
+                              <div className="flex items-start gap-3 relative z-10">
+                                <button
+                                  onClick={() => setCompletedSteps(prev => ({
+                                    ...prev,
+                                    [index]: !prev[index]
+                                  }))}
+                                  className={`flex-shrink-0 w-8 h-8 rounded-xl border-2 flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                                    isCompleted 
+                                      ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30' 
+                                      : 'bg-white border-blue-300 hover:border-blue-500 text-blue-600'
+                                  }`}
+                                >
+                                  {isCompleted ? (
+                                    <CheckCircle className="w-5 h-5" />
+                                  ) : (
+                                    index + 1
+                                  )}
+                                </button>
+                              </div>
+                              
+                              {/* Instruction text */}
+                              <div className="flex-1 relative z-10">
+                                <p className={`text-stone-700 leading-relaxed font-medium text-sm ${
+                                  isCompleted ? 'line-through text-stone-500' : ''
+                                }`}>
+                                  {safeInstruction}
+                                </p>
+                                
+                                {/* Step duration indicator */}
+                                {recipeData.stepDurations && recipeData.stepDurations[index] && (
+                                  <div className="flex items-center gap-2 mt-2 text-xs text-stone-500">
+                                    <Timer className="w-3 h-3" />
+                                    <span>Estimated time: {recipeData.stepDurations[index]}</span>
+                                  </div>
                                 )}
-                              </button>
-                            </div>
-                            
-                            {/* Instruction text */}
-                            <div className="flex-1 relative z-10">
-                              <p className={`text-stone-700 leading-relaxed font-medium text-sm ${
-                                isCompleted ? 'line-through text-stone-500' : ''
-                              }`}>
-                                {instruction}
-                              </p>
-                              
-                              {/* Step duration indicator */}
-                              {recipeData.stepDurations && recipeData.stepDurations[index] && (
-                                <div className="flex items-center gap-2 mt-2 text-xs text-stone-500">
-                                  <Timer className="w-3 h-3" />
-                                  <span>Estimated time: {recipeData.stepDurations[index]}</span>
-                                </div>
-                              )}
-                              
-                              {/* Temperature indicator if mentioned in instruction */}
-                              {instruction.toLowerCase().includes('°c') || instruction.toLowerCase().includes('°f') || instruction.toLowerCase().includes('degrees') && (
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                  <span className="text-xs text-red-600 font-medium">Temperature Critical</span>
-                                </div>
-                              )}
+                                
+                                {/* Temperature indicator if mentioned in instruction */}
+                                {safeInstruction.toLowerCase().includes('°c') || safeInstruction.toLowerCase().includes('°f') || safeInstruction.toLowerCase().includes('degrees') && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                    <span className="text-xs text-red-600 font-medium">Temperature Critical</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      }).filter(Boolean) // Remove null entries
+                    ) : (
+                      <div className="text-stone-500 text-center py-4">
+                        No instructions available. Please refresh the recipe details.
+                      </div>
+                    )}
                   </div>
                   
                   {/* Instruction Summary */}
@@ -591,12 +543,14 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-stone-600 font-medium">Total Steps:</span>
-                        <span className="font-semibold text-stone-800">{recipeData.instructions.length}</span>
+                        <span className="font-semibold text-stone-800">
+                          {Array.isArray(recipeData.instructions) ? recipeData.instructions.length : 0}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-stone-600 font-medium">Completed:</span>
                         <span className="font-semibold text-stone-800">
-                          {Object.values(completedSteps).filter(Boolean).length}/{recipeData.instructions.length}
+                          {Object.values(completedSteps).filter(Boolean).length}/{Array.isArray(recipeData.instructions) ? recipeData.instructions.length : 0}
                         </span>
                       </div>
                     </div>
@@ -759,58 +713,6 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
           ) : null}
         </div>
       </div>
-
-      {/* Authentication Prompt Modal */}
-      {showAuthPrompt && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-stone-900/70 backdrop-blur-sm"
-            onClick={() => setShowAuthPrompt(false)}
-          />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/20 border border-stone-200/60 max-w-md w-full p-8 text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-200/60 shadow-lg shadow-orange-200/30">
-              <LogIn className="w-8 h-8 text-orange-600" />
-            </div>
-            <h3 className="text-xl font-bold text-stone-800 mb-3 tracking-wide">Sign In Required</h3>
-            <p className="text-stone-600 mb-6 leading-relaxed">
-              To save recipes to your favorites or collections, please sign in to your account or create a new one.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => {
-                  setShowAuthPrompt(false);
-                  onClose();
-                  navigate('/sign-in');
-                }}
-                className="relative w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl hover:from-orange-700 hover:to-red-700 transition-all duration-300 font-semibold overflow-hidden group hover:scale-105"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  <LogIn className="w-5 h-5" />
-                  Sign In
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowAuthPrompt(false);
-                  onClose();
-                  navigate('/sign-up');
-                }}
-                className="relative w-full px-6 py-3 bg-gradient-to-r from-stone-100 to-stone-200 text-stone-700 rounded-2xl hover:from-stone-200 hover:to-stone-300 transition-all duration-300 font-semibold overflow-hidden group hover:scale-105 border border-stone-300"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                <span className="relative z-10">Create Account</span>
-              </button>
-              <button
-                onClick={() => setShowAuthPrompt(false)}
-                className="text-stone-500 hover:text-stone-700 font-medium transition-colors mt-2"
-              >
-                Maybe Later
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

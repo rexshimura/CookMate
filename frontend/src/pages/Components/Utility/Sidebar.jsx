@@ -27,6 +27,7 @@ const Sidebar = ({
   onSelectSession, 
   onDeleteSession, 
   onShowFavorites,
+  onShowCollections,
   onLogout,
   sessionsLoading,
   collapsed 
@@ -45,7 +46,13 @@ const Sidebar = ({
 
 
   const SidebarContent = () => (
-    <div className={`sidebar-container ${isMobile ? 'w-80 mobile-sidebar' : isCollapsed ? 'w-20' : 'w-80'} 
+    <div className={`sidebar-container ${
+        isMobile 
+          ? 'w-72 sm:w-80 mobile-sidebar' // 288px on small phones, 320px on larger phones
+          : isCollapsed 
+            ? 'w-20' // 80px collapsed on desktop/tablet
+            : 'w-80 lg:w-96' // 320px on tablets, 384px on large desktop
+      } 
       bg-gradient-to-b from-white via-stone-50 to-stone-100 
       border-r border-stone-200/60 backdrop-blur-xl 
       shadow-2xl shadow-stone-900/10 
@@ -57,14 +64,14 @@ const Sidebar = ({
       </div>
 
       {/* Header */}
-      <div className="relative h-16 flex items-center justify-between px-5 border-b border-stone-200/60 bg-white/40 backdrop-blur-sm">
+      <div className={`relative ${isMobile ? 'h-14' : 'h-16'} flex items-center justify-between ${isMobile ? 'px-3' : 'px-5'} border-b border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
         {!isCollapsed && (
-          <div className="flex items-center gap-3 text-orange-600 group cursor-pointer">
+          <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-3'} text-orange-600 group cursor-pointer`}>
             <div className="relative">
-              <ChefHat className="w-7 h-7 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12" />
-              <Sparkles className="absolute -top-1 -right-1 w-3 h-3 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <ChefHat className={`${isMobile ? 'w-6 h-6' : 'w-7 h-7'} transition-all duration-300 group-hover:scale-110 group-hover:rotate-12`} />
+              <Sparkles className={`absolute ${isMobile ? '-top-0.5 -right-0.5 w-2.5 h-2.5' : '-top-1 -right-1 w-3 h-3'} text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
             </div>
-            <span className="font-bold text-xl gradient-text">
+            <span className={`font-bold ${isMobile ? 'text-lg' : 'text-xl'} gradient-text`}>
               CookMate
             </span>
           </div>
@@ -74,19 +81,19 @@ const Sidebar = ({
             onClick={onToggleCollapse}
             className="w-full flex justify-center text-orange-600 group cursor-pointer"
           >
-            <div className="relative p-2 rounded-xl hover:bg-orange-50 transition-colors duration-200">
-              <ChefHat className="w-6 h-6 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12" />
-              <Sparkles className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className={`relative ${isMobile ? 'p-2.5' : 'p-2'} rounded-xl hover:bg-orange-50 transition-colors duration-200`}>
+              <ChefHat className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} transition-all duration-300 group-hover:scale-110 group-hover:rotate-12`} />
+              <Sparkles className={`absolute ${isMobile ? '-top-0.5 -right-0.5 w-2 h-2' : '-top-0.5 -right-0.5 w-2.5 h-2.5'} text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
             </div>
           </button>
         )}
         {!isCollapsed && (
           <button 
             onClick={isMobile ? onClose : onToggleCollapse} 
-            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-xl transition-all duration-200 group"
+            className={`${isMobile ? 'p-2.5' : 'p-2'} text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-xl transition-all duration-200 group`}
           >
             {isMobile ? (
-              <X className="w-5 h-5 transition-transform duration-200 group-hover:rotate-90" />
+              <X className={`${isMobile ? 'w-5 h-5' : 'w-5 h-5'} transition-transform duration-200 group-hover:rotate-90`} />
             ) : (
               <Menu className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
             )}
@@ -95,22 +102,24 @@ const Sidebar = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="relative p-4 space-y-3">
+      <div className={`relative ${isMobile ? 'p-3 space-y-2' : 'p-4 space-y-3'}`}>
         {/* Create New Chat */}
         <button 
           onClick={onCreateSession} 
           disabled={sessionsLoading}
           className={`
-            sidebar-button hover-lift flex items-center justify-center gap-3 w-full py-3.5 px-4 rounded-2xl 
-            font-semibold text-sm transition-all duration-300 transform pulse-glow
+            sidebar-button hover-lift flex items-center justify-center gap-3 w-full 
+            ${isMobile ? 'py-4 px-3 min-h-[48px]' : 'py-3.5 px-4'} 
+            rounded-2xl font-semibold ${isMobile ? 'text-base' : 'text-sm'} transition-all duration-300 transform pulse-glow
             ${isCollapsed ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95' : 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95'}
             disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed
             relative overflow-hidden group
+            ${isMobile ? 'touch-manipulation' : ''} /* Improve touch response on mobile */
           `}
         >
           {/* Button shimmer effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-          <Plus className={`w-5 h-5 ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:rotate-90`} />
+          <Plus className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'} ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:rotate-90`} />
           {!isCollapsed && <span className="relative z-10">{sessionsLoading ? 'Creating...' : 'New Chat'}</span>}
           
           {/* Tooltip for collapsed state */}
@@ -125,14 +134,16 @@ const Sidebar = ({
         <button 
           onClick={onShowFavorites}
           className={`
-            flex items-center justify-center gap-3 w-full py-3.5 px-4 rounded-2xl 
-            font-semibold text-sm transition-all duration-300 transform
+            flex items-center justify-center gap-3 w-full 
+            ${isMobile ? 'py-4 px-3 min-h-[48px]' : 'py-3.5 px-4'} 
+            rounded-2xl font-semibold ${isMobile ? 'text-base' : 'text-sm'} transition-all duration-300 transform
             ${isCollapsed ? 'bg-gradient-to-br from-pink-50 to-rose-50 text-pink-600 border border-pink-200 hover:bg-gradient-to-br hover:from-pink-100 hover:to-rose-100' : 'bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95'}
             relative overflow-hidden group
+            ${isMobile ? 'touch-manipulation' : ''} /* Improve touch response on mobile */
           `}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 delay-75"></div>
-          <Heart className={`w-5 h-5 ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:scale-110`} />
+          <Heart className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'} ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:scale-110`} />
           {!isCollapsed && <span className="relative z-10">My Favorites</span>}
           
           {isCollapsed && (
@@ -143,18 +154,19 @@ const Sidebar = ({
         </button>
 
         {/* Collections */}
-        <Link 
-          to="/collections" 
-          onClick={isMobile ? onClose : undefined}
+        <button 
+          onClick={onShowCollections}
           className={`
-            flex items-center justify-center gap-3 w-full py-3.5 px-4 rounded-2xl 
-            font-semibold text-sm transition-all duration-300 transform
+            flex items-center justify-center gap-3 w-full 
+            ${isMobile ? 'py-4 px-3 min-h-[48px]' : 'py-3.5 px-4'} 
+            rounded-2xl font-semibold ${isMobile ? 'text-base' : 'text-sm'} transition-all duration-300 transform
             ${isCollapsed ? 'bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 border border-blue-200 hover:bg-gradient-to-br hover:from-blue-100 hover:to-indigo-100' : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95'}
             relative overflow-hidden group
+            ${isMobile ? 'touch-manipulation' : ''} /* Improve touch response on mobile */
           `}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 delay-150"></div>
-          <Folder className={`w-5 h-5 ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:scale-110`} />
+          <Folder className={`${isMobile ? 'w-6 h-6' : 'w-5 h-5'} ${isCollapsed ? '' : 'relative z-10'} transition-all duration-300 group-hover:scale-110`} />
           {!isCollapsed && <span className="relative z-10">My Collections</span>}
           
           {isCollapsed && (
@@ -162,13 +174,13 @@ const Sidebar = ({
               My Collections
             </div>
           )}
-        </Link>
+        </button>
       </div>
 
       {/* Sessions List */}
-      <div className="relative flex-1 sidebar-scroll sidebar-scroll-no-scrollbar overflow-y-auto px-3 pb-4">
+      <div className={`relative flex-1 sidebar-scroll sidebar-scroll-no-scrollbar overflow-y-auto ${isMobile ? 'px-2 pb-3' : 'px-3 pb-4'}`}>
         {!isCollapsed && (
-          <div className="px-3 py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider mb-2">
+          <div className={`${isMobile ? 'px-2 py-2' : 'px-3 py-2'} ${isMobile ? 'text-xs' : 'text-xs'} font-semibold text-stone-500 uppercase tracking-wider ${isMobile ? 'mb-1' : 'mb-2'}`}>
             Recent Chats
           </div>
         )}
@@ -183,13 +195,15 @@ const Sidebar = ({
                 key={session.id}
                 onClick={() => onSelectSession(session)}
                 className={`
-                  session-item group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer 
+                  session-item group relative flex items-center gap-3 
+                  ${isMobile ? 'p-3.5 min-h-[56px]' : 'p-3'} rounded-xl cursor-pointer 
                   transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
                   ${session.id === currentSessionId 
                     ? 'bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 shadow-md shadow-orange-200/30 pulse-glow' 
                     : 'hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 hover:shadow-sm'
                   }
                   ${index === 0 && isCollapsed ? 'mt-2' : ''}
+                  ${isMobile ? 'touch-manipulation' : ''} /* Improve touch response on mobile */
                 `}
               >
                 {/* Active indicator */}
@@ -199,18 +213,18 @@ const Sidebar = ({
                 
                 <div className="flex-shrink-0 relative">
                   <div className={`
-                    w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300
+                    ${isMobile ? 'w-10 h-10' : 'w-9 h-9'} rounded-xl flex items-center justify-center transition-all duration-300
                     ${session.id === currentSessionId 
                       ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg' 
                       : 'bg-stone-100 text-stone-500 group-hover:bg-stone-200'
                     }
                   `}>
-                    <MessageSquare className="w-4.5 h-4.5" />
+                    <MessageSquare className={`${isMobile ? 'w-5 h-5' : 'w-4.5 h-4.5'}`} />
                   </div>
                   
                   {/* Online indicator */}
                   {session.id === currentSessionId && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
+                    <div className={`absolute -bottom-0.5 -right-0.5 ${isMobile ? 'w-3.5 h-3.5' : 'w-3 h-3'} bg-green-400 border-2 border-white rounded-full`}></div>
                   )}
                 </div>
                 
@@ -219,14 +233,14 @@ const Sidebar = ({
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className={`
-                          text-sm font-semibold truncate transition-colors duration-200
+                          ${isMobile ? 'text-base' : 'text-sm'} font-semibold truncate transition-colors duration-200
                           ${session.id === currentSessionId ? 'text-orange-700' : 'text-stone-700'}
                         `}>
                           {session.title}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3 text-stone-400" />
-                          <p className="text-xs text-stone-500 truncate">
+                          <Clock className={`${isMobile ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-stone-400`} />
+                          <p className={`${isMobile ? 'text-sm' : 'text-xs'} text-stone-500 truncate`}>
                             {formatLastMessage(session.lastMessage)}
                           </p>
                         </div>
@@ -239,12 +253,12 @@ const Sidebar = ({
                           console.log('Delete button clicked for session:', session.id);
                           onDeleteSession(session.id, e);
                         }}
-                        className="opacity-40 group-hover:opacity-100 focus:opacity-100 p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 focus:bg-red-50 focus:text-red-500 rounded-lg transition-all duration-200 ml-2 cursor-pointer relative"
+                        className={`opacity-40 group-hover:opacity-100 focus:opacity-100 ${isMobile ? 'p-2' : 'p-1.5'} text-stone-400 hover:text-red-500 hover:bg-red-50 focus:bg-red-50 focus:text-red-500 rounded-lg transition-all duration-200 ml-2 cursor-pointer relative`}
                         style={{ zIndex: 9999, pointerEvents: 'auto' }}
                         title="Delete chat"
                         type="button"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className={`${isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} />
                       </button>
                     </div>
                   </div>
@@ -263,14 +277,15 @@ const Sidebar = ({
       </div>
 
       {/* User Account Footer */}
-      <div className="relative p-4 border-t border-stone-200/60 bg-white/40 backdrop-blur-sm">
+      <div className={`relative ${isMobile ? 'p-3' : 'p-4'} border-t border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
         <div className={`
-          flex items-center w-full p-3 rounded-2xl transition-all duration-300
+          flex items-center w-full ${isMobile ? 'p-3.5 min-h-[56px]' : 'p-3'} rounded-2xl transition-all duration-300
           ${isCollapsed ? 'justify-center' : 'gap-3'}
           hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 hover:shadow-sm
+          ${isMobile ? 'touch-manipulation' : ''} /* Improve touch response on mobile */
         `}>
           <div className={`
-            user-avatar w-10 h-10 rounded-2xl flex items-center justify-center font-medium text-sm
+            user-avatar ${isMobile ? 'w-11 h-11' : 'w-10 h-10'} rounded-2xl flex items-center justify-center ${isMobile ? 'text-base' : 'text-sm'}
             bg-gradient-to-tr from-orange-400 via-red-500 to-pink-500 text-white 
             shadow-lg transition-all duration-300 hover:scale-105 float-animation
             flex-shrink-0 relative overflow-hidden
@@ -283,19 +298,19 @@ const Sidebar = ({
           {!isCollapsed && (
             <>
               <div className="text-left flex-1 overflow-hidden">
-                <p className="text-sm font-semibold text-stone-700 truncate">
+                <p className={`${isMobile ? 'text-base' : 'text-sm'} font-semibold text-stone-700 truncate`}>
                   {user?.displayName || 'Anonymous User'}
                 </p>
-                <p className="text-xs text-stone-500 truncate">{user?.email || 'Guest'}</p>
+                <p className={`${isMobile ? 'text-sm' : 'text-xs'} text-stone-500 truncate`}>{user?.email || 'Guest'}</p>
               </div>
               
               {user && (
                 <button 
                   onClick={onLogout}
-                  className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group"
+                  className={`${isMobile ? 'p-2.5' : 'p-2'} text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200 group`}
                   title="Sign Out"
                 >
-                  <LogOut className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                  <LogOut className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'} transition-transform duration-200 group-hover:scale-110`} />
                 </button>
               )}
             </>

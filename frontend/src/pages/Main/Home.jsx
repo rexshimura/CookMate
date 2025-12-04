@@ -7,6 +7,7 @@ import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
+import { useModal } from '../../App.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from '../Components/UI/useConfirmation.jsx';
 
 export default function Home() {
@@ -14,6 +15,7 @@ export default function Home() {
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
+  const { showAuthPrompt, showRecipeDetail, showCollectionsModal } = useModal();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -39,8 +41,6 @@ export default function Home() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   
   // Recipe modal state
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [recipeModalOpen, setRecipeModalOpen] = useState(false);
   const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
   
   // Favorites state
@@ -51,10 +51,6 @@ export default function Home() {
   // Collections state
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
-
-  // Login prompt state
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [loginPromptMessage, setLoginPromptMessage] = useState('');
 
   useEffect(() => {
     const checkMobile = () => {
@@ -233,13 +229,11 @@ export default function Home() {
 
   // Recipe handlers
   const handleRecipeClick = (recipeName) => {
-    setSelectedRecipe(recipeName);
-    setRecipeModalOpen(true);
-  };
-
-  const handleCloseRecipeModal = () => {
-    setRecipeModalOpen(false);
-    setSelectedRecipe(null);
+    showRecipeDetail({
+      recipeName,
+      fetchRecipeDetails: handleFetchRecipeDetails,
+      onAddToFavorites: handleAddToFavoritesCallback
+    });
   };
 
   const handleFetchRecipeDetails = async (recipeName) => {
@@ -255,8 +249,7 @@ export default function Home() {
   // Favorites handlers
   const handleShowFavorites = () => {
     if (!user) {
-      setLoginPromptMessage('Please sign in to view your favorite recipes.');
-      setShowLoginPrompt(true);
+      showAuthPrompt('Please sign in to view your favorite recipes.');
       return;
     }
     setShowFavorites(true);
@@ -267,6 +260,16 @@ export default function Home() {
     setShowFavorites(false);
   };
 
+  // Collections handlers
+  const handleShowCollections = () => {
+    if (!user) {
+      showAuthPrompt('Please sign in to view and manage your recipe collections.');
+      return;
+    }
+    // Navigate to collections page
+    window.location.href = '/collections';
+  };
+
   // Login prompt handlers
   const handleLoginPromptClose = () => {
     setShowLoginPrompt(false);
@@ -275,8 +278,7 @@ export default function Home() {
 
   const requireAuth = (featureName) => {
     if (!user) {
-      setLoginPromptMessage(`Please sign in to use ${featureName}.`);
-      setShowLoginPrompt(true);
+      showAuthPrompt(`Please sign in to use ${featureName}.`);
       return false;
     }
     return true;
@@ -286,25 +288,47 @@ export default function Home() {
     setFavoritesLoading(true);
     try {
       const result = await getFavorites();
-      if (result.success) {
-        setFavoriteRecipes(result.favorites || []);
+      // The new collections-based API returns { collection: {...}, recipes: [...] }
+      if (result && result.recipes) {
+        setFavoriteRecipes(result.recipes || []);
+      } else {
+        setFavoriteRecipes([]);
       }
     } catch (error) {
       console.error('Failed to load favorites:', error);
+      setFavoriteRecipes([]);
     } finally {
       setFavoritesLoading(false);
     }
   };
 
   const loadCollections = async () => {
+    console.log('📚 [Home] Loading collections...');
     setCollectionsLoading(true);
     try {
       const result = await getCollections();
-      if (result.success) {
-        setCollections(result.collections || []);
+      console.log('📚 [Home] Collections API result:', result);
+      
+      // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
+      let collections = [];
+      if (result && result.collections) {
+        collections = result.collections;
+      } else if (Array.isArray(result)) {
+        collections = result;
+      } else {
+        console.warn('⚠️ [Home] Unexpected collections response format:', result);
       }
+      
+      console.log('📚 [Home] Loaded collections:', collections);
+      setCollections(collections);
+      
     } catch (error) {
-      console.error('Failed to load collections:', error);
+      console.error('❌ [Home] Exception loading collections:', error);
+      console.error('❌ [Home] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
     } finally {
       setCollectionsLoading(false);
     }
@@ -332,6 +356,12 @@ export default function Home() {
         ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
         : collection
     ));
+  };
+
+  // Handle create collection callback
+  const handleCreateCollectionCallback = () => {
+    // Navigate to collections page where user can create a new collection
+    window.location.href = '/collections';
   };
 
   // Helper function to check if a recipe is favorited
@@ -400,6 +430,7 @@ export default function Home() {
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
           onShowFavorites={handleShowFavorites}
+          onShowCollections={handleShowCollections}
           onLogout={handleLogout}
           sessionsLoading={sessionsLoading}
           collapsed={sidebarCollapsed}
@@ -469,6 +500,7 @@ export default function Home() {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onShowFavorites={handleShowFavorites}
+        onShowCollections={handleShowCollections}
         onLogout={handleLogout}
         sessionsLoading={sessionsLoading}
         collapsed={sidebarCollapsed}
@@ -513,7 +545,7 @@ export default function Home() {
                         {console.log('🍳 [FRONTEND] Rendering', message.detectedRecipes.length, 'recipe cards for message:', message.detectedRecipes)}
                         {message.detectedRecipes.map((recipe, index) => (
                           <RecipeCard
-                            key={index}
+                            key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : recipe.title}`}
                             recipe={recipe}
                             onClick={handleRecipeClick}
                             isLoading={recipeDetailsLoading}
@@ -521,6 +553,7 @@ export default function Home() {
                             collections={collections}
                             onAddToFavorites={handleAddToFavoritesCallback}
                             onAddToCollection={handleAddToCollectionCallback}
+                            onCreateCollection={handleCreateCollectionCallback}
                             fetchRecipeDetails={handleFetchRecipeDetails}
                             user={user}
                             requireAuth={requireAuth}
@@ -625,14 +658,7 @@ export default function Home() {
           </div>
         </div>
         
-        {/* Recipe Detail Modal */}
-        <RecipeDetailModal
-          recipeName={selectedRecipe}
-          isOpen={recipeModalOpen}
-          onClose={handleCloseRecipeModal}
-          fetchRecipeDetails={handleFetchRecipeDetails}
-          onAddToFavorites={handleAddToFavoritesCallback}
-        />
+
 
         {/* Favorites Modal/View */}
         {showFavorites && (
@@ -682,7 +708,7 @@ export default function Home() {
                     </h3>
                     {favoriteRecipes.map((recipe, index) => (
                       <RecipeCard
-                        key={index}
+                        key={`favorites_recipe_${index}_${recipe.id || recipe.title || recipe.name}`}
                         recipe={recipe}
                         onClick={handleFavoriteRecipeClick}
                         isLoading={false}
@@ -690,6 +716,7 @@ export default function Home() {
                         collections={collections}
                         onAddToFavorites={handleAddToFavoritesCallback}
                         onAddToCollection={handleAddToCollectionCallback}
+                        onCreateCollection={handleCreateCollectionCallback}
                         fetchRecipeDetails={handleFetchRecipeDetails}
                         user={user}
                         requireAuth={requireAuth}
@@ -702,56 +729,6 @@ export default function Home() {
           </div>
         )}
       </div>
-      
-      {/* Login Prompt Modal */}
-      {showLoginPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
-            onClick={handleLoginPromptClose}
-          />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full transition-all duration-500 ease-out">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-600 via-red-600 to-orange-700 text-white p-6 rounded-t-2xl relative overflow-hidden">
-              {/* Shimmer effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none"></div>
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center gap-3">
-                  <ChefHat className="w-8 h-8 fill-white" />
-                  <h2 className="text-2xl font-bold tracking-wide">Sign In Required</h2>
-                </div>
-                <button
-                  onClick={handleLoginPromptClose}
-                  className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200 hover:scale-110"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              <p className="text-stone-600 mb-6 leading-relaxed">{loginPromptMessage}</p>
-              <div className="space-y-3">
-                <a href="/signin" className="relative block w-full py-3 px-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  Sign In
-                </a>
-                <a href="/signup" className="block w-full py-3 px-4 border border-stone-300 text-stone-700 rounded-2xl font-medium hover:bg-gradient-to-r hover:from-stone-50 hover:to-stone-100 transition-all duration-200 hover:scale-105">
-                  Create Account
-                </a>
-                <button 
-                  onClick={handleLoginPromptClose}
-                  className="block w-full py-2 px-4 text-stone-500 hover:text-stone-700 rounded-2xl font-medium hover:bg-stone-50 transition-all duration-200 hover:scale-105 text-sm"
-                >
-                  Maybe Later
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Confirmation Dialogs */}
       <DeleteDialog />
       <LogoutDialog />

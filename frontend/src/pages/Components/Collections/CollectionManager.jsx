@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Folder, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Folder, CheckCircle, Heart, Lock } from 'lucide-react';
 import { getCollections, deleteCollection } from '../../../utils/api.js';
 import ConfirmationDialog from '../UI/ConfirmationDialog.jsx';
 
@@ -162,8 +162,40 @@ const CollectionManager = ({
             )}
           </div>
 
-          {/* User collections */}
-          {collections.map(collection => (
+          {/* Special "My Favorites" collection - always first */}
+          {collections.find(col => col.isFavorites) && (
+            <div
+              onClick={() => onCollectionSelect(collections.find(col => col.isFavorites).id)}
+              className={`relative flex items-center justify-between p-3 rounded-xl border transition-all duration-300 cursor-pointer hover:scale-[1.02] group overflow-hidden ${
+                selectedCollectionId === collections.find(col => col.isFavorites).id
+                  ? 'border-pink-300 bg-gradient-to-r from-pink-50 to-rose-50 shadow-md shadow-pink-200/30' 
+                  : 'border-pink-200 hover:border-pink-300 hover:bg-gradient-to-r hover:from-pink-50 hover:to-rose-100'
+              }`}
+            >
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-200/50">
+                  <Heart className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-stone-800 flex items-center gap-2">
+                    My Favorites
+                    <Lock className="w-3 h-3 text-stone-400" title="Default collection" />
+                  </p>
+                  <p className="text-sm text-stone-500">
+                    {collections.find(col => col.isFavorites).recipeCount || 0} recipes • Quick access to loved recipes
+                  </p>
+                </div>
+              </div>
+              {selectedCollectionId === collections.find(col => col.isFavorites).id && (
+                <CheckCircle className="w-5 h-5 text-pink-600" />
+              )}
+            </div>
+          )}
+
+          {/* User collections (excluding favorites which is shown above) */}
+          {collections.filter(collection => !collection.isFavorites).map(collection => (
             <div
               key={collection.id}
               className={`relative flex items-center justify-between p-3 rounded-xl border transition-all duration-300 hover:scale-[1.02] group overflow-hidden ${
@@ -199,28 +231,33 @@ const CollectionManager = ({
                 {selectedCollectionId === collection.id && (
                   <CheckCircle className="w-5 h-5 text-orange-600" />
                 )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onEditCollection) {
-                      onEditCollection(collection);
-                    }
-                  }}
-                  className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 hover:scale-110"
-                  title="Edit collection"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    showDeleteConfirmation(collection);
-                  }}
-                  className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
-                  title="Delete collection"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Only show edit/delete buttons for non-favorites collections */}
+                {!collection.isFavorites && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEditCollection) {
+                          onEditCollection(collection);
+                        }
+                      }}
+                      className="p-2 text-stone-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 hover:scale-110"
+                      title="Edit collection"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        showDeleteConfirmation(collection);
+                      }}
+                      className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 hover:scale-110"
+                      title="Delete collection"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

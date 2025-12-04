@@ -36,6 +36,9 @@ console.log('🍳 CookMate API URL:', API_BASE_URL, 'Environment:', import.meta.
 // Generic API call function
 async function apiCall(endpoint, options = {}) {
   try {
+    console.log('🌐 [API] Making API call to:', `${API_BASE_URL}${endpoint}`);
+    console.log('🌐 [API] Options:', options);
+    
     // Get Firebase auth token
     const user = auth.currentUser;
     let token = null;
@@ -46,6 +49,14 @@ async function apiCall(endpoint, options = {}) {
       // Fallback to stored tokens for backward compatibility
       token = localStorage.getItem('authToken') || localStorage.getItem('firebaseAuthToken');
     }
+
+    // In development mode, use mock token if no real token available
+    if (!token && import.meta.env.DEV) {
+      console.log('🔧 [API] Development mode: Using mock authentication token');
+      token = 'mock-token';
+    }
+
+    console.log(' [API] Auth token available:', !!token);
 
     const headers = {
       'Content-Type': 'application/json',
@@ -58,15 +69,21 @@ async function apiCall(endpoint, options = {}) {
       headers,
     });
 
-    const data = await response.json();
-
+    console.log('📡 [API] Response status:', response.status);
+    
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ [API] Response not OK:', response.status, errorText);
+      throw new Error(errorText || `HTTP ${response.status}`);
     }
 
+    const data = await response.json();
+    console.log('✅ [API] Response data:', data);
     return data;
   } catch (error) {
-    console.error(`API call failed for ${endpoint}:`, error);
+    console.error(`❌ [API] Call failed for ${endpoint}:`, error);
+    console.error(`❌ [API] Error type:`, error.constructor.name);
+    console.error(`❌ [API] Error message:`, error.message);
     throw error;
   }
 }
@@ -110,13 +127,25 @@ export const suggestIngredients = async (availableIngredients) => {
 // Recipe Details API
 export const getRecipeDetails = async (recipeName) => {
   try {
+    console.log('📡 [API] Fetching recipe details for:', recipeName);
     const result = await apiCall('/api/ai/recipe-details', {
       method: 'POST',
       body: JSON.stringify({ recipeName }),
     });
+    
+    console.log('📡 [API] Recipe details result:', result);
+    console.log('📡 [API] Recipe data structure:', {
+      hasRecipe: !!result.recipe,
+      recipeTitle: result.recipe?.title,
+      ingredientsType: typeof result.recipe?.ingredients,
+      ingredientsLength: Array.isArray(result.recipe?.ingredients) ? result.recipe.ingredients.length : 'not_array',
+      instructionsType: typeof result.recipe?.instructions,
+      instructionsLength: Array.isArray(result.recipe?.instructions) ? result.recipe.instructions.length : 'not_array'
+    });
+    
     return { success: true, recipe: result.recipe, message: result.message };
   } catch (error) {
-    console.error('Recipe details API error:', error);
+    console.error('❌ [API] Recipe details API error:', error);
     return { success: false, error: error.message };
   }
 };
@@ -133,27 +162,71 @@ export const updateUserProfile = async (updates) => {
   });
 };
 
-// Favorites API
+// Favorites API (using collections underneath)
 export const getFavorites = async () => {
-  return apiCall('/api/users/favorites');
+  return apiCall('/api/collections/favorites');
 };
 
 export const addToFavorites = async (recipeId, recipeData = null) => {
-  return apiCall(`/api/users/favorites/${recipeId}`, {
-    method: 'POST',
-    body: JSON.stringify({ recipeData }),
-  });
+  try {
+    // First get the favorites collection
+    const favoritesResult = await apiCall('/api/collections/favorites');
+    if (favoritesResult && favoritesResult.collection) {
+      // Add to the favorites collection
+      return apiCall(`/api/collections/${favoritesResult.collection.id}/recipes`, {
+        method: 'POST',
+        body: JSON.stringify({ recipeId, recipeData }),
+      });
+    }
+    throw new Error('Favorites collection not found');
+  } catch (error) {
+    console.error('Failed to add to favorites:', error);
+    throw error;
+  }
 };
 
 export const removeFromFavorites = async (recipeId) => {
-  return apiCall(`/api/users/favorites/${recipeId}`, {
-    method: 'DELETE',
-  });
+  try {
+    // First get the favorites collection
+    const favoritesResult = await apiCall('/api/collections/favorites');
+    if (favoritesResult && favoritesResult.collection) {
+      // Remove from the favorites collection
+      return apiCall(`/api/collections/${favoritesResult.collection.id}/recipes/${recipeId}`, {
+        method: 'DELETE',
+      });
+    }
+    throw new Error('Favorites collection not found');
+  } catch (error) {
+    console.error('Failed to remove from favorites:', error);
+    throw error;
+  }
+};
+
+// Helper function to check if recipe is in favorites
+export const checkIsFavorite = async (recipeId) => {
+  try {
+    const favoritesResult = await apiCall('/api/collections/favorites');
+    if (favoritesResult && favoritesResult.recipes) {
+      return favoritesResult.recipes.some(recipe => recipe.id === recipeId);
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to check favorite status:', error);
+    return false;
+  }
 };
 
 // Collections API
 export const getCollections = async () => {
-  return apiCall('/api/collections');
+  console.log('📚 [API] getCollections called');
+  try {
+    const result = await apiCall('/api/collections');
+    console.log('📚 [API] getCollections result:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ [API] getCollections failed:', error);
+    throw error;
+  }
 };
 
 export const createCollection = async (collectionData) => {
@@ -177,10 +250,23 @@ export const deleteCollection = async (collectionId) => {
 };
 
 export const addRecipeToCollection = async (collectionId, recipeId, recipeData = null) => {
-  return apiCall(`/api/collections/${collectionId}/recipes`, {
-    method: 'POST',
-    body: JSON.stringify({ recipeId, recipeData }),
-  });
+  console.log('🚀 [API] addRecipeToCollection called with:');
+  console.log('🚀 [API] Collection ID:', collectionId);
+  console.log('🚀 [API] Recipe ID:', recipeId);
+  console.log('🚀 [API] Recipe Data:', recipeData);
+  
+  try {
+    const result = await apiCall(`/api/collections/${collectionId}/recipes`, {
+      method: 'POST',
+      body: JSON.stringify({ recipeId, recipeData }),
+    });
+    
+    console.log('📡 [API] addRecipeToCollection result:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ [API] addRecipeToCollection failed:', error);
+    throw error;
+  }
 };
 
 export const removeRecipeFromCollection = async (collectionId, recipeId) => {
@@ -191,6 +277,13 @@ export const removeRecipeFromCollection = async (collectionId, recipeId) => {
 
 export const getCollectionRecipes = async (collectionId) => {
   return apiCall(`/api/collections/${collectionId}/recipes`);
+};
+
+// Migration API
+export const migrateFavorites = async () => {
+  return apiCall('/api/collections/migrate-favorites', {
+    method: 'POST',
+  });
 };
 
 // Health check
@@ -208,6 +301,7 @@ export default {
   getFavorites,
   addToFavorites,
   removeFromFavorites,
+  checkIsFavorite,
   getCollections,
   createCollection,
   updateCollection,
@@ -215,5 +309,6 @@ export default {
   addRecipeToCollection,
   removeRecipeFromCollection,
   getCollectionRecipes,
+  migrateFavorites,
   healthCheck,
 };

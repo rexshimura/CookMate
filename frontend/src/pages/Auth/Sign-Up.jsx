@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChefHat, Mail, Lock, User, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -11,11 +12,13 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
 
     try {
       // 1. Create User in Firebase Auth
@@ -36,11 +39,17 @@ export default function SignupPage() {
         favorites: []
       });
 
-
       navigate("/home"); 
 
     } catch (error) {
       console.error("Signup Error:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        setError("An account with this email already exists. Please try signing in instead.");
+      } else if (error.code === 'auth/weak-password') {
+        setError("Password is too weak. Please use at least 6 characters.");
+      } else {
+        setError("Failed to create account. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,13 +69,13 @@ export default function SignupPage() {
 
       <div className="relative z-10">
         <div className="absolute top-6 left-6">
-          <a 
-            href="/" 
+          <Link 
+            to="/" 
             className="flex items-center gap-2 text-stone-500 hover:text-orange-600 transition-all duration-200 text-sm font-medium group hover:scale-105"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" />
             Back to Home
-          </a>
+          </Link>
         </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -96,6 +105,12 @@ export default function SignupPage() {
             
             {/* Accent border */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 rounded-t-3xl" />
+
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm font-medium animate-fadeIn">
+                {error}
+              </div>
+            )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-5">
@@ -178,13 +193,13 @@ export default function SignupPage() {
             <div className="mt-8 text-center animate-slideUp delay-250">
               <p className="text-sm text-stone-600">
                 Already have an account?{' '}
-                <a 
-                  href="/signin" 
+                <Link 
+                  to="/signin" 
                   className="font-bold text-orange-600 hover:text-orange-500 transition-all duration-200 hover:underline relative group"
                 >
                   Log in
                   <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 group-hover:w-full transition-all duration-300"></div>
-                </a>
+                </Link>
               </p>
             </div>
           </div>

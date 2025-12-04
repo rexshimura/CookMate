@@ -19,8 +19,24 @@ router.post('/register', async (req, res) => {
       email: userRecord.email,
       displayName: displayName || '',
       createdAt: new Date().toISOString(),
-      favorites: [] // Initialize empty favorites list
+      dietaryPreferences: '' // Initialize dietary preferences
     });
+
+    // 3. Create Default "My Favorites" Collection
+    const defaultFavoritesCollection = {
+      name: 'My Favorites',
+      description: 'Your favorite recipes',
+      color: '#FF69B4', // Pink color for favorites
+      icon: 'heart', // Heart icon for favorites
+      userId: userRecord.uid,
+      recipes: [], // Empty array of recipe IDs
+      recipeCount: 0,
+      isDefault: true, // Mark as default collection (cannot be deleted)
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await db.collection('collections').add(defaultFavoritesCollection);
 
     res.status(201).json({ message: 'User registered successfully', uid: userRecord.uid });
   } catch (error) {

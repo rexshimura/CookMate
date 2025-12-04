@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChefHat, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebase"; 
@@ -9,11 +10,13 @@ export default function SigninPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
 
     try {
       // THE REAL FIREBASE LOGIN
@@ -23,6 +26,7 @@ export default function SigninPage() {
       navigate("/home");
     } catch (error) {
       console.error("Login Error:", error);
+      setError("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -42,13 +46,13 @@ export default function SigninPage() {
 
       <div className="relative z-10">
         <div className="absolute top-6 left-6">
-          <a 
-            href="/" 
+          <Link 
+            to="/" 
             className="flex items-center gap-2 text-stone-500 hover:text-orange-600 transition-all duration-200 text-sm font-medium group hover:scale-105"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" /> 
             Back to Home
-          </a>
+          </Link>
         </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -78,6 +82,12 @@ export default function SigninPage() {
             
             {/* Accent border */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 rounded-t-3xl" />
+
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm font-medium animate-fadeIn">
+                {error}
+              </div>
+            )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-5">
@@ -143,13 +153,13 @@ export default function SigninPage() {
             <div className="mt-8 text-center animate-slideUp delay-200">
               <p className="text-sm text-stone-600">
                 Don't have an account?{' '}
-                <a 
-                  href="/signup" 
+                <Link 
+                  to="/signup" 
                   className="font-bold text-orange-600 hover:text-orange-500 transition-all duration-200 hover:underline relative group"
                 >
                   Sign up
                   <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 group-hover:w-full transition-all duration-300"></div>
-                </a>
+                </Link>
               </p>
             </div>
           </div>

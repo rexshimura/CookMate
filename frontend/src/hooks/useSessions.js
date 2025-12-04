@@ -42,11 +42,21 @@ export const useSessions = () => {
   // Load user sessions
   const loadSessions = async () => {
     if (!user) {
-      // For anonymous users, check for existing local session
-      const localSession = localStorage.getItem('anonymous_session');
-      if (localSession) {
-        setSessions([JSON.parse(localSession)]);
+      // For anonymous users, check for existing local sessions array
+      console.log('🍳 [useSessions] Loading anonymous sessions from localStorage...');
+      const localSessions = localStorage.getItem('anonymous_sessions');
+      if (localSessions) {
+        try {
+          const parsedSessions = JSON.parse(localSessions);
+          console.log('🍳 [useSessions] Found anonymous sessions:', parsedSessions);
+          setSessions(parsedSessions || []);
+        } catch (error) {
+          console.error('🍳 [useSessions] Error parsing anonymous sessions:', error);
+          localStorage.removeItem('anonymous_sessions');
+          setSessions([]);
+        }
       } else {
+        console.log('🍳 [useSessions] No anonymous sessions found in localStorage');
         setSessions([]);
       }
       return;
@@ -76,6 +86,7 @@ export const useSessions = () => {
       
       if (!user) {
         // Create anonymous session
+        console.log('🍳 [useSessions] Creating new anonymous session...');
         const anonymousSession = {
           id: `anon_${Date.now()}`,
           title: title || 'Anonymous Chat',
@@ -85,11 +96,20 @@ export const useSessions = () => {
           isAnonymous: true
         };
         
-        // Store in localStorage
-        localStorage.setItem('anonymous_session', JSON.stringify(anonymousSession));
+        // Get existing sessions array or create new one
+        const existingSessions = localStorage.getItem('anonymous_sessions');
+        const sessionsArray = existingSessions ? JSON.parse(existingSessions) : [];
         
-        // Add to local state
-        setSessions([anonymousSession]);
+        // Add new session to the beginning of the array
+        const updatedSessions = [anonymousSession, ...sessionsArray];
+        
+        // Store in localStorage
+        localStorage.setItem('anonymous_sessions', JSON.stringify(updatedSessions));
+        console.log('🍳 [useSessions] Anonymous session created and saved:', anonymousSession);
+        console.log('🍳 [useSessions] Total sessions now:', updatedSessions.length);
+        
+        // Update local state
+        setSessions(updatedSessions);
         return anonymousSession;
       }
       
@@ -137,6 +157,22 @@ export const useSessions = () => {
     try {
       setError(null);
       
+      // Handle anonymous sessions locally
+      if (sessionId.startsWith('anon_')) {
+        console.log('🍳 [useSessions] Deleting anonymous session:', sessionId);
+        
+        // Remove from localStorage
+        const existingSessions = localStorage.getItem('anonymous_sessions');
+        const sessionsArray = existingSessions ? JSON.parse(existingSessions) : [];
+        const updatedSessions = sessionsArray.filter(session => session.id !== sessionId);
+        localStorage.setItem('anonymous_sessions', JSON.stringify(updatedSessions));
+        
+        // Remove from local state
+        setSessions(prev => prev.filter(session => session.id !== sessionId));
+        console.log('🍳 [useSessions] Anonymous session deleted. Remaining sessions:', updatedSessions.length);
+        return true;
+      }
+      
       const result = await deleteSession(sessionId);
       if (result.success) {
         // Remove from local state
@@ -154,12 +190,8 @@ export const useSessions = () => {
 
   // Load sessions when user changes
   useEffect(() => {
-    if (user) {
-      loadSessions();
-    } else {
-      setSessions([]);
-      setError(null);
-    }
+    // Always call loadSessions - it handles both authenticated and anonymous users
+    loadSessions();
   }, [user]);
 
   return {
@@ -206,8 +238,22 @@ export const useSessionChat = (sessionId) => {
       
       // For anonymous sessions, load from localStorage
       if (!user || sessionIdToLoad.startsWith('anon_')) {
+        console.log('🍳 [useSessionChat] Loading anonymous messages for session:', sessionIdToLoad);
         const localMessages = localStorage.getItem(`messages_${sessionIdToLoad}`);
-        setMessages(localMessages ? JSON.parse(localMessages) : []);
+        if (localMessages) {
+          try {
+            const parsedMessages = JSON.parse(localMessages);
+            console.log('🍳 [useSessionChat] Loaded', parsedMessages.length, 'messages for anonymous session');
+            setMessages(parsedMessages);
+          } catch (error) {
+            console.error('🍳 [useSessionChat] Error parsing local messages:', error);
+            localStorage.removeItem(`messages_${sessionIdToLoad}`);
+            setMessages([]);
+          }
+        } else {
+          console.log('🍳 [useSessionChat] No messages found for anonymous session');
+          setMessages([]);
+        }
         return;
       }
       
