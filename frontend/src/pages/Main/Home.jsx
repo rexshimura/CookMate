@@ -74,11 +74,10 @@ export default function Home() {
       if (messagesContainerRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
         const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-        const isScrollingUp = scrollTop < lastScrollY;
-        
-        // Show button when user is scrolled up more than 20px from bottom
-        const shouldShow = distanceFromBottom > 20;
-        
+
+        // Show button when user is scrolled up more than 100px from bottom (less jittery)
+        const shouldShow = distanceFromBottom > 100;
+
         setShowScrollButton(shouldShow);
         lastScrollY = scrollTop;
       }
@@ -156,7 +155,6 @@ export default function Home() {
     
     try {
       await sendMessage(messageText);
-      // Focus the input after sending the message
       focusInput();
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -337,22 +335,16 @@ export default function Home() {
   const handleFavoriteRecipeClick = (recipe) => {
     // Close favorites modal first, then open recipe details
     setShowFavorites(false);
-    
-    // For favorites, we need to fetch the full recipe details since we only have basic info
-    setSelectedRecipe(recipe.title || recipe.name);
-    setRecipeModalOpen(true);
+    handleRecipeClick(recipe.title || recipe.name);
   };
 
-  // Handle add to favorites callback
   const handleAddToFavoritesCallback = (recipeData) => {
     setFavoriteRecipes(prev => [...prev, recipeData]);
   };
 
-  // Handle add to collection callback
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
-    // Update the specific collection's recipe count locally
-    setCollections(prev => prev.map(collection => 
-      collection.id === collectionId 
+    setCollections(prev => prev.map(collection =>
+      collection.id === collectionId
         ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
         : collection
     ));
@@ -542,7 +534,7 @@ export default function Home() {
                     {!message.isUser && message.detectedRecipes && message.detectedRecipes.length > 0 && (
                       <div className="mt-4 space-y-3 w-full">
                         <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
-                        {console.log('🍳 [FRONTEND] Rendering', message.detectedRecipes.length, 'recipe cards for message:', message.detectedRecipes)}
+                        {/* Console log removed to clean up spam */}
                         {message.detectedRecipes.map((recipe, index) => (
                           <RecipeCard
                             key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : recipe.title}`}
@@ -590,65 +582,40 @@ export default function Home() {
         
         {/* Scroll Down Button */}
         {showScrollButton && (
-          <div
+          <button
+            onClick={scrollToBottom}
             className={`
-              fixed bottom-6 right-6 z-50 transition-all duration-500 ease-in-out transform
-              ${showScrollButton ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}
+              fixed bottom-24 right-4 lg:right-8 z-40
+              w-10 h-10 bg-white border border-stone-200 text-stone-600
+              rounded-full shadow-lg shadow-stone-200/50
+              flex items-center justify-center
+              hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200
+              hover:scale-110 active:scale-95
+              transition-all duration-300 ease-out transform
+              ${showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}
             `}
+            title="Scroll to bottom"
           >
-            <button
-              onClick={scrollToBottom}
-              className="
-                group relative overflow-hidden
-                bg-gradient-to-br from-blue-600 to-blue-700 
-                hover:from-blue-500 hover:to-blue-600 
-                text-white p-4 rounded-2xl shadow-xl 
-                transform hover:scale-105 hover:-translate-y-1 
-                transition-all duration-300 ease-out
-                focus:outline-none focus:ring-4 focus:ring-blue-300 focus:ring-opacity-50
-                backdrop-blur-sm border border-blue-400/20
-              "
-              aria-label="Scroll to bottom"
-            >
-              {/* Animated background shimmer */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out"></div>
-              
-              {/* Button content */}
-              <div className="relative z-10 flex items-center space-x-2">
-                <ArrowDown className="w-5 h-5 transition-transform group-hover:translate-y-0.5" />
-                <span className="text-sm font-medium hidden sm:block">Bottom</span>
-              </div>
-
-              {/* Ripple effect on click */}
-              <div className="absolute inset-0 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity duration-150">
-                <div className="absolute inset-0 bg-white/20 rounded-2xl animate-ping"></div>
-              </div>
-            </button>
-
-            {/* Tooltip */}
-            <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-              Scroll to bottom
-              <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
+            <ArrowDown className="w-5 h-5" />
+          </button>
         )}
 
         <div className="p-4 lg:p-6 bg-gradient-to-t from-stone-50 via-stone-50 to-transparent">
           <div className="max-w-3xl mx-auto relative">
             <form onSubmit={handleSendMessage} className="relative flex items-center bg-white rounded-full shadow-lg border border-stone-200 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
-              <input 
+              <input
                 ref={inputRef}
-                type="text" 
-                value={inputMessage} 
-                onChange={(e) => setInputMessage(e.target.value)} 
-                placeholder="Type a message..." 
-                className="flex-1 py-4 pl-6 pr-14 bg-transparent border-none focus:ring-0 focus:outline-none placeholder:text-stone-400 text-stone-700" 
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 py-4 pl-6 pr-14 bg-transparent border-none focus:ring-0 focus:outline-none placeholder:text-stone-400 text-stone-700"
                 disabled={!currentSessionId || isTyping}
               />
               <div className="absolute right-2 p-1">
-                <button 
-                  type="submit" 
-                  disabled={!inputMessage.trim() || isTyping || !currentSessionId} 
+                <button
+                  type="submit"
+                  disabled={!inputMessage.trim() || isTyping || !currentSessionId}
                   className={`p-2.5 rounded-full transition-all flex items-center justify-center ${inputMessage.trim() && currentSessionId && !isTyping ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-stone-100 text-stone-300'}`}
                 >
                   <Send className="w-4 h-4 ml-0.5" />
@@ -735,4 +702,3 @@ export default function Home() {
     </div>
   );
 }
-
