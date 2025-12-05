@@ -3,12 +3,28 @@ import { Heart, X, Plus, Folder, Clock } from 'lucide-react';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useCollections } from '../../hooks/useCollections';
 import { useAuth } from '../../hooks/useAuth.jsx';
+import { useModal } from '../../App.jsx';
+import { getRecipeDetails } from '../../utils/api.js';
 
 const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
   const [activeTab, setActiveTab] = useState('favorites');
   const { user } = useAuth();
   const { favorites, toggleFavorite, loading: favoritesLoading, isFavorite } = useFavorites();
   const { collections, addRecipeToCollection, loading: collectionsLoading, createNewCollection } = useCollections();
+  const { showRecipeDetail } = useModal();
+
+  const handleRecipeClick = (recipe) => {
+    const recipeName = recipe.title || recipe.name || recipe;
+    showRecipeDetail({
+      recipeName,
+      fetchRecipeDetails: async (name) => {
+        // Simple wrapper to fetch details
+        const result = await getRecipeDetails(name);
+        return result;
+      },
+      // Optional: pass callbacks if needed, or leave null to handle in modal
+    });
+  };
 
   // Refresh collections data when modal opens
   useEffect(() => {
@@ -46,7 +62,10 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
     const isRecipeFavorite = isFavorite(recipeData);
 
     return (
-      <div className="bg-white rounded-lg border border-stone-200 p-4 hover:shadow-md transition-shadow">
+      <div 
+        className="bg-white rounded-lg border border-stone-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => handleRecipeClick(recipeData)}
+      >
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h4 className="font-medium text-stone-800 truncate">{recipeTitle}</h4>
@@ -64,7 +83,10 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
           </div>
           <div className="flex items-center gap-2 ml-3">
             <button
-              onClick={() => handleFavoriteToggle(recipeData)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFavoriteToggle(recipeData);
+              }}
               className={`p-2 rounded-full transition-colors ${
                 isRecipeFavorite 
                   ? 'bg-pink-100 text-pink-600 hover:bg-pink-200' 
@@ -76,7 +98,10 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
             </button>
             {onRemove && (
               <button
-                onClick={() => onRemove(recipeData)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(recipeData);
+                }}
                 className="p-2 rounded-full bg-stone-100 text-stone-400 hover:bg-red-100 hover:text-red-600 transition-colors"
                 title="Remove from current view"
               >
@@ -113,7 +138,10 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
           </div>
           {onAddRecipe && recipe && (
             <button
-              onClick={() => onAddRecipe(collection.id, recipe)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddRecipe(collection.id, recipe);
+              }}
               className="p-2 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors ml-3"
               title="Add current recipe to this collection"
             >
