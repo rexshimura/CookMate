@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './useAuth.jsx';
 import { getFavorites, addToFavorites, removeFromFavorites, checkIsFavorite } from '../utils/api.js';
 import { generateRecipeId } from '../utils/ids.js';
 
@@ -13,6 +14,7 @@ import { generateRecipeId } from '../utils/ids.js';
  * - Error handling with user-friendly messages
  */
 export const useFavorites = () => {
+  const { user, loading: authLoading } = useAuth();
   const [favorites, setFavorites] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,14 @@ export const useFavorites = () => {
 
   // Load favorites from backend on mount
   const loadFavorites = useCallback(async () => {
+    if (!user && !authLoading) {
+      setFavorites([]);
+      setFavoriteIds(new Set());
+      setLoading(false);
+      return;
+    }
+    if (authLoading) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -45,7 +55,7 @@ export const useFavorites = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, authLoading]);
 
   // Initialize favorites on mount
   useEffect(() => {

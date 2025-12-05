@@ -56,11 +56,11 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
 // Helper function to store detected recipe data
 async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
   try {
-    // FIX: Handle both Object and String inputs safely
+    // SAFEGUARD: Handle both Object and String inputs
     const recipeTitle = typeof recipeInput === 'string' ? recipeInput : recipeInput?.title;
     
     if (!recipeTitle) {
-      console.warn('⚠️ Cannot store recipe: Missing title');
+      console.warn('⚠️ Skipping storage: Missing title');
       return null;
     }
 
@@ -818,44 +818,32 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     // Generate AI response using Groq with fallback handling
     
     let aiReply;
+    let detectedRecipes = [];
+    
     try {
       const fullResponse = await callGroqAI(message, history);
       
-      let detectedRecipes = [];
-
-      // 1. First, try to parse the JSON block to get accurate recipes
+      // 1. EXTRACT FIRST (Before cleaning)
       const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
       if (jsonMatch && jsonMatch[1]) {
         try {
           const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed.recipes && Array.isArray(parsed.recipes)) {
-            // Extract just the titles for the card detection system
-            detectedRecipes = parsed.recipes.map(r => r.title || r.name);
-          }
-        } catch (e) {
-          console.error('Failed to parse recipe JSON:', e);
-        }
+          if (parsed.recipes) detectedRecipes = parsed.recipes.map(r => r.title || r.name);
+        } catch (e) { console.error('JSON Parse Error', e); }
       }
 
-      // 2. Fallback to text detection if JSON was missing or empty
+      // 2. CLEANUP SECOND
+      aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
+      if (!aiReply) aiReply = "I found some recipes! Check below.";
+
+      // 3. Fallback Detection (if JSON failed)
       if (detectedRecipes.length === 0) {
         detectedRecipes = extractRecipesFromResponse(fullResponse);
       }
 
-      // 3. NOW it is safe to remove the JSON so the user sees clean text
-      aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
-      if (!aiReply) aiReply = "I found some recipes! Check the cards below.";
-
-      // 4. Store the detected recipes
+      // 4. Store Data
       if (detectedRecipes.length > 0) {
-        try {
-          await Promise.all(detectedRecipes.map(recipeName => 
-            storeDetectedRecipe(recipeName, req.userId)
-          ));
-        } catch (storeError) {
-          console.warn('Failed to store some detected recipes:', storeError);
-          // Continue without storing - don't block the response
-        }
+         await Promise.allSettled(detectedRecipes.map(r => storeDetectedRecipe(r, req.userId)));
       }
 
     } catch (aiError) {
@@ -863,7 +851,6 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       
       // Create a helpful fallback response based on the message content
       const ingredientList = extractIngredients(message);
-      let detectedRecipes = [];
       
       if (ingredientList.length > 0) {
         aiReply = `I'm having trouble connecting to my AI brain right now, but I can still help you cook! 🌟
@@ -894,32 +881,23 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
       }
     }
     
-    // Extract recipes from AI response for consistency
-    const detectedRecipes = extractRecipesFromResponse(aiReply);
-    
-    // Store detected recipes for consistency
-    if (detectedRecipes.length > 0) {
-      try {
-        await Promise.all(detectedRecipes.map(recipeName => 
-          storeDetectedRecipe(recipeName, req.userId)
-        ));
-      } catch (storeError) {
-        console.warn('Failed to store some detected recipes:', storeError);
-        // Continue without storing - don't block the response
-      }
+    // Extract recipes from AI response for consistency (if not already detected)
+    if (detectedRecipes.length === 0) {
+      detectedRecipes = extractRecipesFromResponse(aiReply);
     }
-    
-    res.status(200).json({
-      response: {
-        message: aiReply,
-        timestamp: new Date().toISOString(),
-        detectedIngredients: extractIngredients(message),
-        detectedRecipes: detectedRecipes,
-        userId: req.userId,
-        isOffTopic: false,
-        redirectToCooking: false
-      }
-    });
+      
+      // 5. Send Response (Ensuring detectedRecipes is included!)
+      res.status(200).json({
+        response: {
+          message: aiReply,
+          timestamp: new Date().toISOString(),
+          detectedIngredients: extractIngredients(message),
+          detectedRecipes: detectedRecipes, // <--- IMPORTANT
+          userId: req.userId,
+          isOffTopic: false,
+          redirectToCooking: false
+        }
+      });
     
   } catch (error) {
     console.error('Chat error:', error);
