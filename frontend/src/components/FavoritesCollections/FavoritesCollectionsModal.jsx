@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, X, Plus, Folder, Clock } from 'lucide-react';
-import { useFavorites } from '../../hooks/useFavorites';
-import { useCollections } from '../../hooks/useCollections';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useModal } from '../../App.jsx';
 import { getRecipeDetails } from '../../utils/api.js';
 
-const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction }) => {
+const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction, favoritesHook, collectionsHook }) => {
   const [activeTab, setActiveTab] = useState('favorites');
   const { user } = useAuth();
-  const { favorites, toggleFavorite, loading: favoritesLoading, isFavorite } = useFavorites();
-  const { collections, addRecipeToCollection, loading: collectionsLoading, createNewCollection } = useCollections();
+  const { favorites, toggleFavorite, loading: favoritesLoading, isFavorite } = favoritesHook || { favorites: [] };
+  const { collections, addRecipeToCollection, loading: collectionsLoading, createNewCollection } = collectionsHook || { collections: [] };
   const { showRecipeDetail } = useModal();
 
   const handleRecipeClick = (recipe) => {

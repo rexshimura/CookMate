@@ -185,6 +185,8 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         onClose={hideFavoritesCollectionsModal}
         recipe={favoritesCollectionsModalState.recipe}
         onAction={favoritesCollectionsModalState.onAction}
+        favoritesHook={favoritesHook}
+        collectionsHook={collectionsHook}
       />
     </ModalContext.Provider>
   );
