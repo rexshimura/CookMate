@@ -14,6 +14,7 @@ import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
 import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
 import FavoritesModal from './pages/Components/UI/FavoritesModal.jsx';
 import CollectionFormModal from './pages/Components/UI/CollectionFormModal.jsx';
+import FavoritesCollectionsModal from './components/FavoritesCollections/FavoritesCollectionsModal.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from './pages/Components/UI/useConfirmation.jsx';
 
 // Import pages
@@ -43,7 +44,8 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     confirmationState,
     recipeDetailModalState,
     favoritesModalState,
-    collectionFormModalState
+    collectionFormModalState,
+    favoritesCollectionsModalState
   } = modalStates;
 
   const {
@@ -58,7 +60,9 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     showFavoritesModal,
     hideFavoritesModal,
     showCollectionFormModal,
-    hideCollectionFormModal
+    hideCollectionFormModal,
+    showFavoritesCollectionsModal,
+    hideFavoritesCollectionsModal
   } = modalActions;
 
   return (
@@ -85,7 +89,11 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
       
       // Collection Form Modal
       showCollectionFormModal,
-      hideCollectionFormModal
+      hideCollectionFormModal,
+      
+      // Unified Favorites & Collections Modal
+      showFavoritesCollectionsModal,
+      hideFavoritesCollectionsModal
     }}>
       {children}
       
@@ -170,6 +178,14 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
 
       {/* Session Transfer Notification */}
       <SessionTransferNotification />
+
+      {/* Unified Favorites & Collections Modal */}
+      <FavoritesCollectionsModal
+        isOpen={favoritesCollectionsModalState.isOpen}
+        onClose={hideFavoritesCollectionsModal}
+        recipe={favoritesCollectionsModalState.recipe}
+        onAction={favoritesCollectionsModalState.onAction}
+      />
     </ModalContext.Provider>
   );
 };
@@ -242,6 +258,12 @@ function App() {
     icons: []
   });
 
+  const [favoritesCollectionsModalState, setFavoritesCollectionsModalState] = useState({
+    isOpen: false,
+    recipe: null,
+    onAction: null
+  });
+
   // Centralized Modal Actions
   const modalActions = {
     // Auth Prompt Actions
@@ -309,6 +331,17 @@ function App() {
     },
     hideCollectionFormModal: () => {
       setCollectionFormModalState(prev => ({ ...prev, isOpen: false }));
+    },
+
+    // Unified Favorites & Collections Modal Actions
+    showFavoritesCollectionsModal: (options) => {
+      setFavoritesCollectionsModalState({ 
+        isOpen: true, 
+        ...options
+      });
+    },
+    hideFavoritesCollectionsModal: () => {
+      setFavoritesCollectionsModalState(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -323,7 +356,8 @@ function App() {
               confirmationState,
               recipeDetailModalState,
               favoritesModalState,
-              collectionFormModalState
+              collectionFormModalState,
+              favoritesCollectionsModalState
             }} 
             modalActions={modalActions}
             favoritesHook={favoritesHook}

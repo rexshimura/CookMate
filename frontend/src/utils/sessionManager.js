@@ -93,20 +93,17 @@ export const transferAnonymousSessions = async (userId) => {
                     createdAt: serverTimestamp()
                   });
                 } catch (messageError) {
-                  console.warn('Failed to transfer individual message:', messageError);
                   // Continue with other messages even if one fails
                 }
               }
             }
           } catch (messagesParseError) {
-            console.warn('Failed to parse messages for session:', anonymousSession.id, messagesParseError);
             // Continue with other sessions even if messages parsing fails
           }
         }
 
         transferredCount++;
       } catch (sessionError) {
-        console.error('Error transferring session:', anonymousSession.id, sessionError);
         transferErrors.push({
           sessionId: anonymousSession.id,
           error: sessionError.message
@@ -125,7 +122,6 @@ export const transferAnonymousSessions = async (userId) => {
           localStorage.removeItem(`messages_${successfulTransfer.anonymousId}`);
         }
       } catch (cleanupError) {
-        console.warn('Failed to clean up localStorage after transfer:', cleanupError);
         // Don't fail the entire operation if cleanup fails
       }
     }
@@ -139,7 +135,6 @@ export const transferAnonymousSessions = async (userId) => {
     };
 
   } catch (error) {
-    console.error('Error in transferAnonymousSessions:', error);
     return { 
       success: false, 
       error: error.message, 
@@ -159,7 +154,6 @@ export const hasAnonymousSessions = () => {
     const anonymousSessions = JSON.parse(anonymousSessionsData);
     return Array.isArray(anonymousSessions) && anonymousSessions.length > 0;
   } catch (error) {
-    console.error('Error checking anonymous sessions:', error);
     return false;
   }
 };
@@ -173,7 +167,6 @@ export const getAnonymousSessionsCount = () => {
     const anonymousSessions = JSON.parse(anonymousSessionsData);
     return Array.isArray(anonymousSessions) ? anonymousSessions.length : 0;
   } catch (error) {
-    console.error('Error getting anonymous sessions count:', error);
     return 0;
   }
 };
@@ -196,7 +189,6 @@ export const createSession = async (userId, title = 'New Cooking Session') => {
     // Return the Firestore document ID, not the custom ID
     return { success: true, session: { ...sessionData, id: docRef.id } };
   } catch (error) {
-    console.error('Error creating session:', error);
     return { success: false, error: error.message };
   }
 };
@@ -249,7 +241,6 @@ export const getUserSessions = async (userId, limitCount = 20) => {
       return { success: true, sessions };
     }
   } catch (error) {
-    console.error('Error fetching sessions:', error);
     return { success: false, error: error.message };
   }
 };
@@ -263,7 +254,6 @@ export const updateSession = async (sessionId, updates) => {
     });
     return { success: true };
   } catch (error) {
-    console.error('Error updating session:', error);
     return { success: false, error: error.message };
   }
 };

@@ -108,7 +108,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
-  const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
+  const { showAuthPrompt, showRecipeDetail, showFavoritesCollectionsModal } = useModal();
   
   // Use unified hooks for favorites and collections
   const { 
@@ -515,23 +515,18 @@ export default function Home({ favoritesHook, collectionsHook }) {
       return;
     }
     
-    // Use hook data directly
-    const favoriteCollectionId = collections.find(col => col.isDefault)?.id || null;
-    
-    showFavoritesModal({
-      favoriteRecipes: favorites,
-      favoritesLoading,
-      collections,
-      favoriteCollectionId,
-      handleFavoriteRecipeClick,
-      handleAddToFavoritesCallback,
-      handleRemoveFromFavoritesCallback,
-      handleAddToCollectionCallback,
-      handleRemoveFromCollectionCallback,
-      handleCreateCollectionCallback,
-      handleFetchRecipeDetails,
-      user,
-      requireAuth
+    // Use the unified modal instead of separate modals
+    showFavoritesCollectionsModal({
+      recipe: null, // When opening from favorites view, no specific recipe
+      onAction: (action, data) => {
+        if (action === 'favorite') {
+          // Handle favorite action if needed
+          console.log('Favorite action:', data);
+        } else if (action === 'collection') {
+          // Handle collection action if needed
+          console.log('Collection action:', data);
+        }
+      }
     });
   };
 
@@ -541,8 +536,20 @@ export default function Home({ favoritesHook, collectionsHook }) {
       showAuthPrompt('Please sign in to view and manage your recipe collections.');
       return;
     }
-    // Navigate to collections page
-    window.location.href = '/collections';
+    
+    // Use the unified modal instead of navigating to separate page
+    showFavoritesCollectionsModal({
+      recipe: null, // When opening from collections view, no specific recipe
+      onAction: (action, data) => {
+        if (action === 'favorite') {
+          // Handle favorite action if needed
+          console.log('Favorite action:', data);
+        } else if (action === 'collection') {
+          // Handle collection action if needed
+          console.log('Collection action:', data);
+        }
+      }
+    });
   };
 
   const requireAuth = (featureName) => {

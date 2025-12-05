@@ -54,9 +54,9 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
 }
 
 // Helper function to store detected recipe data
-async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
+async function storeDetectedRecipe(recipe, userId = 'anonymous') {
   try {
-    const recipeId = generateConsistentRecipeId(recipeName);
+    const recipeId = generateConsistentRecipeId(recipe.title);
     
     try {
       // Check if recipe already exists
@@ -70,13 +70,13 @@ async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
       // Generate basic recipe data for detected recipes
       const recipeData = {
         id: recipeId,
-        title: recipeName,
-        description: `A delicious ${recipeName} recipe to try`,
+        title: recipe.title,
+        description: `A delicious ${recipe.title} recipe to try`,
         ingredients: ["Click on the recipe card to get detailed ingredients"],
         instructions: ["Click on the recipe card to get detailed instructions"],
         cookingTime: "Varies",
-        servings: "4",
-        difficulty: "Medium",
+        servings: recipe.servings || "4",
+        difficulty: recipe.difficulty || "Medium",
         estimatedCost: "Moderate",
         nutritionInfo: {
           calories: "Varies",
@@ -85,7 +85,7 @@ async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
           fat: "Varies"
         },
         tips: ["Click on the recipe to get detailed cooking tips"],
-        youtubeSearchQuery: `${recipeName} recipe tutorial`,
+        youtubeSearchQuery: `${recipe.title} recipe tutorial`,
         userId: userId,
         createdAt: new Date().toISOString(),
         isDetected: true
@@ -699,7 +699,43 @@ async function callGroqAI(message, conversationHistory = []) {
 
   const systemMessage = {
     role: "system",
-    content: "You are CookMate, a comprehensive AI cooking assistant with extensive culinary knowledge. You can help with a wide range of cooking-related tasks:\n\n**CORE CAPABILITIES:**\n\n1. **Celebrity Chefs & Cooking Personalities**: You know about famous chefs like Gordon Ramsay, Julia Child, Anthony Bourdain, Ina Garten, Bobby Flay, Giada De Laurentiis, Jamie Oliver, Nigella Lawson, Martha Stewart, Wolfgang Puck, and many others. Share interesting facts about their cooking styles, signature dishes, and contributions to cuisine.\n\n2. **Recipe Details**: When asked for a recipe, always provide:\n   - Complete ingredient list with measurements\n   - Step-by-step cooking instructions\n   - Cooking time, prep time, and servings\n   - Difficulty level\n   - Tips and variations\n\n3. **Ingredient-Based Suggestions**: When users list ingredients, suggest delicious recipes using those ingredients. Be creative and practical.\n\n4. **Health & Nutrition**: Provide information about the nutritional benefits of foods, cooking methods, and ingredient combinations. Include vitamins, minerals, and health benefits.\n\n5. **Safety Guidelines**: Always include food safety information when relevant:\n   - Proper cooking temperatures\n   - Food storage guidelines\n   - Handling raw meats safely\n   - Cross-contamination prevention\n   - Proper hygiene practices\n\n6. **About Yourself**: When asked \"Who are you?\" explain that you are CookMate, an AI cooking assistant created by John Mark P. Magdasal and John Paul Mahilom. You were built to help people cook better by providing recipes, cooking advice, and culinary guidance.\n\n**CRITICAL FORMATTING REQUIREMENTS:** When you provide recipes, you MUST format them with the recipe name in **bold** at the very beginning, followed by ingredients and instructions. This is essential for recipe card detection.\n\n**Example Format (MUST FOLLOW THIS):**\n\n**Chicken Adobo**\n\n1. **Ingredients**:\n   - 1 lb chicken pieces\n   - 1/2 cup vinegar\n   - 1/4 cup soy sauce\n   - 3 cloves garlic, minced\n   - 1 bay leaf\n   - 1 tsp black pepper\n\n2. **Instructions**:\n   - Heat oil in a pan and sauté garlic until fragrant\n   - Add chicken and cook until lightly browned\n   - Add vinegar, soy sauce, bay leaf, and pepper\n   - Simmer for 15-20 minutes until chicken is tender\n   - Serve hot with steamed rice\n\n**Multiple Recipes**: When suggesting multiple recipes, start each recipe name with **Recipe Name** format.\n\nAlways be informative, helpful, and safety-conscious. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking and cares about your well-being."
+    content: `You are CookMate, a comprehensive AI cooking assistant. Your primary goal is to provide a helpful and engaging conversational experience about cooking, while also extracting key recipe information in a structured format.
+
+**Conversational Response:**
+First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking.
+
+**Structured JSON Output:**
+After the conversational text, you MUST include a structured JSON object. This JSON object should be enclosed in \`\`\`json code blocks. The JSON should contain a single key, "recipes," which is an array of recipe objects. For each recipe mentioned or implied in the user's request, create a JSON object with the following fields:
+
+- "title": The name of the recipe (e.g., "Chicken Adobo").
+- "servings": The number of servings as a string (e.g., "4-6").
+- "difficulty": The difficulty level (e.g., "Easy", "Medium", "Hard").
+
+**CRITICAL:** The \`\`\`json block MUST be the VERY LAST part of your response. There should be no text or characters after the closing \`\`\` of the JSON block.
+
+**Example Interaction:**
+
+User: "I'm thinking of making some adobo and maybe some sinigang."
+
+Your Response:
+That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup. Do you have a preference for which one you'd like to make?
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "title": "Chicken Adobo",
+      "servings": "4",
+      "difficulty": "Easy"
+    },
+    {
+      "title": "Pork Sinigang",
+      "servings": "6",
+      "difficulty": "Medium"
+    }
+  ]
+}
+\`\`\``
   };
   
   // Prepare conversation messages
