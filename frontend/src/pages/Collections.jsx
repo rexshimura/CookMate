@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChefHat, Clock, Users, X, Lock } from 'lucide-react';
+import { ArrowLeft, ChefHat, Clock, Users, X, Lock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import CollectionManager from './Components/Collections/CollectionManager.jsx';
@@ -7,17 +7,21 @@ import RecipeCard from './Components/Recipe/RecipeCard.jsx';
 import { getCollections, getCollectionRecipes, createCollection, updateCollection, getRecipeDetails } from '../utils/api.js';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { useModal } from '../App.jsx';
+import { useLogoutConfirmation } from './Components/UI/useConfirmation.jsx';
+import SimpleLogoutDialog, { LogoutButton, UserMenu } from '../components/SimpleLogoutDialog.jsx';
 
 const Collections = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { showAuthPrompt, showRecipeDetail } = useModal();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { showAuthPrompt, showRecipeDetail, showCollectionFormModal } = useModal();
+  const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [collectionRecipes, setCollectionRecipes] = useState([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [currentCollection, setCurrentCollection] = useState(null);
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Show loading spinner while checking authentication
   if (authLoading) {
@@ -89,20 +93,8 @@ const Collections = () => {
     );
   }
   
-  // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingCollection, setEditingCollection] = useState(null);
   const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   
-  // Form data
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    color: '#FF6B6B',
-    icon: 'folder'
-  });
-
   // Predefined colors and icons for collections
   const colorOptions = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
@@ -113,19 +105,8 @@ const Collections = () => {
     'folder', 'heart', 'star', 'bookmark', 'tag', 'chef-hat', 'clock'
   ];
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      color: '#FF6B6B',
-      icon: 'folder'
-    });
-  };
-
   // Create collection
-  const handleCreateCollection = async (e) => {
-    e.preventDefault();
+  const handleCreateCollection = async (formData) => {
     if (!formData.name.trim()) return;
 
     try {
@@ -142,8 +123,6 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        setShowCreateModal(false);
-        resetForm();
         console.log('✅ Collection created successfully:', result.message);
       } else {
         console.error('❌ Unexpected response format:', result);
@@ -165,12 +144,11 @@ const Collections = () => {
   };
 
   // Update collection
-  const handleUpdateCollection = async (e) => {
-    e.preventDefault();
-    if (!editingCollection || !formData.name.trim()) return;
+  const handleUpdateCollection = async (formData, collection) => {
+    if (!collection || !formData.name.trim()) return;
 
     try {
-      const result = await updateCollection(editingCollection.id, formData);
+      const result = await updateCollection(collection.id, formData);
       
       // Backend returns { message, collection } - check for collection field
       if (result && result.collection) {
@@ -181,9 +159,6 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        setShowEditModal(false);
-        setEditingCollection(null);
-        resetForm();
         console.log('✅ Collection updated successfully:', result.message);
       } else {
         console.error('❌ Unexpected response format:', result);
@@ -195,26 +170,13 @@ const Collections = () => {
 
   // Start editing
   const startEditing = (collection) => {
-    setEditingCollection(collection);
-    setFormData({
-      name: collection.name,
-      description: collection.description || '',
-      color: collection.color,
-      icon: collection.icon
+    showCollectionFormModal({
+      mode: 'edit',
+      collection,
+      onSubmit: (formData) => handleUpdateCollection(formData, collection),
+      colors: colorOptions,
+      icons: iconOptions
     });
-    setShowEditModal(true);
-  };
-
-  // Handle modal close
-  const handleCreateModalClose = () => {
-    setShowCreateModal(false);
-    resetForm();
-  };
-
-  const handleEditModalClose = () => {
-    setShowEditModal(false);
-    setEditingCollection(null);
-    resetForm();
   };
 
   // Handle collection refresh from CollectionManager
@@ -428,7 +390,47 @@ const Collections = () => {
 
   // Handle create collection callback
   const handleCreateCollectionCallback = () => {
-    setShowCreateModal(true);
+    showCollectionFormModal({
+      mode: 'create',
+      onSubmit: handleCreateCollection,
+      colors: colorOptions,
+      icons: iconOptions
+    });
+  };
+
+  // Handle logout with confirmation
+  const handleLogout = async () => {
+    const confirmed = await confirmLogout();
+    
+    if (confirmed) {
+      console.log('🔄 [Collections] User confirmed logout, starting process...');
+      
+      // Set loading state
+      setIsLoggingOut(true);
+      
+      try {
+        const result = await logout();
+        
+        if (result.success) {
+          console.log('✅ [Collections] Logout successful, redirecting...');
+          
+          // Redirect to landing page after successful logout
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+          
+        } else {
+          console.error('❌ [Collections] Logout failed:', result.error);
+          alert(result.error || 'Failed to sign out. Please try again.');
+        }
+        
+      } catch (error) {
+        console.error('❌ [Collections] Unexpected logout error:', error);
+        alert('An unexpected error occurred. Please try again.');
+      } finally {
+        setIsLoggingOut(false);
+      }
+    }
   };
 
   return (
@@ -442,6 +444,19 @@ const Collections = () => {
       {/* Floating decorative elements */}
       <div className="absolute top-20 right-20 w-40 h-40 bg-gradient-to-br from-blue-200 to-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob"></div>
       <div className="absolute bottom-20 left-20 w-40 h-40 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
+      
+      {/* Logout Loading Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+            <p className="text-stone-600">Please wait while we sign you out...</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 relative z-10">
@@ -466,11 +481,22 @@ const Collections = () => {
                 </div>
               </div>
             </div>
-            {/* Authentication status indicator */}
-            <div className="flex items-center gap-2 text-sm text-stone-600">
-              <Lock className="w-4 h-4" />
-              <span>Signed in as {user?.displayName || user?.email}</span>
-            </div>
+            {/* Authentication status indicator and logout - Only show when user is logged in */}
+            {user && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-sm text-stone-600">
+                  <Lock className="w-4 h-4" />
+                  <span>Signed in as {user?.displayName || user?.email}</span>
+                </div>
+                <LogoutButton 
+                  onLogout={handleLogout}
+                  variant="icon-text"
+                  size="md"
+                  className="text-stone-600 hover:text-red-600 hover:bg-red-50"
+                  disabled={isLoggingOut}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -488,7 +514,7 @@ const Collections = () => {
                 key={collectionsRefreshKey}
                 selectedCollectionId={selectedCollectionId}
                 onCollectionSelect={handleCollectionSelect}
-                onCreateCollection={() => setShowCreateModal(true)}
+                onCreateCollection={handleCreateCollectionCallback}
                 onEditCollection={startEditing}
                 onCollectionRefresh={handleCollectionRefresh}
               />
@@ -623,169 +649,9 @@ const Collections = () => {
         </div>
       </div>
 
-      {/* Create Collection Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={handleCreateModalClose} />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full p-6 transition-all duration-500 ease-out my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Create New Collection</h3>
-              <button
-                onClick={handleCreateModalClose}
-                className="p-1 hover:bg-stone-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Logout Confirmation Dialog */}
+      <LogoutDialog />
 
-            <form onSubmit={handleCreateCollection} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Collection Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="e.g., My Fried Recipes"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="Optional description"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {colorOptions.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, color }))}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        formData.color === color ? 'border-stone-400' : 'border-stone-200'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCreateModalClose}
-                  className="flex-1 px-4 py-2.5 border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 transition-all duration-200 font-medium hover:scale-105"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="relative flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200 font-semibold hover:scale-105 overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Collection Modal */}
-      {showEditModal && editingCollection && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={handleEditModalClose} />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full p-6 transition-all duration-500 ease-out my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Edit Collection</h3>
-              <button
-                onClick={handleEditModalClose}
-                className="p-1 hover:bg-stone-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateCollection} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Collection Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {colorOptions.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, color }))}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        formData.color === color ? 'border-stone-400' : 'border-stone-200'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleEditModalClose}
-                  className="flex-1 px-4 py-2.5 border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 transition-all duration-200 font-medium hover:scale-105"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="relative flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200 font-semibold hover:scale-105 overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  Update
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

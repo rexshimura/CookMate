@@ -34,7 +34,7 @@ export default function Home() {
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
-  const { showAuthPrompt, showRecipeDetail, showCollectionsModal } = useModal();
+  const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -63,7 +63,6 @@ export default function Home() {
   const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
   
   // Favorites state
-  const [showFavorites, setShowFavorites] = useState(false);
   const [favoriteRecipes, setFavoriteRecipes] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteCollectionId, setFavoriteCollectionId] = useState(null);
@@ -161,14 +160,7 @@ export default function Home() {
     }
   }, [user]);
 
-  // Load favorites when showing favorites modal
-  useEffect(() => {
-    console.log('🔄 [Home] Favorites modal state changed, showFavorites:', showFavorites);
-    if (showFavorites) {
-      console.log('🔄 [Home] Loading fresh favorites data because modal opened');
-      loadFavoriteRecipes();
-    }
-  }, [showFavorites]);
+
 
   const focusInput = () => {
     // Small delay to ensure the DOM is ready after re-render
@@ -284,10 +276,8 @@ export default function Home() {
           // Clear local state
           setCurrentSessionId(null);
           clearMessages();
-          setCurrentSessionId(null);
           
-          // Clear any modal states
-          setShowFavorites(false);
+          // Modal states are cleared automatically when user logs out
           
           // Show success feedback
           setShowSuccessMessage(true);
@@ -339,12 +329,25 @@ export default function Home() {
       showAuthPrompt('Please sign in to view your favorite recipes.');
       return;
     }
-    setShowFavorites(true);
+    
+    // Load fresh data and show centralized modal
     loadFavoriteRecipes();
-  };
-
-  const handleHideFavorites = () => {
-    setShowFavorites(false);
+    
+    showFavoritesModal({
+      favoriteRecipes,
+      favoritesLoading,
+      collections,
+      favoriteCollectionId,
+      handleFavoriteRecipeClick,
+      handleAddToFavoritesCallback,
+      handleRemoveFromFavoritesCallback,
+      handleAddToCollectionCallback,
+      handleRemoveFromCollectionCallback,
+      handleCreateCollectionCallback,
+      handleFetchRecipeDetails,
+      user,
+      requireAuth
+    });
   };
 
   // Collections handlers
@@ -421,8 +424,7 @@ export default function Home() {
   };
 
   const handleFavoriteRecipeClick = (recipeName) => {
-    // Close favorites modal first, then open recipe details using the modal system
-    setShowFavorites(false);
+    // Open recipe details using the modal system
     handleRecipeClick(recipeName);
   };
 
@@ -555,6 +557,19 @@ export default function Home() {
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
         </div>
+
+        {/* Logout Loading Overlay - Include even in empty state */}
+        {isLoggingOut && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+                <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+              <p className="text-stone-600">Please wait while we sign you out...</p>
+            </div>
+          </div>
+        )}
         
         {/* Enhanced Sidebar */}
         <Sidebar
@@ -597,7 +612,22 @@ export default function Home() {
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="relative text-center max-w-md">
+            <div className="relative text-center max-w-md w-full">
+              {/* Success Message Display - Better positioned above the main content */}
+              {showSuccessMessage && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl animate-slideUp shadow-lg shadow-green-200/30 max-w-sm">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-green-800 font-semibold text-sm">Successfully signed out!</h4>
+                    <p className="text-green-700 text-xs">Redirecting to home page...</p>
+                  </div>
+                </div>
+              )}
+
               <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-200/60 shadow-lg shadow-orange-200/30">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-2000 rounded-2xl"></div>
                 <MessageSquare className="w-10 h-10 text-orange-600 relative z-10" />
@@ -615,6 +645,10 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Confirmation Dialogs - Include logout dialog even in empty state */}
+        <DeleteDialog />
+        <LogoutDialog />
       </div>
     );
   }
@@ -820,77 +854,7 @@ export default function Home() {
         
 
 
-        {/* Favorites Modal/View */}
-        {showFavorites && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div 
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
-              onClick={handleHideFavorites}
-            />
-            <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-4xl w-full max-h-[90vh] overflow-hidden transition-all duration-500 ease-out">
-              {/* Favorites Header */}
-              <div className="bg-gradient-to-r from-pink-600 via-red-600 to-pink-700 text-white p-6 relative overflow-hidden">
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none"></div>
-                <div className="flex items-center justify-between relative z-10">
-                  <div className="flex items-center gap-3">
-                    <Heart className="w-8 h-8 fill-white" />
-                    <h2 className="text-2xl font-bold tracking-wide">My Favorite Recipes</h2>
-                  </div>
-                  <button
-                    onClick={handleHideFavorites}
-                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200 hover:scale-110"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
 
-              {/* Favorites Content */}
-              <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
-                {favoritesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="ml-3 text-stone-600 font-medium">Loading favorites...</span>
-                  </div>
-                ) : favoriteRecipes.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-pink-200/60">
-                      <Heart className="w-10 h-10 text-stone-300" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-stone-700 mb-2 tracking-wide">No favorites yet</h3>
-                    <p className="text-stone-500 leading-relaxed">Start saving recipes you love by clicking the heart icon!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-stone-700 mb-4 tracking-wide">
-                      You have {favoriteRecipes.length} favorite recipe{favoriteRecipes.length !== 1 ? 's' : ''}
-                    </h3>
-                    {favoriteRecipes.map((recipe, index) => (
-                      <RecipeCard
-                        key={`favorites_recipe_${index}_${recipe.id || recipe.title || recipe.name}`}
-                        recipe={recipe}
-                        onClick={(recipeName) => handleFavoriteRecipeClick(recipeName)}
-                        isLoading={false}
-                        isFavorited={true}
-                        collections={collections}
-                        onAddToFavorites={handleAddToFavoritesCallback}
-                        onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
-                        onAddToCollection={handleAddToCollectionCallback}
-                        onRemoveFromCollection={handleRemoveFromCollectionCallback}
-                        onCreateCollection={handleCreateCollectionCallback}
-                        collectionId={favoriteCollectionId}
-                        fetchRecipeDetails={handleFetchRecipeDetails}
-                        user={user}
-                        requireAuth={requireAuth}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       {/* Confirmation Dialogs */}
       <DeleteDialog />
