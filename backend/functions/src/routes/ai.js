@@ -54,9 +54,17 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
 }
 
 // Helper function to store detected recipe data
-async function storeDetectedRecipe(recipe, userId = 'anonymous') {
+async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
   try {
-    const recipeId = generateConsistentRecipeId(recipe.title);
+    // FIX: Handle both Object and String inputs safely
+    const recipeTitle = typeof recipeInput === 'string' ? recipeInput : recipeInput?.title;
+    
+    if (!recipeTitle) {
+      console.warn('⚠️ Cannot store recipe: Missing title');
+      return null;
+    }
+
+    const recipeId = generateConsistentRecipeId(recipeTitle);
     
     try {
       // Check if recipe already exists
@@ -70,13 +78,13 @@ async function storeDetectedRecipe(recipe, userId = 'anonymous') {
       // Generate basic recipe data for detected recipes
       const recipeData = {
         id: recipeId,
-        title: recipe.title,
-        description: `A delicious ${recipe.title} recipe to try`,
+        title: recipeTitle,
+        description: `A delicious ${recipeTitle} recipe to try`,
         ingredients: ["Click on the recipe card to get detailed ingredients"],
         instructions: ["Click on the recipe card to get detailed instructions"],
         cookingTime: "Varies",
-        servings: recipe.servings || "4",
-        difficulty: recipe.difficulty || "Medium",
+        servings: recipeInput?.servings || "4",
+        difficulty: recipeInput?.difficulty || "Medium",
         estimatedCost: "Moderate",
         nutritionInfo: {
           calories: "Varies",
@@ -85,7 +93,7 @@ async function storeDetectedRecipe(recipe, userId = 'anonymous') {
           fat: "Varies"
         },
         tips: ["Click on the recipe to get detailed cooking tips"],
-        youtubeSearchQuery: `${recipe.title} recipe tutorial`,
+        youtubeSearchQuery: `${recipeTitle} recipe tutorial`,
         userId: userId,
         createdAt: new Date().toISOString(),
         isDetected: true
@@ -167,6 +175,16 @@ const verifyAuthToken = async (req, res, next) => {
     }
     
     const token = authHeader.split('Bearer ')[1];
+    
+    // ONLY use mock auth if the client explicitly sends 'mock-token'
+    if (token === 'mock-token') {
+      console.log('✅ Using mock authentication (explicit mock token)');
+      req.userId = 'mock-user-id';
+      req.user = { uid: 'mock-user-id', email: 'mock@cookmate.app' };
+      return next();
+    }
+    
+    // For real Firebase authentication
     const { admin } = require('../config/firebase');
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;
@@ -809,7 +827,13 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
     let aiReply;
     try {
-      aiReply = await callGroqAI(message, history);
+      const fullResponse = await callGroqAI(message, history);
+      
+      // FIX: Remove the JSON block so the user only sees the friendly text
+      aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
+      
+      // Fallback if the message becomes empty
+      if (!aiReply) aiReply = "I found some recipes for you! Check the cards below.";
     } catch (aiError) {
       console.error('AI service failed, using fallback response:', aiError.message);
       
