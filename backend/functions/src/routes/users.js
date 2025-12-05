@@ -13,13 +13,6 @@ const verifyAuthToken = async (req, res, next) => {
     
     const token = authHeader.split('Bearer ')[1];
     
-    // ONLY use mock auth if the client explicitly sends 'mock-token'
-    if (token === 'mock-token') {
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-      return next();
-    }
-    
     // For real Firebase authentication
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;

@@ -176,14 +176,6 @@ const verifyAuthToken = async (req, res, next) => {
     
     const token = authHeader.split('Bearer ')[1];
     
-    // ONLY use mock auth if the client explicitly sends 'mock-token'
-    if (token === 'mock-token') {
-      console.log('✅ Using mock authentication (explicit mock token)');
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'mock@cookmate.app' };
-      return next();
-    }
-    
     // For real Firebase authentication
     const { admin } = require('../config/firebase');
     const decodedToken = await admin.auth().verifyIdToken(token);
@@ -829,16 +821,49 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     try {
       const fullResponse = await callGroqAI(message, history);
       
-      // FIX: Remove the JSON block so the user only sees the friendly text
+      let detectedRecipes = [];
+
+      // 1. First, try to parse the JSON block to get accurate recipes
+      const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          if (parsed.recipes && Array.isArray(parsed.recipes)) {
+            // Extract just the titles for the card detection system
+            detectedRecipes = parsed.recipes.map(r => r.title || r.name);
+          }
+        } catch (e) {
+          console.error('Failed to parse recipe JSON:', e);
+        }
+      }
+
+      // 2. Fallback to text detection if JSON was missing or empty
+      if (detectedRecipes.length === 0) {
+        detectedRecipes = extractRecipesFromResponse(fullResponse);
+      }
+
+      // 3. NOW it is safe to remove the JSON so the user sees clean text
       aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
-      
-      // Fallback if the message becomes empty
-      if (!aiReply) aiReply = "I found some recipes for you! Check the cards below.";
+      if (!aiReply) aiReply = "I found some recipes! Check the cards below.";
+
+      // 4. Store the detected recipes
+      if (detectedRecipes.length > 0) {
+        try {
+          await Promise.all(detectedRecipes.map(recipeName => 
+            storeDetectedRecipe(recipeName, req.userId)
+          ));
+        } catch (storeError) {
+          console.warn('Failed to store some detected recipes:', storeError);
+          // Continue without storing - don't block the response
+        }
+      }
+
     } catch (aiError) {
       console.error('AI service failed, using fallback response:', aiError.message);
       
       // Create a helpful fallback response based on the message content
       const ingredientList = extractIngredients(message);
+      let detectedRecipes = [];
       
       if (ingredientList.length > 0) {
         aiReply = `I'm having trouble connecting to my AI brain right now, but I can still help you cook! 🌟

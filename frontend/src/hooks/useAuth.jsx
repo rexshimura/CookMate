@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
+  onIdTokenChanged,
   updateProfile
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
@@ -30,10 +31,19 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Set up authentication state listener
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
           setUser(firebaseUser);
+          
+          // Get fresh token immediately upon login
+          try {
+            const token = await firebaseUser.getIdToken();
+            console.log('✅ [Auth] Fresh token obtained for user:', firebaseUser.uid);
+          } catch (tokenError) {
+            console.warn('⚠️ [Auth] Initial token retrieval failed:', tokenError);
+          }
           
           // Fetch user profile from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -58,16 +68,38 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(null);
           setUserProfile(null);
+          console.log('🔄 [Auth] User signed out, clearing auth state');
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('Error in auth state change:', error);
         setError(error.message);
       } finally {
         setLoading(false);
       }
     });
 
-    return unsubscribe;
+    // Set up token refresh listener for seamless session management
+    const unsubscribeToken = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // This fires when tokens are refreshed automatically by Firebase
+          const token = await firebaseUser.getIdToken();
+          console.log('🔄 [Auth] Token automatically refreshed');
+          
+          // Store the refreshed token for API calls
+          localStorage.setItem('firebaseAuthToken', token);
+          
+        } catch (tokenError) {
+          console.error('❌ [Auth] Automatic token refresh failed:', tokenError);
+        }
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      unsubscribeAuth();
+      unsubscribeToken();
+    };
   }, []);
 
   // Sign up function

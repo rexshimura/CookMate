@@ -1,5 +1,6 @@
 // API utility functions for backend communication
 import { auth } from '../firebase';
+import { getValidAuthToken, refreshAuthToken } from './tokenManager';
 
 // Smart API base URL detection with input validation
 const getApiBaseUrl = () => {
@@ -49,24 +50,16 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Generic API call function with retry logic
+// Get valid token using the centralized token manager
+async function getValidToken() {
+  return await getValidAuthToken();
+}
+
+// Generic API call function with enhanced token management and retry logic
 async function apiCall(endpoint, options = {}, retryCount = 0) {
   try {
-    // Get Firebase auth token
-    const user = auth.currentUser;
-    let token = null;
-    
-    if (user) {
-      token = await user.getIdToken();
-    } else {
-      // Fallback to stored tokens for backward compatibility
-      token = localStorage.getItem('authToken') || localStorage.getItem('firebaseAuthToken');
-    }
-
-    // In development mode, use mock token if no real token available
-    if (!token && import.meta.env.DEV) {
-      token = 'mock-token';
-    }
+    // Get a valid token (with automatic refresh if needed)
+    const token = await getValidToken();
 
     const headers = {
       'Content-Type': 'application/json',
@@ -80,6 +73,22 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
     });
     
     if (!response.ok) {
+      // Handle authentication errors with token refresh retry
+      if (response.status === 401 && retryCount < 1) {
+        console.log('🔄 [API] 401 Unauthorized - attempting token refresh and retry');
+        
+        // Force refresh the token using the token manager
+        try {
+          await refreshAuthToken();
+          console.log('✅ [API] Token refreshed, retrying request');
+        } catch (refreshError) {
+          console.error('❌ [API] Token refresh failed during retry:', refreshError);
+        }
+        
+        // Retry the request with a fresh token
+        return apiCall(endpoint, options, retryCount + 1);
+      }
+      
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
     }

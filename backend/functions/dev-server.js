@@ -85,18 +85,7 @@ app.use('/api/users', userRouter);
 // Use collections routes - routes have built-in verifyAuthToken
 app.use('/api/collections', collectionsRouter);
 
-// Mock user endpoints (no auth required for this specific endpoint)
-app.get('/api/users/profile', (req, res) => {
-  res.status(200).json({
-    user: {
-      uid: 'mock-user-id',
-      email: 'test@example.com',
-      displayName: 'Test User',
-      plan: 'free',
-      favorites: []
-    }
-  });
-});
+// All routes now require proper authentication - no mock data endpoints
 
 app.listen(PORT, () => {
   console.log(`🚀 CookMate Backend API running on http://localhost:${PORT}`);
