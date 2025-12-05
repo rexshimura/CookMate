@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
 import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.js';
@@ -30,27 +30,98 @@ const parseMarkdownText = (text) => {
   });
 };
 
+// NEW: Improved client-side recipe detection
+const detectRecipesFromText = (text) => {
+  if (!text || typeof text !== 'string') return [];
+
+  // 1) Extract bolded phrases (common pattern used by AI responses)
+  const boldRegex = /\*\*([^*]{2,120}?)\*\*/g;
+  const candidates = [];
+  let match;
+  while ((match = boldRegex.exec(text)) !== null) {
+    const raw = match[1].trim();
+    if (raw) candidates.push(raw);
+  }
+
+  // 2) fallback: sometimes responses use lines/headers like "1. Italian" or "- Italian"
+  if (candidates.length === 0) {
+    const lineRegex = /^(?:[-\d.]+\s*)?([A-Z][A-Za-z &/+-]{2,80})$/gm;
+    while ((match = lineRegex.exec(text)) !== null) {
+      const raw = match[1].trim();
+      if (raw) candidates.push(raw);
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  // 3) validation heuristics: presence of food/cuisine keywords or typical dish words
+  const foodKeywords = [
+    'chicken','beef','pork','pasta','pizza','taco','rice','curry','dessert','cake','pie','salad',
+    'soup','bolognese','spaghetti','pancake','grill','bbq','vegan','vegetarian','seafood','fish',
+    'shrimp','noodle','ramen','sushi','biryani','burger','sandwich','omelette','stew','chili',
+    'risotto','paella','lasagna','italian','mexican','indian','thai','japanese','chinese','korean',
+    'mediterranean','bbq','grilling','desserts','dessert','breakfast','dinner','brunch'
+  ];
+
+  const isLikelyRecipe = (candidate) => {
+    if (!candidate) return false;
+    const c = candidate.toLowerCase();
+
+    // Reject overly long headings
+    if (candidate.length > 80) return false;
+
+    // Accept if contains any strong food/cuisine keyword
+    for (const kw of foodKeywords) {
+      if (c.includes(kw)) return true;
+    }
+
+    // Accept if it's reasonably short and looks like a dish/cuisine (2-4 words, not generic UI text)
+    const words = c.split(/\s+/).filter(Boolean);
+    if (words.length <= 4 && words.length >= 1 && /[a-z]/.test(c)) {
+      // heuristics to avoid generic labels
+      const genericReject = ['choose','options','ingredients','step','instructions','please','choose a','here are'];
+      if (!genericReject.some(g => c.includes(g))) return true;
+    }
+
+    return false;
+  };
+
+  // 4) filter & dedupe while preserving order
+  const seen = new Set();
+  const results = [];
+  for (const raw of candidates) {
+    const normalized = raw.replace(/\s+/g, ' ').trim();
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    if (isLikelyRecipe(normalized)) {
+      seen.add(key);
+      results.push(normalized);
+    }
+  }
+
+  return results;
+};
+
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
   const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
   
+  // --- Hooks & state (must run every render) ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Current session state - persist to localStorage
   const [currentSessionId, setCurrentSessionId] = useState(() => {
-    // Try to restore session from localStorage on initialization
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('currentSessionId');
       return saved || null;
     }
     return null;
   });
-  
+
   // Call ALL hooks at the top level - this fixes the React hook error
   const { 
     messages, 
@@ -86,7 +157,6 @@ export default function Home() {
   
   // Logout state management
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   
   // Session migration notification
   const [showSessionMigrationNotice, setShowSessionMigrationNotice] = useState(false);
@@ -108,7 +178,7 @@ export default function Home() {
 
   // Validate current session exists when sessions load (runs once on mount)
   useEffect(() => {
-    if (currentSessionId && sessions.length > 0 && !sessionsLoading) {
+    if (currentSessionId && sessions.length > 0) {
       const sessionExists = sessions.some(s => s.id === currentSessionId);
       if (!sessionExists) {
         setCurrentSessionId(null);
@@ -169,7 +239,7 @@ export default function Home() {
   // CRITICAL: This useEffect MUST be called before any conditional returns
   // Initialize with existing session if available and validate it exists
   useEffect(() => {
-    if (sessions.length > 0 && !sessionsLoading) {
+    if (sessions.length > 0) {
       // Check if current session still exists in the sessions list
       const currentSessionExists = sessions.some(s => s.id === currentSessionId);
       
@@ -184,7 +254,7 @@ export default function Home() {
       setCurrentSessionId(null);
       localStorage.removeItem('currentSessionId');
     }
-  }, [sessions, sessionsLoading]);
+  }, [sessions]);
 
   // Additional effect to ensure current session persists during any updates
   useEffect(() => {
@@ -316,8 +386,6 @@ export default function Home() {
   };
 
   const handleCreateNewChat = async () => {
-    if (sessionsLoading) return;
-    
     try {
       const newSession = await createNewSession('New Cooking Session');
       if (newSession) {
@@ -329,6 +397,10 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to create new chat:', error);
     }
+  };
+
+  const handleSignIn = () => {
+    navigate('/signin');
   };
 
   const handleSelectSession = (session) => {
@@ -383,7 +455,6 @@ export default function Home() {
       setIsLoggingOut(true);
       setError(null);
       setShowError(false);
-      setShowSuccessMessage(false);
       
       try {
         const result = await logout();
@@ -395,9 +466,6 @@ export default function Home() {
           clearMessages();
           
           // Modal states are cleared automatically when user logs out
-          
-          // Show success feedback
-          setShowSuccessMessage(true);
           
         } else {
           setError(result.error || 'Failed to sign out. Please try again.');
@@ -620,31 +688,31 @@ export default function Home() {
     return lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
   };
 
-  // Allow anonymous users to use chat functionality
-  // Authentication is only required for favorites and collections
-
-  // Show loading while setting up session
-  if (sessionsLoading && sessions.length === 0 && !currentSessionId) {
+  // Moved auth-loading UI here (after all hooks are defined) to avoid changing hooks order
+  if (authLoading) {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 items-center justify-center relative overflow-hidden">
+      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
         </div>
         
-        <div className="relative text-center">
-          <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-orange-200/60 shadow-lg shadow-orange-200/30">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-1000 rounded-2xl"></div>
-            <ChefHat className="w-10 h-10 text-orange-600 relative z-10 animate-pulse" />
+        {/* Loading spinner overlay */}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Loading...</h3>
+            <p className="text-stone-600">Checking your authentication status</p>
           </div>
-          <p className="text-stone-600 font-medium tracking-wide">Loading your cooking sessions...</p>
         </div>
       </div>
     );
   }
-
+  
   // If no current session and not creating one, show empty state
-  if (!currentSessionId && !sessionsLoading) {
+  if (!currentSessionId) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
         {/* Background pattern */}
@@ -681,7 +749,6 @@ export default function Home() {
           onShowFavorites={handleShowFavorites}
           onShowCollections={handleShowCollections}
           onLogout={handleLogout}
-          sessionsLoading={sessionsLoading}
           isLoggingOut={isLoggingOut}
           collapsed={sidebarCollapsed}
         />
@@ -701,27 +768,21 @@ export default function Home() {
               >
                 <Heart className="w-5 h-5" />
               </button>
-              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
+              {!user && (
+                <button 
+                  onClick={handleSignIn}
+                  className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-all duration-200 hover:scale-105"
+                  title="Sign In"
+                >
+                  <LogIn className="w-5 h-5" />
+                </button>
+              )}
+              <button onClick={handleCreateNewChat} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="relative text-center max-w-md w-full">
-              {/* Success Message Display - Better positioned above the main content */}
-              {showSuccessMessage && (
-                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl animate-slideUp shadow-lg shadow-green-200/30 max-w-sm">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-green-800 font-semibold text-sm">Successfully signed out!</h4>
-                    <p className="text-green-700 text-xs">You can continue browsing or sign in again.</p>
-                  </div>
-                </div>
-              )}
-
               {/* Session Migration Notice */}
               {showSessionMigrationNotice && (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-slideUp shadow-lg shadow-blue-200/30 max-w-sm">
@@ -747,16 +808,34 @@ export default function Home() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-2000 rounded-2xl"></div>
                 <MessageSquare className="w-10 h-10 text-orange-600 relative z-10" />
               </div>
-              <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">Start a New Cooking Conversation</h2>
-              <p className="text-stone-600 mb-6 leading-relaxed">Create your first chat session and let CookMate help you with your culinary adventures!</p>
-              <button 
-                onClick={handleCreateNewChat} 
-                disabled={sessionsLoading} 
-                className="relative px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                {sessionsLoading ? 'Creating Chat...' : 'Start New Chat'}
-              </button>
+              <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">{user ? 'Welcome back!' : 'Start a New Cooking Conversation'}</h2>
+              <p className="text-stone-600 mb-6 leading-relaxed">
+                {user 
+                  ? 'Create your first chat session and continue your culinary journey with CookMate!' 
+                  : 'Create your first chat session and let CookMate help you with your culinary adventures!'
+                }
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button 
+                  onClick={handleCreateNewChat} 
+                  className="relative px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  Start New Chat
+                </button>
+                {!user && (
+                  <button 
+                    onClick={handleSignIn}
+                    className="relative px-6 py-3 bg-white text-stone-700 border border-stone-300 rounded-2xl font-semibold hover:bg-stone-50 transition-all duration-300 hover:scale-105 overflow-hidden group shadow-lg hover:shadow-stone-200/50"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-stone-100/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      <LogIn className="w-5 h-5" />
+                      Sign In
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -818,11 +897,29 @@ export default function Home() {
             <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors duration-200"><Menu className="w-6 h-6" /></button>
             <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
           </div>
-          <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
+          <button onClick={handleCreateNewChat} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
         </div>
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
+            {/* Show sign-in prompt for non-authenticated users when there are no messages */}
+            {!user && messages.length === 0 && (
+              <div className="text-center py-8 bg-gradient-to-b from-blue-50/50 to-stone-50/50 rounded-2xl border border-blue-200/60">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <LogIn className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-stone-800 mb-2">Sign in to unlock more features!</h3>
+                <p className="text-stone-600 mb-4">Save your favorite recipes, create collections, and sync your cooking sessions across devices.</p>
+                <button 
+                  onClick={handleSignIn}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 mx-auto"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </button>
+              </div>
+            )}
+
             {/* Error Message Display */}
             {showError && error && (
               <ErrorMessage
@@ -836,32 +933,18 @@ export default function Home() {
               />
             )}
 
-            {/* Success Message Display */}
-            {showSuccessMessage && (
-              <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-2xl animate-slideUp">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-green-800 font-semibold">Successfully signed out!</h4>
-                  <p className="text-green-700 text-sm">You can continue browsing or sign in again.</p>
-                </div>
-              </div>
-            )}
-
-            {messagesLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <ChefHat className="w-8 h-8 text-orange-600 animate-pulse" />
-              </div>
-            ) : messages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="text-center py-8">
                 <MessageSquare className="w-12 h-12 text-orange-600 mx-auto mb-4" />
                 <p className="text-stone-600">Start your cooking conversation!</p>
               </div>
             ) : (
               messages.map((message) => {
+                // Use server-provided detectedRecipes if available; otherwise run client detection
+                const detected = (!message.isUser && Array.isArray(message.detectedRecipes) && message.detectedRecipes.length > 0)
+                  ? message.detectedRecipes
+                  : (!message.isUser ? detectRecipesFromText(message.text) : []);
+
                 return (
                 <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${message.isUser ? 'bg-stone-800 text-white' : 'bg-white border border-stone-200 text-orange-600'}`}>
@@ -873,11 +956,10 @@ export default function Home() {
                     </div>
                     
                     {/* Render Recipe Cards if detectedRecipes exist */}
-                    {!message.isUser && message.detectedRecipes && message.detectedRecipes.length > 0 && (
+                    {!message.isUser && detected && detected.length > 0 && (
                       <div className="mt-4 space-y-3 w-full">
                         <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
-                        {/* Console log removed to clean up spam */}
-                        {message.detectedRecipes.map((recipe, index) => (
+                        {detected.map((recipe, index) => (
                           <RecipeCard
                             key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : recipe.title}`}
                             recipe={recipe}

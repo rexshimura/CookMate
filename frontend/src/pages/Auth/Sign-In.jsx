@@ -10,7 +10,7 @@ export default function SigninPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { signIn } = useAuth();
+  const { signIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -23,8 +23,8 @@ export default function SigninPage() {
       const result = await signIn(email, password);
       
       if (result.success) {
-        // If successful, redirect to Home
-        navigate("/home");
+        // Don't navigate here - let the auth state change trigger navigation
+        // The ProtectedRoute will handle redirecting authenticated users away from signin
       } else {
         setError(result.error || "Sign in failed. Please try again.");
       }

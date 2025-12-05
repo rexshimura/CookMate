@@ -21,6 +21,8 @@ export default defineConfig({
         // We do NOT rewrite the path because your Express app expects routes to start with /api
       },
     },
+    // SPA fallback configuration for client-side routing
+    historyApiFallback: true,
   },
   build: {
     outDir: 'dist',

@@ -10,6 +10,66 @@ import { useModal } from '../App.jsx';
 import { useLogoutConfirmation } from './Components/UI/useConfirmation.jsx';
 import SimpleLogoutDialog, { LogoutButton, UserMenu } from '../components/SimpleLogoutDialog.jsx';
 
+// NEW: Helper to decide if a string is likely a recipe name (not a category/header)
+const categoryKeywords = [
+  'cuisine','food','vegan','vegetarian','dessert','desserts','breakfast',
+  'lunch','dinner','snack','comfort','seafood','global','bbq','grilling',
+  'baking','healthy','quick','easy','popular','classic','options','recipes',
+  'categories','meals','sides'
+];
+
+const dishKeywords = [
+  'chicken','beef','pork','salmon','fish','shrimp','pasta','spaghetti',
+  'risotto','curry','biryani','taco','burger','cake','pie','stew','sushi',
+  'ramen','lasagna','omelette','pancake','salad','paella','noodle','sandwich',
+  'parmesan','parmesan','meatloaf','parmesan','parmesan'
+];
+
+const normalizeText = (t = '') => ('' + t).replace(/[*_`~]/g, '').trim();
+
+const extractName = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return normalizeText(item);
+  if (item.title) return normalizeText(item.title);
+  if (item.name) return normalizeText(item.name);
+  return '';
+};
+
+const isRecipeName = (text) => {
+  if (!text) return false;
+  const cleaned = extractName(text);
+  if (!cleaned) return false;
+  if (cleaned.length < 2 || cleaned.length > 120) return false;
+
+  const lower = cleaned.toLowerCase();
+
+  // Immediate reject if it contains obvious category words as whole words
+  for (const kw of categoryKeywords) {
+    if (new RegExp(`\\b${kw}\\b`).test(lower)) return false;
+  }
+
+  // Accept if contains a strong dish keyword
+  for (const kw of dishKeywords) {
+    if (lower.includes(kw)) return true;
+  }
+
+  // Heuristic: title-case multi-word strings are likely dish names (e.g., "Spaghetti Bolognese")
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 5) {
+    const titleCaseCount = words.filter(w => /^[A-Z][a-z]/.test(w)).length;
+    if (titleCaseCount >= Math.max(1, Math.ceil(words.length / 2))) return true;
+  }
+
+  // If it's a single word but not a generic label and looks like a food (letters only, not short like 'the', 'and')
+  if (words.length === 1 && /^[A-Za-z'-]{3,30}$/.test(words[0])) {
+    // accept short single-word dish names like "Risotto", "Tiramisu"
+    return true;
+  }
+
+  // Otherwise, treat as category / ambiguous -> reject
+  return false;
+};
+
 const Collections = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
@@ -22,11 +82,156 @@ const Collections = () => {
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
 
-  // Show loading spinner while checking authentication
-  if (authLoading) {
-    return <LoadingSpinner />;
-  }
+  // --- MOVED UP: ensure these functions are initialized before any useEffect uses them ---
+  const loadAllCollectionRecipes = async () => {
+    setLoadingRecipes(true);
+    try {
+      const collectionsResult = await getCollections();
+      if (!collectionsResult || !collectionsResult.collections) {
+        console.error('Failed to load collections for All Recipes view');
+        setCollectionRecipes([]);
+        setCurrentCollection({
+          id: null,
+          name: 'All Recipes',
+          description: 'All recipes from your collections',
+          color: '#FF6B6B',
+          icon: 'folder'
+        });
+        return;
+      }
+
+      const allRecipes = [];
+      const collectionsList = collectionsResult.collections;
+
+      for (const collection of collectionsList) {
+        try {
+          const collectionResult = await getCollectionRecipes(collection.id);
+          if (collectionResult && collectionResult.recipes) {
+            // FILTER: only include items that look like actual recipe names
+            const recipesWithCollection = collectionResult.recipes
+              .map(recipe => ({
+                ...recipe,
+                collectionName: collection.name,
+                collectionColor: collection.color
+              }))
+              .filter(r => {
+                const candidate = extractName(r);
+                if (!isRecipeName(candidate)) {
+                  // skip category-like item
+                  return false;
+                }
+                return true;
+              });
+            allRecipes.push(...recipesWithCollection);
+          }
+        } catch (error) {
+          console.error(`Failed to load recipes from collection ${collection.name}:`, error);
+        }
+      }
+
+      setCollectionRecipes(allRecipes);
+      setCurrentCollection({
+        id: null,
+        name: 'All Recipes',
+        description: `${allRecipes.length} recipes from ${collectionsList.length} collection${collectionsList.length !== 1 ? 's' : ''}`,
+        color: '#FF6B6B',
+        icon: 'folder'
+      });
+
+    } catch (error) {
+      console.error('Failed to load all collection recipes:', error);
+      setCollectionRecipes([]);
+      setCurrentCollection({
+        id: null,
+        name: 'All Recipes',
+        description: 'Failed to load recipes',
+        color: '#FF6B6B',
+        icon: 'folder'
+      });
+    } finally {
+      setLoadingRecipes(false);
+    }
+  };
+
+  const loadCollectionRecipes = async (collectionId) => {
+    if (!collectionId) {
+      await loadAllCollectionRecipes();
+      return;
+    }
+
+    setLoadingRecipes(true);
+    try {
+      const result = await getCollectionRecipes(collectionId);
+      if (result && result.recipes !== undefined && result.collection !== undefined) {
+        // FILTER: remove category-like items from API response before setting state
+        const filtered = (result.recipes || []).filter(r => isRecipeName(extractName(r)));
+        setCollectionRecipes(filtered);
+        setCurrentCollection(result.collection);
+      } else {
+        console.error('Unexpected response format:', result);
+        setCollectionRecipes([]);
+        setCurrentCollection(null);
+      }
+    } catch (error) {
+      console.error('Failed to load collection recipes:', error);
+      setCollectionRecipes([]);
+      setCurrentCollection(null);
+    } finally {
+      setLoadingRecipes(false);
+    }
+  };
+
+  const loadCollections = async () => {
+    console.log('📚 [Collections] Loading collections...');
+    setCollectionsLoading(true);
+    try {
+      const result = await getCollections();
+      console.log('📚 [Collections] Collections API result:', result);
+
+      let collectionsList = [];
+      if (result && result.collections) {
+        collectionsList = result.collections;
+      } else if (Array.isArray(result)) {
+        collectionsList = result;
+      } else {
+        console.warn('⚠️ [Collections] Unexpected collections response format:', result);
+      }
+
+      console.log('📚 [Collections] Loaded collections:', collectionsList);
+      setCollections(collectionsList);
+
+    } catch (error) {
+      console.error('❌ [Collections] Exception loading collections:', error);
+      console.error('❌ [Collections] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    } finally {
+      setCollectionsLoading(false);
+    }
+  };
+  // --- END MOVED SECTION ---
+
+  // Move useEffect hooks here to ensure they're always called
+  useEffect(() => {
+    // Load recipes for the initially selected collection (if any)
+    if (selectedCollectionId) {
+      loadCollectionRecipes(selectedCollectionId);
+    } else {
+      // Load "All Recipes" view when no specific collection is selected
+      loadCollectionRecipes(null);
+    }
+  }, [selectedCollectionId]);
+
+  useEffect(() => {
+    // Load collections when user is authenticated
+    if (user) {
+      loadCollections();
+    }
+  }, [user]);
 
   // Show auth prompt if not authenticated instead of redirecting
   if (!user) {
@@ -92,8 +297,6 @@ const Collections = () => {
       </div>
     );
   }
-  
-  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
   
   // Predefined colors and icons for collections
   const colorOptions = [
@@ -177,121 +380,13 @@ const Collections = () => {
     }
   };
 
-  // Load all recipes from all collections (for "All Recipes" view)
-  const loadAllCollectionRecipes = async () => {
-    setLoadingRecipes(true);
-    try {
-      // First get all collections
-      const collectionsResult = await getCollections();
-      if (!collectionsResult || !collectionsResult.collections) {
-        console.error('Failed to load collections for All Recipes view');
-        setCollectionRecipes([]);
-        setCurrentCollection({
-          id: null,
-          name: 'All Recipes',
-          description: 'All recipes from your collections',
-          color: '#FF6B6B',
-          icon: 'folder'
-        });
-        return;
-      }
 
-      const allRecipes = [];
-      const collections = collectionsResult.collections;
-
-      // Load recipes from each collection
-      for (const collection of collections) {
-        try {
-          const collectionResult = await getCollectionRecipes(collection.id);
-          if (collectionResult && collectionResult.recipes) {
-            // Add collection name to each recipe for reference
-            const recipesWithCollection = collectionResult.recipes.map(recipe => ({
-              ...recipe,
-              collectionName: collection.name,
-              collectionColor: collection.color
-            }));
-            allRecipes.push(...recipesWithCollection);
-          }
-        } catch (error) {
-          console.error(`Failed to load recipes from collection ${collection.name}:`, error);
-        }
-      }
-
-      setCollectionRecipes(allRecipes);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: `${allRecipes.length} recipes from ${collections.length} collection${collections.length !== 1 ? 's' : ''}`,
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-
-    } catch (error) {
-      console.error('Failed to load all collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: 'Failed to load recipes',
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
-
-  // Load recipes for selected collection
-  const loadCollectionRecipes = async (collectionId) => {
-    if (!collectionId) {
-      // Load all recipes from all collections when "All Recipes" is selected
-      await loadAllCollectionRecipes();
-      return;
-    }
-
-    setLoadingRecipes(true);
-    try {
-      const result = await getCollectionRecipes(collectionId);
-      // Backend returns { collection: {...}, recipes: [...] } directly
-      if (result && result.recipes !== undefined && result.collection !== undefined) {
-        setCollectionRecipes(result.recipes || []);
-        setCurrentCollection(result.collection);
-      } else {
-        console.error('Unexpected response format:', result);
-        setCollectionRecipes([]);
-        setCurrentCollection(null);
-      }
-    } catch (error) {
-      console.error('Failed to load collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection(null);
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
 
   // Handle collection selection
   const handleCollectionSelect = (collectionId) => {
     setSelectedCollectionId(collectionId);
     loadCollectionRecipes(collectionId);
   };
-
-  useEffect(() => {
-    // Load recipes for the initially selected collection (if any)
-    if (selectedCollectionId) {
-      loadCollectionRecipes(selectedCollectionId);
-    } else {
-      // Load "All Recipes" view when no specific collection is selected
-      loadCollectionRecipes(null);
-    }
-  }, [selectedCollectionId]);
-
-  useEffect(() => {
-    // Load collections when user is authenticated
-    if (user) {
-      loadCollections();
-    }
-  }, [user]);
 
   const handleRecipeClick = (recipeName) => {
     showRecipeDetail({
@@ -311,37 +406,7 @@ const Collections = () => {
     }
   };
 
-  const loadCollections = async () => {
-    console.log('📚 [Collections] Loading collections...');
-    setCollectionsLoading(true);
-    try {
-      const result = await getCollections();
-      console.log('📚 [Collections] Collections API result:', result);
-      
-      // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
-      let collections = [];
-      if (result && result.collections) {
-        collections = result.collections;
-      } else if (Array.isArray(result)) {
-        collections = result;
-      } else {
-        console.warn('⚠️ [Collections] Unexpected collections response format:', result);
-      }
-      
-      console.log('📚 [Collections] Loaded collections:', collections);
-      setCollections(collections);
-      
-    } catch (error) {
-      console.error('❌ [Collections] Exception loading collections:', error);
-      console.error('❌ [Collections] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
+
 
   // Login prompt handlers
   const requireAuth = (featureName) => {

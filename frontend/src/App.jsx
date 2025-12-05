@@ -318,12 +318,12 @@ function App() {
             <div className="App">
               <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/home" element={<Home />} />
-                <Route path="/collections" element={
-                  <ProtectedRoute requireAuth={true}>
-                    <Collections />
+                <Route path="/home" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <Home />
                   </ProtectedRoute>
                 } />
+                <Route path="/collections" element={<Collections />} />
 
                 <Route path="/signin" element={
                   <ProtectedRoute requireAuth={false}>
