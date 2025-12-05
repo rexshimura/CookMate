@@ -96,7 +96,7 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
     ...(Array.isArray(history) && history.length > 0 ? { history } : {}),
   };
   
-  return apiCall('/api/ai/chat', {
+  return apiCall('/ai/chat', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -104,7 +104,7 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
 
 // Generate Recipe API
 export const generateRecipe = async (ingredients, dietaryPreferences = '', recipeType = '') => {
-  return apiCall('/api/ai/generate-recipe', {
+  return apiCall('/ai/generate-recipe', {
     method: 'POST',
     body: JSON.stringify({
       ingredients: Array.isArray(ingredients) ? ingredients : [ingredients],
@@ -116,7 +116,7 @@ export const generateRecipe = async (ingredients, dietaryPreferences = '', recip
 
 // Suggest Ingredients API
 export const suggestIngredients = async (availableIngredients) => {
-  return apiCall('/api/ai/suggest-ingredients', {
+  return apiCall('/ai/suggest-ingredients', {
     method: 'POST',
     body: JSON.stringify({
       availableIngredients: Array.isArray(availableIngredients) ? availableIngredients : [availableIngredients],
@@ -128,7 +128,7 @@ export const suggestIngredients = async (availableIngredients) => {
 export const getRecipeDetails = async (recipeName) => {
   try {
     console.log('📡 [API] Fetching recipe details for:', recipeName);
-    const result = await apiCall('/api/ai/recipe-details', {
+    const result = await apiCall('/ai/recipe-details', {
       method: 'POST',
       body: JSON.stringify({ recipeName }),
     });
@@ -152,11 +152,11 @@ export const getRecipeDetails = async (recipeName) => {
 
 // User Profile API
 export const getUserProfile = async () => {
-  return apiCall('/api/users/profile');
+  return apiCall('/users/profile');
 };
 
 export const updateUserProfile = async (updates) => {
-  return apiCall('/api/users/profile', {
+  return apiCall('/users/profile', {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
@@ -164,16 +164,16 @@ export const updateUserProfile = async (updates) => {
 
 // Favorites API (using collections underneath)
 export const getFavorites = async () => {
-  return apiCall('/api/collections/favorites');
+  return apiCall('/collections/favorites');
 };
 
 export const addToFavorites = async (recipeId, recipeData = null) => {
   try {
     // First get the favorites collection
-    const favoritesResult = await apiCall('/api/collections/favorites');
+    const favoritesResult = await apiCall('/collections/favorites');
     if (favoritesResult && favoritesResult.collection) {
       // Add to the favorites collection
-      return apiCall(`/api/collections/${favoritesResult.collection.id}/recipes`, {
+      return apiCall(`/collections/${favoritesResult.collection.id}/recipes`, {
         method: 'POST',
         body: JSON.stringify({ recipeId, recipeData }),
       });
@@ -188,10 +188,10 @@ export const addToFavorites = async (recipeId, recipeData = null) => {
 export const removeFromFavorites = async (recipeId) => {
   try {
     // First get the favorites collection
-    const favoritesResult = await apiCall('/api/collections/favorites');
+    const favoritesResult = await apiCall('/collections/favorites');
     if (favoritesResult && favoritesResult.collection) {
       // Remove from the favorites collection
-      return apiCall(`/api/collections/${favoritesResult.collection.id}/recipes/${recipeId}`, {
+      return apiCall(`/collections/${favoritesResult.collection.id}/recipes/${recipeId}`, {
         method: 'DELETE',
       });
     }
@@ -205,7 +205,7 @@ export const removeFromFavorites = async (recipeId) => {
 // Helper function to check if recipe is in favorites
 export const checkIsFavorite = async (recipeId) => {
   try {
-    const favoritesResult = await apiCall('/api/collections/favorites');
+    const favoritesResult = await apiCall('/collections/favorites');
     if (favoritesResult && favoritesResult.recipes) {
       return favoritesResult.recipes.some(recipe => recipe.id === recipeId);
     }
@@ -220,7 +220,7 @@ export const checkIsFavorite = async (recipeId) => {
 export const getCollections = async () => {
   console.log('📚 [API] getCollections called');
   try {
-    const result = await apiCall('/api/collections');
+    const result = await apiCall('/collections');
     console.log('📚 [API] getCollections result:', result);
     return result;
   } catch (error) {
@@ -230,21 +230,21 @@ export const getCollections = async () => {
 };
 
 export const createCollection = async (collectionData) => {
-  return apiCall('/api/collections', {
+  return apiCall('/collections', {
     method: 'POST',
     body: JSON.stringify(collectionData),
   });
 };
 
 export const updateCollection = async (collectionId, updates) => {
-  return apiCall(`/api/collections/${collectionId}`, {
+  return apiCall(`/collections/${collectionId}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
 };
 
 export const deleteCollection = async (collectionId) => {
-  return apiCall(`/api/collections/${collectionId}`, {
+  return apiCall(`/collections/${collectionId}`, {
     method: 'DELETE',
   });
 };
@@ -256,7 +256,7 @@ export const addRecipeToCollection = async (collectionId, recipeId, recipeData =
   console.log('🚀 [API] Recipe Data:', recipeData);
   
   try {
-    const result = await apiCall(`/api/collections/${collectionId}/recipes`, {
+    const result = await apiCall(`/collections/${collectionId}/recipes`, {
       method: 'POST',
       body: JSON.stringify({ recipeId, recipeData }),
     });
@@ -270,25 +270,25 @@ export const addRecipeToCollection = async (collectionId, recipeId, recipeData =
 };
 
 export const removeRecipeFromCollection = async (collectionId, recipeId) => {
-  return apiCall(`/api/collections/${collectionId}/recipes/${recipeId}`, {
+  return apiCall(`/collections/${collectionId}/recipes/${recipeId}`, {
     method: 'DELETE',
   });
 };
 
 export const getCollectionRecipes = async (collectionId) => {
-  return apiCall(`/api/collections/${collectionId}/recipes`);
+  return apiCall(`/collections/${collectionId}/recipes`);
 };
 
 // Migration API
 export const migrateFavorites = async () => {
-  return apiCall('/api/collections/migrate-favorites', {
+  return apiCall('/collections/migrate-favorites', {
     method: 'POST',
   });
 };
 
 // Health check
 export const healthCheck = async () => {
-  return apiCall('/api/health');
+  return apiCall('/health');
 };
 
 export default {
