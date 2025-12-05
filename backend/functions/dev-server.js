@@ -20,12 +20,7 @@ app.use(express.json());
 // Handle preflight requests
 app.options('*', cors());
 
-// Mock authentication middleware
-const mockAuth = (req, res, next) => {
-  req.userId = 'mock-user-id';
-  req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-  next();
-};
+// Note: Routes now handle their own authentication with secure verifyAuthToken middleware
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -81,20 +76,20 @@ const aiRouter = require('./src/routes/ai');
 const userRouter = require('./src/routes/users');
 const collectionsRouter = require('./src/routes/collections');
 
-// Use AI routes
-app.use('/api/ai', mockAuth, aiRouter);
+// Use AI routes (AI routes don't need authentication for now)
+app.use('/api/ai', aiRouter);
 
-// Use user routes (for favorites functionality)
-app.use('/api/users', mockAuth, userRouter);
+// Use user routes (for favorites functionality) - routes have built-in verifyAuthToken
+app.use('/api/users', userRouter);
 
-// Use collections routes
-app.use('/api/collections', mockAuth, collectionsRouter);
+// Use collections routes - routes have built-in verifyAuthToken
+app.use('/api/collections', collectionsRouter);
 
-// Mock user endpoints
-app.get('/api/users/profile', mockAuth, (req, res) => {
+// Mock user endpoints (no auth required for this specific endpoint)
+app.get('/api/users/profile', (req, res) => {
   res.status(200).json({
     user: {
-      uid: req.userId,
+      uid: 'mock-user-id',
       email: 'test@example.com',
       displayName: 'Test User',
       plan: 'free',
