@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, Sparkles, ArrowRight, Clock, Leaf, BookOpen, CheckCircle2, Menu, X } from 'lucide-react';
-import ScrollToBottomButton from "./Components/Utility/ScrollToBottomButton.jsx";
+import ScrollToTopButton from "./Components/Utility/ScrollToTopButton.jsx";
 
 // 1. Define the 5 different scenarios
 const demoScenarios = [
@@ -43,6 +43,15 @@ export default function CookMateLanding() {
     setCurrentScenario(demoScenarios[randomIndex]);
   }, []);
 
+  // --- Scroll Handler ---
+  const scrollToSection = (sectionId) => {
+    setIsMobileMenuOpen(false); // Close the mobile menu (if open)
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-stone-800 relative overflow-hidden">
 
@@ -63,7 +72,14 @@ export default function CookMateLanding() {
               <span className="text-xl font-bold tracking-tight text-stone-900">CookMate</span>
             </div>
 
-            <div className="hidden md:flex items-center gap-6">
+            {/* Desktop Navigation - Updated with links */}
+            <div className="hidden md:flex items-center gap-8">
+              <button
+                onClick={() => scrollToSection('features')}
+                className="text-sm font-bold text-stone-600 hover:text-orange-600 transition-colors duration-200"
+              >
+                Features
+              </button>
               <Link
                 to="/signin"
                 className="relative px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl hover:from-orange-700 hover:to-red-700 transition-all duration-300 overflow-hidden group shadow-lg shadow-orange-200/50 hover:scale-105"
@@ -73,6 +89,7 @@ export default function CookMateLanding() {
               </Link>
             </div>
 
+            {/* Mobile Menu Toggle */}
             <div className="md:hidden">
               <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors duration-200">
                 {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -81,18 +98,33 @@ export default function CookMateLanding() {
           </div>
         </div>
 
+        {/* Mobile Dropdown Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden bg-gradient-to-b from-white via-stone-50 to-stone-100 border-b border-stone-200/60 backdrop-blur-xl px-4 py-4 space-y-3">
-             <button className="block w-full text-left px-4 py-3 text-sm font-medium text-stone-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 rounded-xl transition-all duration-200">How it works</button>
-              <button className="block w-full text-left px-4 py-3 text-sm font-medium text-stone-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 rounded-xl transition-all duration-200">Features</button>
-              <Link to="/signin" className="block w-full px-4 py-3 text-sm font-semibold text-center text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200">Sign In</Link>
+          <div className="md:hidden bg-gradient-to-b from-white via-stone-50 to-stone-100 border-b border-stone-200/60 backdrop-blur-xl px-4 py-4 space-y-3 shadow-2xl">
+              <button
+                onClick={() => scrollToSection('features')}
+                className="block w-full text-left px-4 py-3 text-sm font-medium text-stone-600 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 rounded-xl transition-all duration-200"
+              >
+                Features
+              </button>
+
+              <Link
+                to="/signin"
+                className="block w-full px-4 py-3 text-sm font-semibold text-center text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200"
+              >
+                Sign In
+              </Link>
           </div>
         )}
       </nav>
 
-      {/* --- Hero Section --- */}
-      <main className="pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden relative">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      {/* --- Hero Section (How it Works) --- */}
+      {/* min-h-screen: Ensures it takes full height on mobile/desktop.
+          flex items-center: Centers content vertically.
+          pt-24: Padding for mobile to account for fixed navbar.
+      */}
+      <main id="how-it-works" className="min-h-screen flex items-center pt-24 pb-16 md:pt-0 md:pb-0 relative overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
 
             {/* Text Content */}
@@ -187,7 +219,7 @@ export default function CookMateLanding() {
       </main>
 
       {/* --- Features Grid --- */}
-      <section className="py-20 bg-gradient-to-b from-white via-stone-50 to-stone-100 border-t border-stone-200/60">
+      <section id="features" className="py-20 bg-gradient-to-b from-white via-stone-50 to-stone-100 border-t border-stone-200/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           {/* Background pattern */}
           <div className="absolute inset-0 opacity-5">
@@ -228,7 +260,7 @@ export default function CookMateLanding() {
         </div>
       </section>
 
-      <ScrollToBottomButton/>
+      <ScrollToTopButton/>
 
       {/* --- Footer --- */}
       <footer className="bg-gradient-to-br from-stone-900 via-stone-800 to-stone-900 text-stone-400 py-16 border-t border-stone-700/60 relative overflow-hidden">
