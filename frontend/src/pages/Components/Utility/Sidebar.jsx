@@ -8,10 +8,12 @@ import {
   Heart, 
   Folder, 
   LogOut, 
+  LogIn,
   Trash2,
   Sparkles,
   Clock
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Sidebar = ({
   isOpen,
@@ -31,10 +33,17 @@ const Sidebar = ({
   sessionsLoading,
   collapsed
 }) => {
+  const navigate = useNavigate();
+  
   const formatTime = (date) => {
     if (!date) return '';
     const messageDate = date.toDate ? date.toDate() : new Date(date);
     return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleSignIn = () => {
+    navigate('/signin');
+    if (isMobile && onClose) onClose();
   };
 
   const formatLastMessage = (lastMessage) => {
@@ -261,30 +270,74 @@ const Sidebar = ({
           flex items-center w-full p-2 rounded-xl transition-all duration-200
           ${isCollapsed && !isMobile ? 'justify-center' : 'gap-3'}
         `}>
-          <div className={`
-            w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
-            bg-gradient-to-br from-stone-700 to-stone-900 text-white shadow-md
-            flex-shrink-0
-          `}>
-            {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A'}
-          </div>
-
-          {(!isCollapsed || isMobile) && (
+          {user ? (
             <>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-semibold text-stone-700 truncate">
-                  {user?.displayName || 'User'}
-                </p>
-                <p className="text-xs text-stone-500 truncate">{user?.email}</p>
+              <div className={`
+                w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
+                bg-gradient-to-br from-stone-700 to-stone-900 text-white shadow-md
+                flex-shrink-0
+              `}>
+                {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'A'}
               </div>
 
-              <button
-                onClick={onLogout}
-                className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                title="Sign Out"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+              {(!isCollapsed || isMobile) && (
+                <>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-sm font-semibold text-stone-700 truncate">
+                      {user.displayName || 'User'}
+                    </p>
+                    <p className="text-xs text-stone-500 truncate">{user.email}</p>
+                  </div>
+
+                  <button
+                    onClick={onLogout}
+                    className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className={`
+                w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
+                bg-gradient-to-br from-stone-400 to-stone-600 text-white shadow-md
+                flex-shrink-0
+              `}>
+                <LogIn className="w-5 h-5" />
+              </div>
+
+              {(!isCollapsed || isMobile) && (
+                <>
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-sm font-semibold text-stone-600 truncate">
+                      Guest User
+                    </p>
+                    <p className="text-xs text-stone-400 truncate">Not signed in</p>
+                  </div>
+
+                  <button
+                    onClick={handleSignIn}
+                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all"
+                    title="Sign In"
+                  >
+                    <LogIn className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+
+              {/* Collapsed sign in button */}
+              {isCollapsed && !isMobile && (
+                <button
+                  onClick={handleSignIn}
+                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all"
+                  title="Sign In"
+                >
+                  <LogIn className="w-5 h-5" />
+                </button>
+              )}
             </>
           )}
         </div>

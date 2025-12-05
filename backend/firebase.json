@@ -11,30 +11,12 @@
       ]
     }
   ],
-  "hosting": {
-    "public": "../frontend/dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/api/**",
-        "function": "api"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
+  "firestore": {
+    "indexes": "firestore.indexes.json"
   },
   "emulators": {
     "functions": {
       "port": 5001
-    },
-    "hosting": {
-      "port": 5000
     },
     "firestore": {
       "port": 8080

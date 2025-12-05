@@ -6,9 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:vercel": "vite build && echo 'Build completed for Vercel deployment'",
     "lint": "eslint .",
     "preview": "vite preview",
-    "serve": "vite preview --port 3000"
+    "serve": "vite preview --port 3000",
+    "deploy": "npm run build:vercel && npx vercel --prod --yes",
+    "deploy:check": "npm run build && echo '✅ Build successful - Ready for Vercel deployment'",
+    "vercel:dev": "npx vercel dev",
+    "vercel:build": "npm run build",
+    "predeploy": "npm run build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",

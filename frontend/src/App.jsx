@@ -1,13 +1,19 @@
 import React, { useState, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth.jsx';
+import { useFavorites } from './hooks/useFavorites.js';
+import { useCollections } from './hooks/useCollections.js';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Import all modal components
 import AuthPromptModal from './components/AuthPromptModal.jsx';
+import SessionTransferNotification from './components/SessionTransferNotification.jsx';
 import CollectionsModal from './pages/Components/UI/CollectionsModal.jsx';
 import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
 import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
+import FavoritesModal from './pages/Components/UI/FavoritesModal.jsx';
+import CollectionFormModal from './pages/Components/UI/CollectionFormModal.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from './pages/Components/UI/useConfirmation.jsx';
 
 // Import pages
@@ -30,12 +36,14 @@ export const useModal = () => {
 };
 
 // Centralized Modal Manager Component
-const ModalManager = ({ modalStates, modalActions, children }) => {
+const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHook, children }) => {
   const {
     authPromptState,
     collectionsModalState,
     confirmationState,
-    recipeDetailModalState
+    recipeDetailModalState,
+    favoritesModalState,
+    collectionFormModalState
   } = modalStates;
 
   const {
@@ -46,7 +54,11 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
     showConfirmation,
     hideConfirmation,
     showRecipeDetail,
-    hideRecipeDetail
+    hideRecipeDetail,
+    showFavoritesModal,
+    hideFavoritesModal,
+    showCollectionFormModal,
+    hideCollectionFormModal
   } = modalActions;
 
   return (
@@ -65,7 +77,15 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
       
       // Recipe Detail Modal
       showRecipeDetail,
-      hideRecipeDetail
+      hideRecipeDetail,
+      
+      // Favorites Modal
+      showFavoritesModal,
+      hideFavoritesModal,
+      
+      // Collection Form Modal
+      showCollectionFormModal,
+      hideCollectionFormModal
     }}>
       {children}
       
@@ -96,6 +116,7 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
         user={collectionsModalState.user}
         requireAuth={collectionsModalState.requireAuth}
         onAddToCollection={collectionsModalState.onAddToCollection}
+        onRemoveFromCollection={collectionsModalState.onRemoveFromCollection}
         onCreateCollection={collectionsModalState.onCreateCollection}
         triggerRef={collectionsModalState.triggerRef}
       />
@@ -113,11 +134,51 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
         confirmButtonClass={confirmationState.confirmButtonClass}
         loading={confirmationState.loading}
       />
+
+      {/* Favorites Modal */}
+      <FavoritesModal
+        isOpen={favoritesModalState.isOpen}
+        onClose={hideFavoritesModal}
+        favoriteRecipes={favoritesModalState.favoriteRecipes || []}
+        favoritesLoading={favoritesModalState.favoritesLoading || false}
+        collections={favoritesModalState.collections || []}
+        favoriteCollectionId={favoritesModalState.favoriteCollectionId || null}
+        handleFavoriteRecipeClick={favoritesModalState.handleFavoriteRecipeClick}
+        handleAddToFavoritesCallback={favoritesModalState.handleAddToFavoritesCallback}
+        handleRemoveFromFavoritesCallback={favoritesModalState.handleRemoveFromFavoritesCallback}
+        handleAddToCollectionCallback={favoritesModalState.handleAddToCollectionCallback}
+        handleRemoveFromCollectionCallback={favoritesModalState.handleRemoveFromCollectionCallback}
+        handleCreateCollectionCallback={favoritesModalState.handleCreateCollectionCallback}
+        handleFetchRecipeDetails={favoritesModalState.handleFetchRecipeDetails}
+        user={favoritesModalState.user}
+        requireAuth={favoritesModalState.requireAuth}
+        // New unified architecture props
+        favoritesHook={favoritesHook}
+        collectionsHook={collectionsHook}
+      />
+
+      {/* Collection Form Modal */}
+      <CollectionFormModal
+        isOpen={collectionFormModalState.isOpen}
+        onClose={hideCollectionFormModal}
+        mode={collectionFormModalState.mode || 'create'}
+        collection={collectionFormModalState.collection}
+        onSubmit={collectionFormModalState.onSubmit}
+        colors={collectionFormModalState.colors || []}
+        icons={collectionFormModalState.icons || []}
+      />
+
+      {/* Session Transfer Notification */}
+      <SessionTransferNotification />
     </ModalContext.Provider>
   );
 };
 
 function App() {
+  // Initialize Unified Collections Architecture hooks
+  const favoritesHook = useFavorites();
+  const collectionsHook = useCollections();
+
   // Centralized Modal States
   const [authPromptState, setAuthPromptState] = useState({
     isOpen: false,
@@ -131,6 +192,7 @@ function App() {
     user: null,
     requireAuth: false,
     onAddToCollection: null,
+    onRemoveFromCollection: null,
     onCreateCollection: null,
     triggerRef: null
   });
@@ -152,6 +214,32 @@ function App() {
     recipeName: '',
     fetchRecipeDetails: null,
     onAddToFavorites: null
+  });
+
+  const [favoritesModalState, setFavoritesModalState] = useState({
+    isOpen: false,
+    favoriteRecipes: [],
+    favoritesLoading: false,
+    collections: [],
+    favoriteCollectionId: null,
+    handleFavoriteRecipeClick: null,
+    handleAddToFavoritesCallback: null,
+    handleRemoveFromFavoritesCallback: null,
+    handleAddToCollectionCallback: null,
+    handleRemoveFromCollectionCallback: null,
+    handleCreateCollectionCallback: null,
+    handleFetchRecipeDetails: null,
+    user: null,
+    requireAuth: null
+  });
+
+  const [collectionFormModalState, setCollectionFormModalState] = useState({
+    isOpen: false,
+    mode: 'create', // 'create' or 'edit'
+    collection: null,
+    onSubmit: null,
+    colors: [],
+    icons: []
   });
 
   // Centralized Modal Actions
@@ -199,43 +287,77 @@ function App() {
     },
     hideRecipeDetail: () => {
       setRecipeDetailModalState(prev => ({ ...prev, isOpen: false }));
+    },
+
+    // Favorites Modal Actions
+    showFavoritesModal: (options) => {
+      setFavoritesModalState({ 
+        isOpen: true, 
+        ...options
+      });
+    },
+    hideFavoritesModal: () => {
+      setFavoritesModalState(prev => ({ ...prev, isOpen: false }));
+    },
+
+    // Collection Form Modal Actions
+    showCollectionFormModal: (options) => {
+      setCollectionFormModalState({ 
+        isOpen: true, 
+        ...options
+      });
+    },
+    hideCollectionFormModal: () => {
+      setCollectionFormModalState(prev => ({ ...prev, isOpen: false }));
     }
   };
 
   return (
-    <AuthProvider>
-      <Router>
-        <ModalManager modalStates={{
-          authPromptState,
-          collectionsModalState,
-          confirmationState,
-          recipeDetailModalState
-        }} modalActions={modalActions}>
-          <div className="App">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/home" element={<Home />} />
-              <Route path="/collections" element={
-                <ProtectedRoute requireAuth={true}>
-                  <Collections />
-                </ProtectedRoute>
-              } />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <ModalManager 
+            modalStates={{
+              authPromptState,
+              collectionsModalState,
+              confirmationState,
+              recipeDetailModalState,
+              favoritesModalState,
+              collectionFormModalState
+            }} 
+            modalActions={modalActions}
+            favoritesHook={favoritesHook}
+            collectionsHook={collectionsHook}
+          >
+            <div className="App">
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/home" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <Home 
+                      favoritesHook={favoritesHook}
+                      collectionsHook={collectionsHook}
+                    />
+                  </ProtectedRoute>
+                } />
+                <Route path="/collections" element={<Collections />} />
 
-              <Route path="/signin" element={
-                <ProtectedRoute requireAuth={false}>
-                  <SigninPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/signup" element={
-                <ProtectedRoute requireAuth={false}>
-                  <SignupPage />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </div>
-        </ModalManager>
-      </Router>
-    </AuthProvider>
+                <Route path="/signin" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <SigninPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/signup" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <SignupPage />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </div>
+          </ModalManager>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

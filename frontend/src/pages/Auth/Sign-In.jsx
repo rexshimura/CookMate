@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase"; 
+import { useAuth } from '../../hooks/useAuth.jsx';
 import { useNavigate } from "react-router-dom";
 
 
@@ -11,6 +10,7 @@ export default function SigninPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { signIn, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -19,14 +19,18 @@ export default function SigninPage() {
     setError("");
 
     try {
-      // THE REAL FIREBASE LOGIN
-      await signInWithEmailAndPassword(auth, email, password);
+      // Use our custom signIn function that includes session transfer
+      const result = await signIn(email, password);
       
-      // If successful, redirect to Home
-      navigate("/home");
+      if (result.success) {
+        // Don't navigate here - let the auth state change trigger navigation
+        // The ProtectedRoute will handle redirecting authenticated users away from signin
+      } else {
+        setError(result.error || "Sign in failed. Please try again.");
+      }
     } catch (error) {
       console.error("Login Error:", error);
-      setError("Invalid email or password. Please try again.");
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +155,7 @@ export default function SigninPage() {
             </form>
 
             <div className="mt-8 text-center animate-slideUp delay-200">
-              <p className="text-sm text-stone-600">
+              <div className="text-sm text-stone-600">
                 Don't have an account?{' '}
                 <Link 
                   to="/signup" 
@@ -160,7 +164,7 @@ export default function SigninPage() {
                   Sign up
                   <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 group-hover:w-full transition-all duration-300"></div>
                 </Link>
-              </p>
+              </div>
             </div>
           </div>
         </div>

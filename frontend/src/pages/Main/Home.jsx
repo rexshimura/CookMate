@@ -1,29 +1,146 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
 import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.js';
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
+import ErrorMessage from '../../components/ErrorMessage.jsx';
+
 import { useModal } from '../../App.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from '../Components/UI/useConfirmation.jsx';
 
-export default function Home() {
-  const { user, logout } = useAuth();
+// Simple markdown parser for bold text
+const parseMarkdownText = (text) => {
+  if (!text) return '';
+  
+  // Split text by ** patterns and wrap bold parts in JSX
+  const parts = text.split(/(\*\*[^*]+\*\*)/);
+  
+  return parts.map((part, index) => {
+    // Check if this part is bold markdown
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const boldText = part.slice(2, -2); // Remove ** from both ends
+      return <strong key={index} className="font-semibold">{boldText}</strong>;
+    }
+    // Return regular text as-is
+    return part;
+  });
+};
+
+// NEW: Improved client-side recipe detection
+const detectRecipesFromText = (text) => {
+  if (!text || typeof text !== 'string') return [];
+
+  // 1) Extract bolded phrases (common pattern used by AI responses)
+  const boldRegex = /\*\*([^*]{2,120}?)\*\*/g;
+  const candidates = [];
+  let match;
+  while ((match = boldRegex.exec(text)) !== null) {
+    const raw = match[1].trim();
+    if (raw) candidates.push(raw);
+  }
+
+  // 2) fallback: sometimes responses use lines/headers like "1. Italian" or "- Italian"
+  if (candidates.length === 0) {
+    const lineRegex = /^(?:[-\d.]+\s*)?([A-Z][A-Za-z &/+-]{2,80})$/gm;
+    while ((match = lineRegex.exec(text)) !== null) {
+      const raw = match[1].trim();
+      if (raw) candidates.push(raw);
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  // 3) validation heuristics: presence of food/cuisine keywords or typical dish words
+  const foodKeywords = [
+    'chicken','beef','pork','pasta','pizza','taco','rice','curry','dessert','cake','pie','salad',
+    'soup','bolognese','spaghetti','pancake','grill','bbq','vegan','vegetarian','seafood','fish',
+    'shrimp','noodle','ramen','sushi','biryani','burger','sandwich','omelette','stew','chili',
+    'risotto','paella','lasagna','italian','mexican','indian','thai','japanese','chinese','korean',
+    'mediterranean','bbq','grilling','desserts','dessert','breakfast','dinner','brunch'
+  ];
+
+  const isLikelyRecipe = (candidate) => {
+    if (!candidate) return false;
+    const c = candidate.toLowerCase();
+
+    // Reject overly long headings
+    if (candidate.length > 80) return false;
+
+    // Accept if contains any strong food/cuisine keyword
+    for (const kw of foodKeywords) {
+      if (c.includes(kw)) return true;
+    }
+
+    // Accept if it's reasonably short and looks like a dish/cuisine (2-4 words, not generic UI text)
+    const words = c.split(/\s+/).filter(Boolean);
+    if (words.length <= 4 && words.length >= 1 && /[a-z]/.test(c)) {
+      // heuristics to avoid generic labels
+      const genericReject = ['choose','options','ingredients','step','instructions','please','choose a','here are'];
+      if (!genericReject.some(g => c.includes(g))) return true;
+    }
+
+    return false;
+  };
+
+  // 4) filter & dedupe while preserving order
+  const seen = new Set();
+  const results = [];
+  for (const raw of candidates) {
+    const normalized = raw.replace(/\s+/g, ' ').trim();
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    if (isLikelyRecipe(normalized)) {
+      seen.add(key);
+      results.push(normalized);
+    }
+  }
+
+  return results;
+};
+
+export default function Home({ favoritesHook, collectionsHook }) {
+  const { user, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
-  const { showAuthPrompt, showRecipeDetail, showCollectionsModal } = useModal();
+  const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
   
+  // Use unified hooks for favorites and collections
+  const { 
+    favorites, 
+    loading: favoritesLoading, 
+    error: favoritesError,
+    toggleFavorite,
+    isFavorite 
+  } = favoritesHook;
+  
+  const {
+    collections,
+    loading: collectionsLoading,
+    error: collectionsError,
+    createNewCollection,
+    addRecipeToCollection,
+    removeRecipeFromCollection,
+    isRecipeInCollection
+  } = collectionsHook;
+  
+  // --- Hooks & state (must run every render) ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Current session state
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('currentSessionId');
+      return saved || null;
+    }
+    return null;
+  });
+
   // Call ALL hooks at the top level - this fixes the React hook error
   const { 
     messages, 
@@ -43,14 +160,19 @@ export default function Home() {
   // Recipe modal state
   const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
   
-  // Favorites state
-  const [showFavorites, setShowFavorites] = useState(false);
-  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  // Legacy state for backward compatibility (will be removed)
+  const [favoriteCollectionId, setFavoriteCollectionId] = useState(null);
 
-  // Collections state
-  const [collections, setCollections] = useState([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  // Error state management
+  const [error, setError] = useState(null);
+  const [showError, setShowError] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  
+  // Logout state management
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  // Session migration notification
+  const [showSessionMigrationNotice, setShowSessionMigrationNotice] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -66,6 +188,17 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Validate current session exists when sessions load (runs once on mount)
+  useEffect(() => {
+    if (currentSessionId && sessions.length > 0) {
+      const sessionExists = sessions.some(s => s.id === currentSessionId);
+      if (!sessionExists) {
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+      }
+    }
+  }, []); // Empty dependency array - run once on mount
 
   useEffect(() => {
     let lastScrollY = 0;
@@ -87,7 +220,6 @@ export default function Home() {
     const setupScrollListener = () => {
       const container = messagesContainerRef.current;
       if (container) {
-        console.log('✅ [SCROLL] Adding scroll listener to container');
         container.addEventListener('scroll', handleScroll);
         handleScroll(); // Check initial position
         return true;
@@ -118,26 +250,102 @@ export default function Home() {
   };
 
   // CRITICAL: This useEffect MUST be called before any conditional returns
-  // Initialize with existing session if available
+  // Initialize with existing session if available and validate it exists
   useEffect(() => {
-    if (!currentSessionId && sessions.length > 0 && !sessionsLoading) {
-      setCurrentSessionId(sessions[0].id);
+    if (sessions.length > 0) {
+      // Check if current session still exists in the sessions list
+      const currentSessionExists = sessions.some(s => s.id === currentSessionId);
+      
+      if (!currentSessionId || !currentSessionExists) {
+        // If no current session or it doesn't exist, use the first available session
+        const newSessionId = sessions[0].id;
+        setCurrentSessionId(newSessionId);
+        localStorage.setItem('currentSessionId', newSessionId);
+      }
+    } else if (sessions.length === 0 && currentSessionId) {
+      // No sessions available, clear current session
+      setCurrentSessionId(null);
+      localStorage.removeItem('currentSessionId');
     }
-  }, [sessions, currentSessionId, sessionsLoading]);
+  }, [sessions]);
 
-  // Load collections when user is authenticated
+  // Additional effect to ensure current session persists during any updates
   useEffect(() => {
-    if (user) {
-      loadCollections();
+    if (currentSessionId && sessions.length > 0) {
+      const sessionExists = sessions.some(s => s.id === currentSessionId);
+      if (!sessionExists) {
+        const firstSession = sessions[0];
+        if (firstSession) {
+          setCurrentSessionId(firstSession.id);
+          localStorage.setItem('currentSessionId', firstSession.id);
+        }
+      }
     }
-  }, [user]);
+  }, [sessions]);
 
-  // Load favorites when showing favorites modal
+  // Collections are now loaded automatically by the hook when user is authenticated
+
+  // Handle user state changes - migrate sessions when going from anonymous to authenticated
+  const [previousUserId, setPreviousUserId] = useState(null);
+  
   useEffect(() => {
-    if (showFavorites) {
-      loadFavoriteRecipes();
+    const currentUserId = user?.uid || 'anonymous';
+    
+    if (previousUserId && previousUserId !== currentUserId) {
+      if (previousUserId === 'anonymous' && currentUserId !== 'anonymous') {
+        // User transitioned from anonymous to authenticated
+        
+        // Check if we have anonymous sessions to migrate
+        const anonymousSessions = localStorage.getItem('anonymous_sessions');
+        let hadSessions = false;
+        
+        if (anonymousSessions) {
+          try {
+            const sessions = JSON.parse(anonymousSessions);
+            if (sessions && sessions.length > 0) {
+              hadSessions = true;
+              
+              // Show migration notice
+              setShowSessionMigrationNotice(true);
+              
+              // Clear current state to force user to create new authenticated sessions
+              setCurrentSessionId(null);
+              localStorage.removeItem('currentSessionId');
+              clearMessages();
+            } else {
+              // No anonymous sessions, just clear current state
+              setCurrentSessionId(null);
+              localStorage.removeItem('currentSessionId');
+              clearMessages();
+            }
+          } catch (error) {
+            setCurrentSessionId(null);
+            localStorage.removeItem('currentSessionId');
+            clearMessages();
+          }
+        } else {
+          // No anonymous sessions, just clear current state
+          setCurrentSessionId(null);
+          localStorage.removeItem('currentSessionId');
+          clearMessages();
+        }
+      } else if (previousUserId !== 'anonymous' && currentUserId === 'anonymous') {
+        // User logged out
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+        clearMessages();
+      } else {
+        // User switched between different authenticated accounts
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+        clearMessages();
+      }
     }
-  }, [showFavorites]);
+    
+    setPreviousUserId(currentUserId);
+  }, [user, clearMessages]);
+
+
 
   const focusInput = () => {
     // Small delay to ensure the DOM is ready after re-render
@@ -148,7 +356,29 @@ export default function Home() {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !currentSessionId) return;
+    
+    // Clear any previous errors
+    setError(null);
+    setShowError(false);
+
+    // Input validation
+    if (!inputMessage.trim()) {
+      setError('Please type a message before sending.');
+      setShowError(true);
+      return;
+    }
+
+    if (inputMessage.length < 2) {
+      setError('Message is too short. Please enter at least 2 characters.');
+      setShowError(true);
+      return;
+    }
+
+    if (!currentSessionId) {
+      setError('No active chat session. Please create a new chat.');
+      setShowError(true);
+      return;
+    }
 
     const messageText = inputMessage;
     setInputMessage('');
@@ -158,26 +388,36 @@ export default function Home() {
       focusInput();
     } catch (error) {
       console.error('Failed to send message:', error);
+      setError(error.message || 'Failed to send message. Please try again.');
+      setShowError(true);
     }
   };
 
   const handleCreateNewChat = async () => {
-    if (sessionsLoading) return;
-    
     try {
       const newSession = await createNewSession('New Cooking Session');
       if (newSession) {
         setCurrentSessionId(newSession.id);
         if (isMobile) setSidebarOpen(false);
+        // Save to localStorage for persistence
+        localStorage.setItem('currentSessionId', newSession.id);
       }
     } catch (error) {
       console.error('Failed to create new chat:', error);
     }
   };
 
+  const handleSignIn = () => {
+    navigate('/signin');
+  };
+
   const handleSelectSession = (session) => {
     setCurrentSessionId(session.id);
     if (isMobile) setSidebarOpen(false);
+    // Save to localStorage for persistence
+    if (session.id) {
+      localStorage.setItem('currentSessionId', session.id);
+    }
   };
 
   const handleDeleteSession = async (sessionId, e) => {
@@ -194,13 +434,20 @@ export default function Home() {
         if (sessionId === currentSessionId) {
           const remainingSessions = sessions.filter(s => s.id !== sessionId);
           if (remainingSessions.length > 0) {
-            setCurrentSessionId(remainingSessions[0].id);
+            const newCurrentSessionId = remainingSessions[0].id;
+            setCurrentSessionId(newCurrentSessionId);
+            localStorage.setItem('currentSessionId', newCurrentSessionId);
           } else {
             setCurrentSessionId(null);
+            localStorage.removeItem('currentSessionId');
             clearMessages();
           }
         }
         
+        // Clean up localStorage if the deleted session was the current one
+        if (sessionId === currentSessionId) {
+          localStorage.removeItem('currentSessionId');
+        }
 
       } catch (error) {
         console.error('Failed to delete session:', error);
@@ -212,15 +459,32 @@ export default function Home() {
     const confirmed = await confirmLogout();
     
     if (confirmed) {
+      // Set loading state
+      setIsLoggingOut(true);
+      setError(null);
+      setShowError(false);
+      
       try {
-        await logout();
-        // Clear local state
-        setCurrentSessionId(null);
-        clearMessages();
+        const result = await logout();
         
-
+        if (result.success) {
+          // Clear local state
+          setCurrentSessionId(null);
+          localStorage.removeItem('currentSessionId');
+          clearMessages();
+          
+          // Modal states are cleared automatically when user logs out
+          
+        } else {
+          setError(result.error || 'Failed to sign out. Please try again.');
+          setShowError(true);
+        }
+        
       } catch (error) {
-        console.error('Failed to logout:', error);
+        setError('An unexpected error occurred. Please try again.');
+        setShowError(true);
+      } finally {
+        setIsLoggingOut(false);
       }
     }
   };
@@ -250,12 +514,25 @@ export default function Home() {
       showAuthPrompt('Please sign in to view your favorite recipes.');
       return;
     }
-    setShowFavorites(true);
-    loadFavoriteRecipes();
-  };
-
-  const handleHideFavorites = () => {
-    setShowFavorites(false);
+    
+    // Use hook data directly
+    const favoriteCollectionId = collections.find(col => col.isDefault)?.id || null;
+    
+    showFavoritesModal({
+      favoriteRecipes: favorites,
+      favoritesLoading,
+      collections,
+      favoriteCollectionId,
+      handleFavoriteRecipeClick,
+      handleAddToFavoritesCallback,
+      handleRemoveFromFavoritesCallback,
+      handleAddToCollectionCallback,
+      handleRemoveFromCollectionCallback,
+      handleCreateCollectionCallback,
+      handleFetchRecipeDetails,
+      user,
+      requireAuth
+    });
   };
 
   // Collections handlers
@@ -268,12 +545,6 @@ export default function Home() {
     window.location.href = '/collections';
   };
 
-  // Login prompt handlers
-  const handleLoginPromptClose = () => {
-    setShowLoginPrompt(false);
-    setLoginPromptMessage('');
-  };
-
   const requireAuth = (featureName) => {
     if (!user) {
       showAuthPrompt(`Please sign in to use ${featureName}.`);
@@ -282,72 +553,32 @@ export default function Home() {
     return true;
   };
 
-  const loadFavoriteRecipes = async () => {
-    setFavoritesLoading(true);
-    try {
-      const result = await getFavorites();
-      // The new collections-based API returns { collection: {...}, recipes: [...] }
-      if (result && result.recipes) {
-        setFavoriteRecipes(result.recipes || []);
-      } else {
-        setFavoriteRecipes([]);
-      }
-    } catch (error) {
-      console.error('Failed to load favorites:', error);
-      setFavoriteRecipes([]);
-    } finally {
-      setFavoritesLoading(false);
-    }
+  // Load functions removed - hooks handle this automatically
+
+  const handleFavoriteRecipeClick = (recipeName) => {
+    // Open recipe details using the modal system
+    handleRecipeClick(recipeName);
   };
 
-  const loadCollections = async () => {
-    console.log('📚 [Home] Loading collections...');
-    setCollectionsLoading(true);
-    try {
-      const result = await getCollections();
-      console.log('📚 [Home] Collections API result:', result);
-      
-      // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
-      let collections = [];
-      if (result && result.collections) {
-        collections = result.collections;
-      } else if (Array.isArray(result)) {
-        collections = result;
-      } else {
-        console.warn('⚠️ [Home] Unexpected collections response format:', result);
-      }
-      
-      console.log('📚 [Home] Loaded collections:', collections);
-      setCollections(collections);
-      
-    } catch (error) {
-      console.error('❌ [Home] Exception loading collections:', error);
-      console.error('❌ [Home] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
-
-  const handleFavoriteRecipeClick = (recipe) => {
-    // Close favorites modal first, then open recipe details
-    setShowFavorites(false);
-    handleRecipeClick(recipe.title || recipe.name);
-  };
-
+  // Legacy callback functions for backward compatibility with old modals
   const handleAddToFavoritesCallback = (recipeData) => {
-    setFavoriteRecipes(prev => [...prev, recipeData]);
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy add to favorites callback - using hooks instead');
+  };
+
+  const handleRemoveFromFavoritesCallback = (recipeData) => {
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy remove from favorites callback - using hooks instead');
   };
 
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
-    setCollections(prev => prev.map(collection =>
-      collection.id === collectionId
-        ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
-        : collection
-    ));
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy add to collection callback - using hooks instead');
+  };
+
+  const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy remove from collection callback - using hooks instead');
   };
 
   // Handle create collection callback
@@ -356,13 +587,48 @@ export default function Home() {
     window.location.href = '/collections';
   };
 
-  // Helper function to check if a recipe is favorited
-  const isRecipeFavorited = (recipeName) => {
-    return favoriteRecipes.some(fav => 
-      fav.title === recipeName || 
-      fav.name === recipeName ||
-      fav.id === recipeName
-    );
+  // Helper function removed - using hook's isFavorite instead
+
+  // Error handling functions
+  const handleDismissError = () => {
+    setShowError(false);
+    setError(null);
+  };
+
+  const handleRetrySendMessage = async () => {
+    if (!error || !inputMessage.trim()) {
+      handleDismissError();
+      return;
+    }
+
+    setIsRetrying(true);
+    setShowError(false);
+    
+    try {
+      await sendMessage(inputMessage);
+      setInputMessage('');
+      setError(null);
+    } catch (retryError) {
+      console.error('Retry failed:', retryError);
+      setError(retryError.message || 'Failed to send message. Please try again.');
+      setShowError(true);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // Determine error type for styling
+  const getErrorType = (errorMessage) => {
+    if (errorMessage.includes('Network') || errorMessage.includes('connection') || errorMessage.includes('fetch')) {
+      return 'network';
+    } else if (errorMessage.includes('auth') || errorMessage.includes('sign in') || errorMessage.includes('unauthorized')) {
+      return 'auth';
+    } else if (errorMessage.includes('server') || errorMessage.includes('500')) {
+      return 'server';
+    } else if (errorMessage.includes('validation') || errorMessage.includes('invalid') || errorMessage.includes('too short')) {
+      return 'validation';
+    }
+    return 'general';
   };
 
   const formatTime = (date) => {
@@ -376,37 +642,50 @@ export default function Home() {
     return lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
   };
 
-  // Allow anonymous users to use chat functionality
-  // Authentication is only required for favorites and collections
-
-  // Show loading while setting up session
-  if (sessionsLoading && sessions.length === 0 && !currentSessionId) {
-    return (
-      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 items-center justify-center relative overflow-hidden">
-        {/* Background pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
-        </div>
-        
-        <div className="relative text-center">
-          <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-orange-200/60 shadow-lg shadow-orange-200/30">
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-1000 rounded-2xl"></div>
-            <ChefHat className="w-10 h-10 text-orange-600 relative z-10 animate-pulse" />
-          </div>
-          <p className="text-stone-600 font-medium tracking-wide">Loading your cooking sessions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If no current session and not creating one, show empty state
-  if (!currentSessionId && !sessionsLoading) {
+  // Moved auth-loading UI here (after all hooks are defined) to avoid changing hooks order
+  if (authLoading) {
     return (
       <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
         </div>
+        
+        {/* Loading spinner overlay */}
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Loading...</h3>
+            <p className="text-stone-600">Checking your authentication status</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // If no current session and not creating one, show empty state
+  if (!currentSessionId) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-slate-800 overflow-hidden relative">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
+        </div>
+
+        {/* Logout Loading Overlay - Include even in empty state */}
+        {isLoggingOut && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+                <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+              <p className="text-stone-600">Please wait while we sign you out...</p>
+            </div>
+          </div>
+        )}
         
         {/* Enhanced Sidebar */}
         <Sidebar
@@ -424,7 +703,7 @@ export default function Home() {
           onShowFavorites={handleShowFavorites}
           onShowCollections={handleShowCollections}
           onLogout={handleLogout}
-          sessionsLoading={sessionsLoading}
+          isLoggingOut={isLoggingOut}
           collapsed={sidebarCollapsed}
         />
 
@@ -443,29 +722,82 @@ export default function Home() {
               >
                 <Heart className="w-5 h-5" />
               </button>
-              <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
+              {!user && (
+                <button 
+                  onClick={handleSignIn}
+                  className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-full transition-all duration-200 hover:scale-105"
+                  title="Sign In"
+                >
+                  <LogIn className="w-5 h-5" />
+                </button>
+              )}
+              <button onClick={handleCreateNewChat} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="relative text-center max-w-md">
+            <div className="relative text-center max-w-md w-full">
+              {/* Session Migration Notice */}
+              {showSessionMigrationNotice && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-slideUp shadow-lg shadow-blue-200/30 max-w-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-blue-800 font-semibold text-sm">Welcome back!</h4>
+                    <p className="text-blue-700 text-xs">
+                      You're now signed in. Your anonymous sessions have been cleared, but you can start fresh with your authenticated account.
+                    </p>
+                    <button 
+                      onClick={() => setShowSessionMigrationNotice(false)}
+                      className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Got it
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="relative w-20 h-20 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-orange-200/60 shadow-lg shadow-orange-200/30">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-200/50 to-transparent animate-pulse duration-2000 rounded-2xl"></div>
                 <MessageSquare className="w-10 h-10 text-orange-600 relative z-10" />
               </div>
-              <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">Start a New Cooking Conversation</h2>
-              <p className="text-stone-600 mb-6 leading-relaxed">Create your first chat session and let CookMate help you with your culinary adventures!</p>
-              <button 
-                onClick={handleCreateNewChat} 
-                disabled={sessionsLoading} 
-                className="relative px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 disabled:opacity-50 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                {sessionsLoading ? 'Creating Chat...' : 'Start New Chat'}
-              </button>
+              <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-wide">{user ? 'Welcome back!' : 'Start a New Cooking Conversation'}</h2>
+              <p className="text-stone-600 mb-6 leading-relaxed">
+                {user 
+                  ? 'Create your first chat session and continue your culinary journey with CookMate!' 
+                  : 'Create your first chat session and let CookMate help you with your culinary adventures!'
+                }
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button 
+                  onClick={handleCreateNewChat} 
+                  className="relative px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg shadow-orange-200/50 hover:scale-105 overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  Start New Chat
+                </button>
+                {!user && (
+                  <button 
+                    onClick={handleSignIn}
+                    className="relative px-6 py-3 bg-white text-stone-700 border border-stone-300 rounded-2xl font-semibold hover:bg-stone-50 transition-all duration-300 hover:scale-105 overflow-hidden group shadow-lg hover:shadow-stone-200/50"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-stone-100/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      <LogIn className="w-5 h-5" />
+                      Sign In
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Confirmation Dialogs - Include logout dialog even in empty state */}
+        <DeleteDialog />
+        <LogoutDialog />
+
       </div>
     );
   }
@@ -477,6 +809,19 @@ export default function Home() {
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
       </div>
+      
+      {/* Logout Loading Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+            <p className="text-stone-600">Please wait while we sign you out...</p>
+          </div>
+        </div>
+      )}
       
       {/* Enhanced Sidebar */}
       <Sidebar
@@ -495,6 +840,7 @@ export default function Home() {
         onShowCollections={handleShowCollections}
         onLogout={handleLogout}
         sessionsLoading={sessionsLoading}
+        isLoggingOut={isLoggingOut}
         collapsed={sidebarCollapsed}
       />
 
@@ -505,46 +851,86 @@ export default function Home() {
             <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors duration-200"><Menu className="w-6 h-6" /></button>
             <div className="flex items-center gap-2 text-orange-600"><ChefHat className="w-5 h-5" /><span className="font-bold text-lg">CookMate</span></div>
           </div>
-          <button onClick={handleCreateNewChat} disabled={sessionsLoading} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full disabled:opacity-50 transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
+          <button onClick={handleCreateNewChat} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-full transition-all duration-200 hover:scale-105"><Plus className="w-5 h-5" /></button>
         </div>
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
-            {messagesLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <ChefHat className="w-8 h-8 text-orange-600 animate-pulse" />
+            {/* Show sign-in prompt for non-authenticated users when there are no messages */}
+            {!user && messages.length === 0 && (
+              <div className="text-center py-8 bg-gradient-to-b from-blue-50/50 to-stone-50/50 rounded-2xl border border-blue-200/60">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <LogIn className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-stone-800 mb-2">Sign in to unlock more features!</h3>
+                <p className="text-stone-600 mb-4">Save your favorite recipes, create collections, and sync your cooking sessions across devices.</p>
+                <button 
+                  onClick={handleSignIn}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 mx-auto"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </button>
               </div>
-            ) : messages.length === 0 ? (
+            )}
+
+            {/* Error Message Display */}
+            {showError && error && (
+              <ErrorMessage
+                error={error}
+                type={getErrorType(error)}
+                onRetry={inputMessage.trim() ? handleRetrySendMessage : undefined}
+                onDismiss={handleDismissError}
+                showRetry={!!inputMessage.trim()}
+                showDismiss={true}
+                isRetrying={isRetrying}
+              />
+            )}
+
+            {messages.length === 0 ? (
               <div className="text-center py-8">
                 <MessageSquare className="w-12 h-12 text-orange-600 mx-auto mb-4" />
                 <p className="text-stone-600">Start your cooking conversation!</p>
               </div>
             ) : (
-              messages.map((message) => (
+              messages.map((message) => {
+                // Use server-provided detectedRecipes if available; otherwise run client detection
+                const detected = (!message.isUser && Array.isArray(message.detectedRecipes) && message.detectedRecipes.length > 0)
+                  ? message.detectedRecipes
+                  : (!message.isUser ? detectRecipesFromText(message.text) : []);
+
+                return (
                 <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${message.isUser ? 'bg-stone-800 text-white' : 'bg-white border border-stone-200 text-orange-600'}`}>
                     {message.isUser ? user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A' : <Flame className="w-5 h-5 fill-orange-500" />}
                   </div>
                   <div className={`flex flex-col max-w-[85%] lg:max-w-[75%] ${message.isUser ? 'items-end' : 'items-start'}`}>
                     <div className={`px-5 py-4 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${message.isUser ? 'bg-orange-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-700 rounded-2xl rounded-tl-sm'}`}>
-                      {message.text}
+                      {message.isUser ? message.text : parseMarkdownText(message.text)}
                     </div>
                     
                     {/* Render Recipe Cards if detectedRecipes exist */}
-                    {!message.isUser && message.detectedRecipes && message.detectedRecipes.length > 0 && (
+                    {!message.isUser && detected && detected.length > 0 && (
                       <div className="mt-4 space-y-3 w-full">
                         <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
-                        {/* Console log removed to clean up spam */}
-                        {message.detectedRecipes.map((recipe, index) => (
+                        {detected.map((recipe, index) => (
                           <RecipeCard
                             key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : recipe.title}`}
                             recipe={recipe}
                             onClick={handleRecipeClick}
                             isLoading={recipeDetailsLoading}
-                            isFavorited={isRecipeFavorited(recipe)}
+                            isFavorited={isFavorite(recipe)}
                             collections={collections}
+                            // New unified architecture props
+                            favoritesHook={favoritesHook}
+                            collectionsHook={collectionsHook}
+                            toggleFavorite={toggleFavorite}
+                            isFavorite={isFavorite}
+                            // Legacy props for backward compatibility
                             onAddToFavorites={handleAddToFavoritesCallback}
+                            onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                             onAddToCollection={handleAddToCollectionCallback}
+                            onRemoveFromCollection={handleRemoveFromCollectionCallback}
                             onCreateCollection={handleCreateCollectionCallback}
                             fetchRecipeDetails={handleFetchRecipeDetails}
                             user={user}
@@ -558,7 +944,8 @@ export default function Home() {
                     <span className="text-[11px] text-stone-400 mt-1.5 px-1 font-medium">{formatTime(message.timestamp)}</span>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
             {isTyping && (
                <div className="flex gap-4 animate-slideUp">
@@ -627,78 +1014,12 @@ export default function Home() {
         
 
 
-        {/* Favorites Modal/View */}
-        {showFavorites && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div 
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl"
-              onClick={handleHideFavorites}
-            />
-            <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-4xl w-full max-h-[90vh] overflow-hidden transition-all duration-500 ease-out">
-              {/* Favorites Header */}
-              <div className="bg-gradient-to-r from-pink-600 via-red-600 to-pink-700 text-white p-6 relative overflow-hidden">
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-pulse duration-3000 pointer-events-none"></div>
-                <div className="flex items-center justify-between relative z-10">
-                  <div className="flex items-center gap-3">
-                    <Heart className="w-8 h-8 fill-white" />
-                    <h2 className="text-2xl font-bold tracking-wide">My Favorite Recipes</h2>
-                  </div>
-                  <button
-                    onClick={handleHideFavorites}
-                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-all duration-200 hover:scale-110"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
 
-              {/* Favorites Content */}
-              <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
-                {favoritesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="ml-3 text-stone-600 font-medium">Loading favorites...</span>
-                  </div>
-                ) : favoriteRecipes.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-pink-200/60">
-                      <Heart className="w-10 h-10 text-stone-300" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-stone-700 mb-2 tracking-wide">No favorites yet</h3>
-                    <p className="text-stone-500 leading-relaxed">Start saving recipes you love by clicking the heart icon!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-stone-700 mb-4 tracking-wide">
-                      You have {favoriteRecipes.length} favorite recipe{favoriteRecipes.length !== 1 ? 's' : ''}
-                    </h3>
-                    {favoriteRecipes.map((recipe, index) => (
-                      <RecipeCard
-                        key={`favorites_recipe_${index}_${recipe.id || recipe.title || recipe.name}`}
-                        recipe={recipe}
-                        onClick={handleFavoriteRecipeClick}
-                        isLoading={false}
-                        isFavorited={true}
-                        collections={collections}
-                        onAddToFavorites={handleAddToFavoritesCallback}
-                        onAddToCollection={handleAddToCollectionCallback}
-                        onCreateCollection={handleCreateCollectionCallback}
-                        fetchRecipeDetails={handleFetchRecipeDetails}
-                        user={user}
-                        requireAuth={requireAuth}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
       {/* Confirmation Dialogs */}
       <DeleteDialog />
       <LogoutDialog />
+
     </div>
   );
 }

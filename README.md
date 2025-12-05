@@ -373,8 +373,8 @@ The CookMate application is now **fully functional and ready for deployment**:
 
 ### Next Steps for Production
 1. Add Hugging Face API key for real AI responses
-2. Configure Firebase hosting for frontend
-3. Set up domain and SSL certificates
+2. Deploy frontend to Vercel (already configured)
+3. Set up custom domain and SSL certificates
 4. Add analytics and monitoring
 5. Implement user onboarding flow
 

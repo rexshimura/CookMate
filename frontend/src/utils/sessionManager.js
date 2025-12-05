@@ -20,6 +20,164 @@ const generateSessionId = () => {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// Transfer anonymous sessions to authenticated user
+export const transferAnonymousSessions = async (userId) => {
+  try {
+    // Get anonymous sessions from localStorage
+    const anonymousSessionsData = localStorage.getItem('anonymous_sessions');
+    if (!anonymousSessionsData) {
+      return { success: true, transferredCount: 0 };
+    }
+
+    const anonymousSessions = JSON.parse(anonymousSessionsData);
+    if (!Array.isArray(anonymousSessions) || anonymousSessions.length === 0) {
+      return { success: true, transferredCount: 0 };
+    }
+
+    let transferredCount = 0;
+    const transferErrors = [];
+    const successfullyTransferredSessions = [];
+
+    // Process each anonymous session
+    for (const anonymousSession of anonymousSessions) {
+      try {
+        // Validate session data
+        if (!anonymousSession.id || typeof anonymousSession.id !== 'string') {
+          throw new Error('Invalid session ID');
+        }
+
+        // Create new session for authenticated user
+        const newSessionData = {
+          id: generateSessionId(),
+          userId: userId,
+          title: anonymousSession.title || 'Transferred Chat',
+          lastMessage: anonymousSession.lastMessage || '',
+          createdAt: anonymousSession.createdAt || new Date(),
+          updatedAt: new Date(), // Use current time for updatedAt
+          isActive: true,
+          isTransferred: true, // Flag to indicate this was transferred
+          originalAnonymousId: anonymousSession.id
+        };
+
+        // Add the session to Firestore
+        const docRef = await addDoc(collection(db, 'sessions'), {
+          ...newSessionData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        const firestoreSessionId = docRef.id;
+        successfullyTransferredSessions.push({
+          anonymousId: anonymousSession.id,
+          firestoreId: firestoreSessionId
+        });
+
+        // Transfer messages for this session
+        const anonymousMessagesKey = `messages_${anonymousSession.id}`;
+        const anonymousMessagesData = localStorage.getItem(anonymousMessagesKey);
+        
+        if (anonymousMessagesData) {
+          try {
+            const anonymousMessages = JSON.parse(anonymousMessagesData);
+            if (Array.isArray(anonymousMessages) && anonymousMessages.length > 0) {
+              // Save each message to the new Firestore session
+              for (const message of anonymousMessages) {
+                try {
+                  const messageData = {
+                    ...message,
+                    sessionId: firestoreSessionId,
+                    createdAt: message.createdAt || new Date()
+                  };
+                  await addDoc(collection(db, 'messages'), {
+                    ...messageData,
+                    createdAt: serverTimestamp()
+                  });
+                } catch (messageError) {
+                  console.warn('Failed to transfer individual message:', messageError);
+                  // Continue with other messages even if one fails
+                }
+              }
+            }
+          } catch (messagesParseError) {
+            console.warn('Failed to parse messages for session:', anonymousSession.id, messagesParseError);
+            // Continue with other sessions even if messages parsing fails
+          }
+        }
+
+        transferredCount++;
+      } catch (sessionError) {
+        console.error('Error transferring session:', anonymousSession.id, sessionError);
+        transferErrors.push({
+          sessionId: anonymousSession.id,
+          error: sessionError.message
+        });
+      }
+    }
+
+    // Only clear localStorage if we successfully transferred at least some sessions
+    if (transferredCount > 0) {
+      try {
+        // Only clear the sessions that were successfully transferred
+        localStorage.removeItem('anonymous_sessions');
+        
+        // Clean up anonymous message data for successfully transferred sessions
+        for (const successfulTransfer of successfullyTransferredSessions) {
+          localStorage.removeItem(`messages_${successfulTransfer.anonymousId}`);
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to clean up localStorage after transfer:', cleanupError);
+        // Don't fail the entire operation if cleanup fails
+      }
+    }
+
+    return {
+      success: true,
+      transferredCount,
+      errors: transferErrors,
+      totalSessions: anonymousSessions.length,
+      successRate: transferredCount / anonymousSessions.length
+    };
+
+  } catch (error) {
+    console.error('Error in transferAnonymousSessions:', error);
+    return { 
+      success: false, 
+      error: error.message, 
+      transferredCount: 0,
+      totalSessions: 0,
+      successRate: 0
+    };
+  }
+};
+
+// Check if user has anonymous sessions that can be transferred
+export const hasAnonymousSessions = () => {
+  try {
+    const anonymousSessionsData = localStorage.getItem('anonymous_sessions');
+    if (!anonymousSessionsData) return false;
+
+    const anonymousSessions = JSON.parse(anonymousSessionsData);
+    return Array.isArray(anonymousSessions) && anonymousSessions.length > 0;
+  } catch (error) {
+    console.error('Error checking anonymous sessions:', error);
+    return false;
+  }
+};
+
+// Get count of anonymous sessions
+export const getAnonymousSessionsCount = () => {
+  try {
+    const anonymousSessionsData = localStorage.getItem('anonymous_sessions');
+    if (!anonymousSessionsData) return 0;
+
+    const anonymousSessions = JSON.parse(anonymousSessionsData);
+    return Array.isArray(anonymousSessions) ? anonymousSessions.length : 0;
+  } catch (error) {
+    console.error('Error getting anonymous sessions count:', error);
+    return 0;
+  }
+};
+
 // Session Management
 export const createSession = async (userId, title = 'New Cooking Session') => {
   try {
@@ -35,7 +193,6 @@ export const createSession = async (userId, title = 'New Cooking Session') => {
     };
 
     const docRef = await addDoc(collection(db, 'sessions'), sessionData);
-    console.log('[DEBUG] Created session - Custom ID:', sessionId, '| Firestore Doc ID:', docRef.id);
     // Return the Firestore document ID, not the custom ID
     return { success: true, session: { ...sessionData, id: docRef.id } };
   } catch (error) {
@@ -235,6 +392,36 @@ export const deleteSessionMessages = async (sessionId) => {
   }
 };
 
+// Clean up orphaned localStorage data (for anonymous users)
+export const cleanupOrphanedData = () => {
+  try {
+    // Get all localStorage keys
+    const allKeys = Object.keys(localStorage);
+    
+    // Find all messages keys
+    const messageKeys = allKeys.filter(key => key.startsWith('messages_'));
+    
+    // Get current sessions to check against
+    const currentSessionsKey = localStorage.getItem('anonymous_sessions');
+    const currentSessions = currentSessionsKey ? JSON.parse(currentSessionsKey) : [];
+    const sessionIds = new Set(currentSessions.map(session => session.id));
+    
+    // Remove orphaned message entries
+    let removedCount = 0;
+    messageKeys.forEach(key => {
+      const sessionId = key.replace('messages_', '');
+      if (!sessionIds.has(sessionId)) {
+        localStorage.removeItem(key);
+        removedCount++;
+      }
+    });
+    
+    return { success: true, removedCount };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
 // Generate session title from first message
 export const generateSessionTitle = (firstMessage) => {
   if (!firstMessage || firstMessage.trim().length === 0) {
@@ -304,4 +491,8 @@ export default {
   getSessionMessages,
   deleteSessionMessages,
   generateSessionTitle,
+  cleanupOrphanedData,
+  transferAnonymousSessions,
+  hasAnonymousSessions,
+  getAnonymousSessionsCount,
 };

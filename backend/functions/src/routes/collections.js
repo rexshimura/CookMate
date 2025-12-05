@@ -5,46 +5,67 @@ const { db, admin } = require('../config/firebase');
 // Middleware to verify Firebase Auth tokens
 const verifyAuthToken = async (req, res, next) => {
   try {
-    console.log('🔍 COLLECTIONS DEBUG - Request received:');
+    console.log(' COLLECTIONS DEBUG - Request received:');
     console.log('- admin.apps.length:', admin.apps.length);
     console.log('- Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
     
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ No authorization token provided');
+      console.log(' No authorization token provided');
       return res.status(401).json({ error: 'No authorization token provided' });
     }
     
     const token = authHeader.split('Bearer ')[1];
-    console.log('🔑 Token extracted, length:', token ? token.length : 0);
+    console.log(' Token extracted, length:', token ? token.length : 0);
     
-    // In development mode, accept mock tokens or any token
-    if (process.env.NODE_ENV === 'development' || !admin.apps.length || token === 'mock-token') {
-      console.log('🔧 Development mode: Using mock authentication');
+    // In development mode, accept mock tokens
+    if (process.env.NODE_ENV === 'development' || token === 'mock-token') {
+      console.log(' Development mode: Using mock authentication');
       req.userId = 'mock-user-id';
       req.user = { uid: 'mock-user-id', email: 'test@example.com' };
       return next();
     }
     
-    // Always verify Firebase tokens - no development bypass
-    if (!admin.apps.length) {
-      console.warn('❌ Firebase not initialized - admin.apps.length =', admin.apps.length);
-      console.warn('❌ This means Firebase Admin SDK is not properly initialized');
-      return res.status(503).json({ error: 'Service unavailable - Firebase not configured' });
+    // For production mode, verify Firebase tokens
+    if (admin.apps.length === 0) {
+      console.warn(' Firebase not initialized in production mode, using mock auth');
+      req.userId = 'mock-user-id';
+      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
+      return next();
     }
     
-    console.log('✅ Firebase Admin SDK is initialized, proceeding with token verification...');
+    console.log(' Firebase Admin SDK is initialized, proceeding with token verification...');
     
     // For real Firebase authentication
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.user = decodedToken;
-    next();
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.userId = decodedToken.uid;
+      req.user = decodedToken;
+      next();
+    } catch (firebaseError) {
+      console.error('Firebase token verification failed:', firebaseError);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
   } catch (error) {
     console.error('Auth token verification failed:', error);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+};
+
+// Helper to merge nested recipe data into the top level for consistent clients
+const normalizeRecipeData = (recipe) => {
+  if (!recipe || typeof recipe !== 'object') {
+    return recipe;
+  }
+
+  if (recipe.data && typeof recipe.data === 'object') {
+    const mergedRecipe = { ...recipe, ...recipe.data };
+    delete mergedRecipe.data;
+    return mergedRecipe;
+  }
+
+  return recipe;
 };
 
 // 1. Get All Collections for User
@@ -178,16 +199,16 @@ router.delete('/:id', verifyAuthToken, async (req, res) => {
 // 5. Add Recipe to Collection
 router.post('/:id/recipes', verifyAuthToken, async (req, res) => {
   try {
-    console.log('🍳 [BACKEND] Add recipe to collection request received');
-    console.log('🍳 [BACKEND] Collection ID:', req.params.id);
-    console.log('🍳 [BACKEND] Request body:', req.body);
-    console.log('🍳 [BACKEND] User ID:', req.userId);
+    console.log(' [BACKEND] Add recipe to collection request received');
+    console.log(' [BACKEND] Collection ID:', req.params.id);
+    console.log(' [BACKEND] Request body:', req.body);
+    console.log(' [BACKEND] User ID:', req.userId);
     
     const { id } = req.params;
     const { recipeId, recipeData } = req.body;
 
     if (!recipeId) {
-      console.error('❌ [BACKEND] No recipe ID provided');
+      console.error(' [BACKEND] No recipe ID provided');
       return res.status(400).json({ error: 'Recipe ID is required' });
     }
 
@@ -204,25 +225,45 @@ router.post('/:id/recipes', verifyAuthToken, async (req, res) => {
 
     // Check if recipe already exists in collection
     const currentRecipes = collectionData.recipes || [];
-    console.log('📋 [BACKEND] Current recipes in collection:', currentRecipes.length);
+    console.log(' [BACKEND] Current recipes in collection:', currentRecipes.length);
     const recipeExists = currentRecipes.some(recipe => recipe.id === recipeId);
 
     if (recipeExists) {
-      console.log('⚠️ [BACKEND] Recipe already exists in collection');
+      console.log(' [BACKEND] Recipe already exists in collection');
+      
+      // For favorites collection, return 200 OK (idempotent success) instead of 400
+      // This prevents UI/DB desync when users click favorite multiple times
+      if (collectionData.isFavorites || collectionData.isDefault) {
+        console.log(' [BACKEND] Idempotent success for favorites collection');
+        return res.status(200).json({ 
+          message: 'Recipe already in favorites (idempotent success)',
+          recipeCount: currentRecipes.length,
+          idempotent: true
+        });
+      }
+      
+      // For other collections, still return 400 to maintain existing behavior
       return res.status(400).json({ error: 'Recipe already exists in this collection' });
     }
 
     // Add recipe to collection
+    const flattenedRecipeData = (recipeData && typeof recipeData === 'object')
+      ? { ...recipeData }
+      : {};
+
+    // Ensure we don't duplicate ID fields coming from the client payload
+    delete flattenedRecipeData.id;
+
     const newRecipe = {
       id: recipeId,
       addedAt: new Date().toISOString(),
-      ...(recipeData && { data: recipeData })
+      ...flattenedRecipeData
     };
 
-    console.log('➕ [BACKEND] Adding new recipe:', newRecipe);
+    console.log(' [BACKEND] Adding new recipe:', newRecipe);
 
     const updatedRecipes = [...currentRecipes, newRecipe];
-    console.log('📈 [BACKEND] Updated recipes count:', updatedRecipes.length);
+    console.log(' [BACKEND] Updated recipes count:', updatedRecipes.length);
     
     await db.collection('collections').doc(id).update({
       recipes: updatedRecipes,
@@ -230,14 +271,17 @@ router.post('/:id/recipes', verifyAuthToken, async (req, res) => {
       updatedAt: new Date().toISOString()
     });
 
-    console.log('✅ [BACKEND] Successfully updated collection in database');
+    console.log(' [BACKEND] Successfully updated collection in database');
+    const normalizedRecipes = (updatedRecipes).map(normalizeRecipeData);
+
     res.status(200).json({ 
       message: 'Recipe added to collection successfully',
-      recipeCount: updatedRecipes.length
+      recipeCount: updatedRecipes.length,
+      recipe: normalizedRecipes[normalizedRecipes.length - 1]
     });
   } catch (error) {
-    console.error('❌ [BACKEND] Error adding recipe to collection:', error);
-    console.error('❌ [BACKEND] Error details:', {
+    console.error(' [BACKEND] Error adding recipe to collection:', error);
+    console.error(' [BACKEND] Error details:', {
       message: error.message,
       stack: error.stack,
       name: error.name
@@ -272,9 +316,12 @@ router.delete('/:id/recipes/:recipeId', verifyAuthToken, async (req, res) => {
       updatedAt: new Date().toISOString()
     });
 
+    const normalizedRecipes = updatedRecipes.map(normalizeRecipeData);
+
     res.status(200).json({ 
       message: 'Recipe removed from collection successfully',
-      recipeCount: updatedRecipes.length
+      recipeCount: updatedRecipes.length,
+      recipes: normalizedRecipes
     });
   } catch (error) {
     console.error('Error removing recipe from collection:', error);
@@ -292,13 +339,56 @@ router.get('/favorites', verifyAuthToken, async (req, res) => {
       .limit(1)
       .get();
 
+    console.log(' [FAVORITES DEBUG] Favorites collection query result:', favoritesSnapshot.size);
+
     if (favoritesSnapshot.empty) {
-      return res.status(404).json({ error: 'Favorites collection not found' });
+      console.log(' [FAVORITES DEBUG] No favorites collection found for user:', req.userId);
+      console.log(' [FAVORITES DEBUG] Auto-creating favorites collection...');
+      
+      // Auto-create favorites collection if it doesn't exist
+      try {
+        const favoritesCollection = {
+          name: 'My Favorites',
+          description: 'Your favorite recipes, all in one place',
+          color: '#FF6B6B',
+          icon: 'heart',
+          userId: req.userId,
+          recipes: [],
+          recipeCount: 0,
+          isDefault: true,
+          isFavorites: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        const docRef = await db.collection('collections').add(favoritesCollection);
+        console.log(' [FAVORITES DEBUG] Auto-created favorites collection with ID:', docRef.id);
+        
+        // Return the newly created collection
+        return res.status(200).json({ 
+          collection: {
+            id: docRef.id,
+            name: favoritesCollection.name,
+            description: favoritesCollection.description,
+            color: favoritesCollection.color,
+            icon: favoritesCollection.icon,
+            isDefault: true
+          },
+          recipes: [],
+          recipeCount: 0,
+          autoCreated: true
+        });
+      } catch (createError) {
+        console.error(' [FAVORITES DEBUG] Failed to auto-create favorites collection:', createError);
+        return res.status(500).json({ error: 'Failed to create favorites collection' });
+      }
     }
 
     const favoritesDoc = favoritesSnapshot.docs[0];
     const favoritesData = favoritesDoc.data();
     
+    const normalizedRecipes = (favoritesData.recipes || []).map(normalizeRecipeData);
+
     res.status(200).json({ 
       collection: {
         id: favoritesDoc.id,
@@ -308,8 +398,8 @@ router.get('/favorites', verifyAuthToken, async (req, res) => {
         icon: favoritesData.icon,
         isDefault: true
       },
-      recipes: favoritesData.recipes || [],
-      recipeCount: favoritesData.recipeCount || 0
+      recipes: normalizedRecipes,
+      recipeCount: normalizedRecipes.length
     });
   } catch (error) {
     console.error('Error fetching favorites collection:', error);
@@ -333,7 +423,7 @@ router.get('/:id/recipes', verifyAuthToken, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to collection' });
     }
 
-    const recipes = collectionData.recipes || [];
+    const recipes = (collectionData.recipes || []).map(normalizeRecipeData);
     
     res.status(200).json({ 
       collection: {

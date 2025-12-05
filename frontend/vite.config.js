@@ -9,7 +9,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-
+    port: 3000,
+    host: true,
     proxy: {
       '/api': {
         // Target the dev server directly
@@ -20,9 +21,24 @@ export default defineConfig({
         // We do NOT rewrite the path because your Express app expects routes to start with /api
       },
     },
+    // SPA fallback configuration for client-side routing
+    historyApiFallback: true,
   },
   build: {
-    outDir: '../backend/dist',
+    outDir: 'dist',
     emptyOutDir: true,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          router: ['react-router-dom'],
+          ui: ['lucide-react']
+        }
+      }
+    }
   },
+  // Set base path for production deployment
+  base: process.env.NODE_ENV === 'production' ? '/' : '/',
 })

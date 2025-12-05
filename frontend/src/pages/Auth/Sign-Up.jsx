@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, Mail, Lock, User, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase"; 
+import { useAuth } from '../../hooks/useAuth.jsx';
 import { useNavigate } from "react-router-dom";
 
 
@@ -13,6 +11,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,35 +20,17 @@ export default function SignupPage() {
     setError("");
 
     try {
-      // 1. Create User in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // 2. Update Display Name
-      await updateProfile(user, {
-        displayName: name
-      });
-
-      // 3. Create User Document in Firestore (Create 'users' collection)
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        name: name,
-        email: email,
-        createdAt: new Date().toISOString(),
-        favorites: []
-      });
-
-      navigate("/home"); 
-
+      // Use our custom signUp function that includes session transfer
+      const result = await signUp(email, password, name);
+      
+      if (result.success) {
+        navigate("/home");
+      } else {
+        setError(result.error || "Failed to create account. Please try again.");
+      }
     } catch (error) {
       console.error("Signup Error:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        setError("An account with this email already exists. Please try signing in instead.");
-      } else if (error.code === 'auth/weak-password') {
-        setError("Password is too weak. Please use at least 6 characters.");
-      } else {
-        setError("Failed to create account. Please try again.");
-      }
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +172,7 @@ export default function SignupPage() {
             </form>
 
             <div className="mt-8 text-center animate-slideUp delay-250">
-              <p className="text-sm text-stone-600">
+              <div className="text-sm text-stone-600">
                 Already have an account?{' '}
                 <Link 
                   to="/signin" 
@@ -200,7 +181,7 @@ export default function SignupPage() {
                   Log in
                   <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-gradient-to-r from-orange-500 to-red-500 group-hover:w-full transition-all duration-300"></div>
                 </Link>
-              </p>
+              </div>
             </div>
           </div>
         </div>

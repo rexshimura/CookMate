@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Folder, Plus, CheckCircle } from 'lucide-react';
+import { Folder, Plus, CheckCircle, Trash2 } from 'lucide-react';
 
 const CollectionsModal = ({ 
   isOpen, 
@@ -9,6 +9,7 @@ const CollectionsModal = ({
   user,
   requireAuth,
   onAddToCollection,
+  onRemoveFromCollection,
   onCreateCollection,
   triggerRef 
 }) => {
@@ -64,6 +65,13 @@ const CollectionsModal = ({
     onClose();
   };
 
+  const handleRemoveFromCollection = async (collectionId) => {
+    if (onRemoveFromCollection) {
+      await onRemoveFromCollection(collectionId);
+      onClose();
+    }
+  };
+
   const handleCreateCollection = () => {
     onClose();
     if (onCreateCollection) {
@@ -99,7 +107,7 @@ const CollectionsModal = ({
         {/* Header */}
         <div className="p-4 border-b border-stone-200/60">
           <h4 className="font-semibold text-stone-800 text-sm tracking-wide">
-            {collections.length > 0 ? 'Add to Collection' : 'Create Collection'}
+            {collections.length > 0 ? 'Manage Collection' : 'Create Collection'}
           </h4>
           <p className="text-xs text-stone-500 mt-1">
             {collections.length > 0 
@@ -118,8 +126,18 @@ const CollectionsModal = ({
               .map(collection => (
                 <button
                   key={collection.id}
-                  onClick={() => handleAddToCollection(collection.id)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50 transition-all duration-300 text-left hover:scale-[1.02] group rounded-xl"
+                  onClick={() => {
+                    if (checkIfRecipeInCollection(collection.id) && onRemoveFromCollection) {
+                      handleRemoveFromCollection(collection.id);
+                    } else {
+                      handleAddToCollection(collection.id);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 p-3 transition-all duration-300 text-left hover:scale-[1.02] group rounded-xl ${
+                    checkIfRecipeInCollection(collection.id)
+                      ? 'hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50'
+                      : 'hover:bg-gradient-to-r hover:from-orange-50 hover:to-red-50'
+                  }`}
                 >
                   <div 
                     className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
@@ -142,8 +160,13 @@ const CollectionsModal = ({
                       {collection.recipeCount || 0} recipes
                     </p>
                   </div>
-                  {checkIfRecipeInCollection(collection.id) && (
-                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  {checkIfRecipeInCollection(collection.id) ? (
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <Trash2 className="w-3 h-3 text-red-500 flex-shrink-0" />
+                    </div>
+                  ) : (
+                    <div className="w-4 h-4" />
                   )}
                 </button>
               ))
@@ -171,6 +194,9 @@ const CollectionsModal = ({
         {/* Footer */}
         {collections.length > 0 && (
           <div className="p-3 border-t border-stone-200/60">
+            <div className="text-xs text-stone-500 mb-2 text-center">
+              ✓ Add to collection • 🗑️ Remove from collection
+            </div>
             <button
               onClick={handleCreateCollection}
               className="w-full flex items-center justify-center gap-2 p-2 text-sm text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-xl transition-all duration-300 font-medium"

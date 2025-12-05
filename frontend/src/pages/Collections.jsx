@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChefHat, Clock, Users, X, Lock } from 'lucide-react';
+import { ArrowLeft, ChefHat, Clock, Users, X, Lock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import CollectionManager from './Components/Collections/CollectionManager.jsx';
@@ -7,22 +7,231 @@ import RecipeCard from './Components/Recipe/RecipeCard.jsx';
 import { getCollections, getCollectionRecipes, createCollection, updateCollection, getRecipeDetails } from '../utils/api.js';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { useModal } from '../App.jsx';
+import { useLogoutConfirmation } from './Components/UI/useConfirmation.jsx';
+import SimpleLogoutDialog, { LogoutButton, UserMenu } from '../components/SimpleLogoutDialog.jsx';
+
+// NEW: Helper to decide if a string is likely a recipe name (not a category/header)
+const categoryKeywords = [
+  'cuisine','food','vegan','vegetarian','dessert','desserts','breakfast',
+  'lunch','dinner','snack','comfort','seafood','global','bbq','grilling',
+  'baking','healthy','quick','easy','popular','classic','options','recipes',
+  'categories','meals','sides'
+];
+
+const dishKeywords = [
+  'chicken','beef','pork','salmon','fish','shrimp','pasta','spaghetti',
+  'risotto','curry','biryani','taco','burger','cake','pie','stew','sushi',
+  'ramen','lasagna','omelette','pancake','salad','paella','noodle','sandwich',
+  'parmesan','parmesan','meatloaf','parmesan','parmesan'
+];
+
+const normalizeText = (t = '') => ('' + t).replace(/[*_`~]/g, '').trim();
+
+const extractName = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return normalizeText(item);
+  if (item.title) return normalizeText(item.title);
+  if (item.name) return normalizeText(item.name);
+  return '';
+};
+
+const isRecipeName = (text) => {
+  if (!text) return false;
+  const cleaned = extractName(text);
+  if (!cleaned) return false;
+  if (cleaned.length < 2 || cleaned.length > 120) return false;
+
+  const lower = cleaned.toLowerCase();
+
+  // Immediate reject if it contains obvious category words as whole words
+  for (const kw of categoryKeywords) {
+    if (new RegExp(`\\b${kw}\\b`).test(lower)) return false;
+  }
+
+  // Accept if contains a strong dish keyword
+  for (const kw of dishKeywords) {
+    if (lower.includes(kw)) return true;
+  }
+
+  // Heuristic: title-case multi-word strings are likely dish names (e.g., "Spaghetti Bolognese")
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 5) {
+    const titleCaseCount = words.filter(w => /^[A-Z][a-z]/.test(w)).length;
+    if (titleCaseCount >= Math.max(1, Math.ceil(words.length / 2))) return true;
+  }
+
+  // If it's a single word but not a generic label and looks like a food (letters only, not short like 'the', 'and')
+  if (words.length === 1 && /^[A-Za-z'-]{3,30}$/.test(words[0])) {
+    // accept short single-word dish names like "Risotto", "Tiramisu"
+    return true;
+  }
+
+  // Otherwise, treat as category / ambiguous -> reject
+  return false;
+};
 
 const Collections = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { showAuthPrompt, showRecipeDetail } = useModal();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { showAuthPrompt, showRecipeDetail, showCollectionFormModal } = useModal();
+  const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [collectionRecipes, setCollectionRecipes] = useState([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [currentCollection, setCurrentCollection] = useState(null);
   const [collections, setCollections] = useState([]);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
 
-  // Show loading spinner while checking authentication
-  if (authLoading) {
-    return <LoadingSpinner />;
-  }
+  // --- MOVED UP: ensure these functions are initialized before any useEffect uses them ---
+  const loadAllCollectionRecipes = async () => {
+    setLoadingRecipes(true);
+    try {
+      const collectionsResult = await getCollections();
+      if (!collectionsResult || !collectionsResult.collections) {
+        console.error('Failed to load collections for All Recipes view');
+        setCollectionRecipes([]);
+        setCurrentCollection({
+          id: null,
+          name: 'All Recipes',
+          description: 'All recipes from your collections',
+          color: '#FF6B6B',
+          icon: 'folder'
+        });
+        return;
+      }
+
+      const allRecipes = [];
+      const collectionsList = collectionsResult.collections;
+
+      for (const collection of collectionsList) {
+        try {
+          const collectionResult = await getCollectionRecipes(collection.id);
+          if (collectionResult && collectionResult.recipes) {
+            // FILTER: only include items that look like actual recipe names
+            const recipesWithCollection = collectionResult.recipes
+              .map(recipe => ({
+                ...recipe,
+                collectionName: collection.name,
+                collectionColor: collection.color
+              }))
+              .filter(r => {
+                const candidate = extractName(r);
+                if (!isRecipeName(candidate)) {
+                  // skip category-like item
+                  return false;
+                }
+                return true;
+              });
+            allRecipes.push(...recipesWithCollection);
+          }
+        } catch (error) {
+          console.error(`Failed to load recipes from collection ${collection.name}:`, error);
+        }
+      }
+
+      setCollectionRecipes(allRecipes);
+      setCurrentCollection({
+        id: null,
+        name: 'All Recipes',
+        description: `${allRecipes.length} recipes from ${collectionsList.length} collection${collectionsList.length !== 1 ? 's' : ''}`,
+        color: '#FF6B6B',
+        icon: 'folder'
+      });
+
+    } catch (error) {
+      console.error('Failed to load all collection recipes:', error);
+      setCollectionRecipes([]);
+      setCurrentCollection({
+        id: null,
+        name: 'All Recipes',
+        description: 'Failed to load recipes',
+        color: '#FF6B6B',
+        icon: 'folder'
+      });
+    } finally {
+      setLoadingRecipes(false);
+    }
+  };
+
+  const loadCollectionRecipes = async (collectionId) => {
+    if (!collectionId) {
+      await loadAllCollectionRecipes();
+      return;
+    }
+
+    setLoadingRecipes(true);
+    try {
+      const result = await getCollectionRecipes(collectionId);
+      if (result && result.recipes !== undefined && result.collection !== undefined) {
+        // FILTER: remove category-like items from API response before setting state
+        const filtered = (result.recipes || []).filter(r => isRecipeName(extractName(r)));
+        setCollectionRecipes(filtered);
+        setCurrentCollection(result.collection);
+      } else {
+        console.error('Unexpected response format:', result);
+        setCollectionRecipes([]);
+        setCurrentCollection(null);
+      }
+    } catch (error) {
+      console.error('Failed to load collection recipes:', error);
+      setCollectionRecipes([]);
+      setCurrentCollection(null);
+    } finally {
+      setLoadingRecipes(false);
+    }
+  };
+
+  const loadCollections = async () => {
+    console.log('📚 [Collections] Loading collections...');
+    setCollectionsLoading(true);
+    try {
+      const result = await getCollections();
+      console.log('📚 [Collections] Collections API result:', result);
+
+      let collectionsList = [];
+      if (result && result.collections) {
+        collectionsList = result.collections;
+      } else if (Array.isArray(result)) {
+        collectionsList = result;
+      } else {
+        console.warn('⚠️ [Collections] Unexpected collections response format:', result);
+      }
+
+      console.log('📚 [Collections] Loaded collections:', collectionsList);
+      setCollections(collectionsList);
+
+    } catch (error) {
+      console.error('❌ [Collections] Exception loading collections:', error);
+      console.error('❌ [Collections] Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+    } finally {
+      setCollectionsLoading(false);
+    }
+  };
+  // --- END MOVED SECTION ---
+
+  // Move useEffect hooks here to ensure they're always called
+  useEffect(() => {
+    // Load recipes for the initially selected collection (if any)
+    if (selectedCollectionId) {
+      loadCollectionRecipes(selectedCollectionId);
+    } else {
+      // Load "All Recipes" view when no specific collection is selected
+      loadCollectionRecipes(null);
+    }
+  }, [selectedCollectionId]);
+
+  useEffect(() => {
+    // Load collections when user is authenticated
+    if (user) {
+      loadCollections();
+    }
+  }, [user]);
 
   // Show auth prompt if not authenticated instead of redirecting
   if (!user) {
@@ -89,20 +298,6 @@ const Collections = () => {
     );
   }
   
-  // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingCollection, setEditingCollection] = useState(null);
-  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
-  
-  // Form data
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    color: '#FF6B6B',
-    icon: 'folder'
-  });
-
   // Predefined colors and icons for collections
   const colorOptions = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
@@ -113,19 +308,8 @@ const Collections = () => {
     'folder', 'heart', 'star', 'bookmark', 'tag', 'chef-hat', 'clock'
   ];
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      color: '#FF6B6B',
-      icon: 'folder'
-    });
-  };
-
   // Create collection
-  const handleCreateCollection = async (e) => {
-    e.preventDefault();
+  const handleCreateCollection = async (formData) => {
     if (!formData.name.trim()) return;
 
     try {
@@ -140,24 +324,25 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        setShowCreateModal(false);
-        resetForm();
-        console.log('✅ Collection created successfully:', result.message);
       } else {
-        console.error('❌ Unexpected response format:', result);
+        // Show user-friendly error without crashing
+        alert('Failed to create collection: Unexpected response from server');
       }
     } catch (error) {
-      console.error('❌ Failed to create collection:', error);
+      console.error('Failed to create collection:', error);
+      
+      // Show user-friendly error without crashing the page
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`Failed to create collection: ${errorMessage}`);
     }
   };
 
   // Update collection
-  const handleUpdateCollection = async (e) => {
-    e.preventDefault();
-    if (!editingCollection || !formData.name.trim()) return;
+  const handleUpdateCollection = async (formData, collection) => {
+    if (!collection || !formData.name.trim()) return;
 
     try {
-      const result = await updateCollection(editingCollection.id, formData);
+      const result = await updateCollection(collection.id, formData);
       
       // Backend returns { message, collection } - check for collection field
       if (result && result.collection) {
@@ -168,40 +353,23 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        setShowEditModal(false);
-        setEditingCollection(null);
-        resetForm();
-        console.log('✅ Collection updated successfully:', result.message);
       } else {
-        console.error('❌ Unexpected response format:', result);
+        console.error('Unexpected response format:', result);
       }
     } catch (error) {
-      console.error('❌ Failed to update collection:', error);
+      console.error('Failed to update collection:', error);
     }
   };
 
   // Start editing
   const startEditing = (collection) => {
-    setEditingCollection(collection);
-    setFormData({
-      name: collection.name,
-      description: collection.description || '',
-      color: collection.color,
-      icon: collection.icon
+    showCollectionFormModal({
+      mode: 'edit',
+      collection,
+      onSubmit: (formData) => handleUpdateCollection(formData, collection),
+      colors: colorOptions,
+      icons: iconOptions
     });
-    setShowEditModal(true);
-  };
-
-  // Handle modal close
-  const handleCreateModalClose = () => {
-    setShowCreateModal(false);
-    resetForm();
-  };
-
-  const handleEditModalClose = () => {
-    setShowEditModal(false);
-    setEditingCollection(null);
-    resetForm();
   };
 
   // Handle collection refresh from CollectionManager
@@ -212,118 +380,13 @@ const Collections = () => {
     }
   };
 
-  // Load all recipes from all collections (for "All Recipes" view)
-  const loadAllCollectionRecipes = async () => {
-    setLoadingRecipes(true);
-    try {
-      // First get all collections
-      const collectionsResult = await getCollections();
-      if (!collectionsResult || !collectionsResult.collections) {
-        console.error('Failed to load collections for All Recipes view');
-        setCollectionRecipes([]);
-        setCurrentCollection({
-          id: null,
-          name: 'All Recipes',
-          description: 'All recipes from your collections',
-          color: '#FF6B6B',
-          icon: 'folder'
-        });
-        return;
-      }
 
-      const allRecipes = [];
-      const collections = collectionsResult.collections;
-
-      // Load recipes from each collection
-      for (const collection of collections) {
-        try {
-          const collectionResult = await getCollectionRecipes(collection.id);
-          if (collectionResult && collectionResult.recipes) {
-            // Add collection name to each recipe for reference
-            const recipesWithCollection = collectionResult.recipes.map(recipe => ({
-              ...recipe,
-              collectionName: collection.name,
-              collectionColor: collection.color
-            }));
-            allRecipes.push(...recipesWithCollection);
-          }
-        } catch (error) {
-          console.error(`Failed to load recipes from collection ${collection.name}:`, error);
-        }
-      }
-
-      setCollectionRecipes(allRecipes);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: `${allRecipes.length} recipes from ${collections.length} collection${collections.length !== 1 ? 's' : ''}`,
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-
-    } catch (error) {
-      console.error('Failed to load all collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: 'Failed to load recipes',
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
-
-  // Load recipes for selected collection
-  const loadCollectionRecipes = async (collectionId) => {
-    if (!collectionId) {
-      // Load all recipes from all collections when "All Recipes" is selected
-      await loadAllCollectionRecipes();
-      return;
-    }
-
-    setLoadingRecipes(true);
-    try {
-      const result = await getCollectionRecipes(collectionId);
-      // Backend returns { collection: {...}, recipes: [...] } directly
-      if (result && result.recipes !== undefined && result.collection !== undefined) {
-        setCollectionRecipes(result.recipes || []);
-        setCurrentCollection(result.collection);
-      } else {
-        console.error('Unexpected response format:', result);
-        setCollectionRecipes([]);
-        setCurrentCollection(null);
-      }
-    } catch (error) {
-      console.error('Failed to load collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection(null);
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
 
   // Handle collection selection
   const handleCollectionSelect = (collectionId) => {
     setSelectedCollectionId(collectionId);
     loadCollectionRecipes(collectionId);
   };
-
-  useEffect(() => {
-    // Load recipes for the initially selected collection (if any)
-    if (selectedCollectionId) {
-      loadCollectionRecipes(selectedCollectionId);
-    }
-  }, [selectedCollectionId]);
-
-  useEffect(() => {
-    // Load collections when user is authenticated
-    if (user) {
-      loadCollections();
-    }
-  }, [user]);
 
   const handleRecipeClick = (recipeName) => {
     showRecipeDetail({
@@ -343,37 +406,7 @@ const Collections = () => {
     }
   };
 
-  const loadCollections = async () => {
-    console.log('📚 [Collections] Loading collections...');
-    setCollectionsLoading(true);
-    try {
-      const result = await getCollections();
-      console.log('📚 [Collections] Collections API result:', result);
-      
-      // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
-      let collections = [];
-      if (result && result.collections) {
-        collections = result.collections;
-      } else if (Array.isArray(result)) {
-        collections = result;
-      } else {
-        console.warn('⚠️ [Collections] Unexpected collections response format:', result);
-      }
-      
-      console.log('📚 [Collections] Loaded collections:', collections);
-      setCollections(collections);
-      
-    } catch (error) {
-      console.error('❌ [Collections] Exception loading collections:', error);
-      console.error('❌ [Collections] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
+
 
   // Login prompt handlers
   const requireAuth = (featureName) => {
@@ -389,14 +422,70 @@ const Collections = () => {
     console.log('Added to favorites:', recipeData);
   };
 
+  // Handle remove from favorites callback
+  const handleRemoveFromFavoritesCallback = (recipeData) => {
+    console.log('Removed from favorites:', recipeData);
+  };
+
   // Handle add to collection callback  
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
     console.log('Added to collection:', collectionId, recipeData);
   };
 
+  // Handle remove from collection callback
+  const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
+    console.log('Removed from collection:', collectionId, recipeData);
+    // Refresh the current collection to show updated recipes
+    if (selectedCollectionId) {
+      loadCollectionRecipes(selectedCollectionId);
+    }
+    // Also refresh collections to update recipe counts
+    loadCollections();
+  };
+
   // Handle create collection callback
   const handleCreateCollectionCallback = () => {
-    setShowCreateModal(true);
+    showCollectionFormModal({
+      mode: 'create',
+      onSubmit: handleCreateCollection,
+      colors: colorOptions,
+      icons: iconOptions
+    });
+  };
+
+  // Handle logout with confirmation
+  const handleLogout = async () => {
+    const confirmed = await confirmLogout();
+    
+    if (confirmed) {
+      console.log('🔄 [Collections] User confirmed logout, starting process...');
+      
+      // Set loading state
+      setIsLoggingOut(true);
+      
+      try {
+        const result = await logout();
+        
+        if (result.success) {
+          console.log('✅ [Collections] Logout successful, redirecting...');
+          
+          // Redirect to landing page after successful logout
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+          
+        } else {
+          console.error('❌ [Collections] Logout failed:', result.error);
+          alert(result.error || 'Failed to sign out. Please try again.');
+        }
+        
+      } catch (error) {
+        console.error('❌ [Collections] Unexpected logout error:', error);
+        alert('An unexpected error occurred. Please try again.');
+      } finally {
+        setIsLoggingOut(false);
+      }
+    }
   };
 
   return (
@@ -410,6 +499,19 @@ const Collections = () => {
       {/* Floating decorative elements */}
       <div className="absolute top-20 right-20 w-40 h-40 bg-gradient-to-br from-blue-200 to-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob"></div>
       <div className="absolute bottom-20 left-20 w-40 h-40 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
+      
+      {/* Logout Loading Overlay */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-200/60">
+              <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 mb-2">Signing Out</h3>
+            <p className="text-stone-600">Please wait while we sign you out...</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 relative z-10">
@@ -434,11 +536,22 @@ const Collections = () => {
                 </div>
               </div>
             </div>
-            {/* Authentication status indicator */}
-            <div className="flex items-center gap-2 text-sm text-stone-600">
-              <Lock className="w-4 h-4" />
-              <span>Signed in as {user?.displayName || user?.email}</span>
-            </div>
+            {/* Authentication status indicator and logout - Only show when user is logged in */}
+            {user && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-sm text-stone-600">
+                  <Lock className="w-4 h-4" />
+                  <span>Signed in as {user?.displayName || user?.email}</span>
+                </div>
+                <LogoutButton 
+                  onLogout={handleLogout}
+                  variant="icon-text"
+                  size="md"
+                  className="text-stone-600 hover:text-red-600 hover:bg-red-50"
+                  disabled={isLoggingOut}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -456,7 +569,7 @@ const Collections = () => {
                 key={collectionsRefreshKey}
                 selectedCollectionId={selectedCollectionId}
                 onCollectionSelect={handleCollectionSelect}
-                onCreateCollection={() => setShowCreateModal(true)}
+                onCreateCollection={handleCreateCollectionCallback}
                 onEditCollection={startEditing}
                 onCollectionRefresh={handleCollectionRefresh}
               />
@@ -516,14 +629,17 @@ const Collections = () => {
                       {collectionRecipes.map((recipe, index) => (
                         <RecipeCard
                           key={recipe.id || index}
-                          recipe={recipe.title || recipe.name || `Recipe ${index + 1}`}
+                          recipe={recipe}
                           onClick={handleRecipeClick}
                           isFavorited={true}
                           user={user}
                           collections={collections}
                           requireAuth={requireAuth}
+                          collectionId={currentCollection?.id}
                           onAddToFavorites={handleAddToFavoritesCallback}
+                          onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                           onAddToCollection={handleAddToCollectionCallback}
+                          onRemoveFromCollection={handleRemoveFromCollectionCallback}
                           onCreateCollection={handleCreateCollectionCallback}
                           fetchRecipeDetails={handleFetchRecipeDetails}
                         />
@@ -588,169 +704,9 @@ const Collections = () => {
         </div>
       </div>
 
-      {/* Create Collection Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={handleCreateModalClose} />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full p-6 transition-all duration-500 ease-out my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Create New Collection</h3>
-              <button
-                onClick={handleCreateModalClose}
-                className="p-1 hover:bg-stone-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Logout Confirmation Dialog */}
+      <LogoutDialog />
 
-            <form onSubmit={handleCreateCollection} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Collection Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="e.g., My Fried Recipes"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="Optional description"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {colorOptions.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, color }))}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        formData.color === color ? 'border-stone-400' : 'border-stone-200'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCreateModalClose}
-                  className="flex-1 px-4 py-2.5 border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 transition-all duration-200 font-medium hover:scale-105"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="relative flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200 font-semibold hover:scale-105 overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Collection Modal */}
-      {showEditModal && editingCollection && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 overflow-y-auto">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={handleEditModalClose} />
-          <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 backdrop-blur-xl max-w-md w-full p-6 transition-all duration-500 ease-out my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-800">Edit Collection</h3>
-              <button
-                onClick={handleEditModalClose}
-                className="p-1 hover:bg-stone-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateCollection} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Collection Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2 flex-wrap">
-                  {colorOptions.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, color }))}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        formData.color === color ? 'border-stone-400' : 'border-stone-200'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleEditModalClose}
-                  className="flex-1 px-4 py-2.5 border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 transition-all duration-200 font-medium hover:scale-105"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="relative flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all duration-200 font-semibold hover:scale-105 overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  Update
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

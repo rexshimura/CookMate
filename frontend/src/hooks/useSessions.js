@@ -20,7 +20,7 @@ export const useSessions = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Listen for global session updates
+  // Listen for global session updates and auth events
   useEffect(() => {
     const handleSessionUpdate = (event) => {
       const { sessionId, updates } = event.detail;
@@ -32,10 +32,27 @@ export const useSessions = () => {
       );
     };
 
+    const handleSessionsTransferred = (event) => {
+      console.log('🔄 [useSessions] Sessions transferred, reloading sessions...');
+      // Reload sessions after transfer to show the new authenticated sessions
+      loadSessions();
+    };
+
+    const handleUserLoggingOut = (event) => {
+      console.log('🔄 [useSessions] User logging out, clearing sessions...');
+      // Clear sessions when user logs out
+      setSessions([]);
+      setError(null);
+    };
+
     window.addEventListener('sessionUpdated', handleSessionUpdate);
+    window.addEventListener('sessionsTransferred', handleSessionsTransferred);
+    window.addEventListener('userLoggingOut', handleUserLoggingOut);
     
     return () => {
       window.removeEventListener('sessionUpdated', handleSessionUpdate);
+      window.removeEventListener('sessionsTransferred', handleSessionsTransferred);
+      window.removeEventListener('userLoggingOut', handleUserLoggingOut);
     };
   }, []);
 
@@ -43,20 +60,17 @@ export const useSessions = () => {
   const loadSessions = async () => {
     if (!user) {
       // For anonymous users, check for existing local sessions array
-      console.log('🍳 [useSessions] Loading anonymous sessions from localStorage...');
       const localSessions = localStorage.getItem('anonymous_sessions');
       if (localSessions) {
         try {
           const parsedSessions = JSON.parse(localSessions);
-          console.log('🍳 [useSessions] Found anonymous sessions:', parsedSessions);
           setSessions(parsedSessions || []);
         } catch (error) {
-          console.error('🍳 [useSessions] Error parsing anonymous sessions:', error);
+          console.error('Error parsing anonymous sessions:', error);
           localStorage.removeItem('anonymous_sessions');
           setSessions([]);
         }
       } else {
-        console.log('🍳 [useSessions] No anonymous sessions found in localStorage');
         setSessions([]);
       }
       return;
@@ -86,7 +100,6 @@ export const useSessions = () => {
       
       if (!user) {
         // Create anonymous session
-        console.log('🍳 [useSessions] Creating new anonymous session...');
         const anonymousSession = {
           id: `anon_${Date.now()}`,
           title: title || 'Anonymous Chat',
@@ -105,8 +118,6 @@ export const useSessions = () => {
         
         // Store in localStorage
         localStorage.setItem('anonymous_sessions', JSON.stringify(updatedSessions));
-        console.log('🍳 [useSessions] Anonymous session created and saved:', anonymousSession);
-        console.log('🍳 [useSessions] Total sessions now:', updatedSessions.length);
         
         // Update local state
         setSessions(updatedSessions);
@@ -159,7 +170,8 @@ export const useSessions = () => {
       
       // Handle anonymous sessions locally
       if (sessionId.startsWith('anon_')) {
-        console.log('🍳 [useSessions] Deleting anonymous session:', sessionId);
+        // Remove messages from localStorage first
+        localStorage.removeItem(`messages_${sessionId}`);
         
         // Remove from localStorage
         const existingSessions = localStorage.getItem('anonymous_sessions');
@@ -169,7 +181,6 @@ export const useSessions = () => {
         
         // Remove from local state
         setSessions(prev => prev.filter(session => session.id !== sessionId));
-        console.log('🍳 [useSessions] Anonymous session deleted. Remaining sessions:', updatedSessions.length);
         return true;
       }
       
@@ -188,10 +199,20 @@ export const useSessions = () => {
     }
   };
 
-  // Load sessions when user changes
+  // Load sessions when user changes (but track user ID to avoid unnecessary reloads)
+  const [previousUserId, setPreviousUserId] = useState(null);
+  
   useEffect(() => {
-    // Always call loadSessions - it handles both authenticated and anonymous users
+    const currentUserId = user?.uid || 'anonymous';
+    
+    // Only reload sessions if user ID actually changed
+    if (previousUserId !== null && previousUserId === currentUserId) {
+      setPreviousUserId(currentUserId);
+      return;
+    }
+    
     loadSessions();
+    setPreviousUserId(currentUserId);
   }, [user]);
 
   return {
@@ -238,20 +259,17 @@ export const useSessionChat = (sessionId) => {
       
       // For anonymous sessions, load from localStorage
       if (!user || sessionIdToLoad.startsWith('anon_')) {
-        console.log('🍳 [useSessionChat] Loading anonymous messages for session:', sessionIdToLoad);
         const localMessages = localStorage.getItem(`messages_${sessionIdToLoad}`);
         if (localMessages) {
           try {
             const parsedMessages = JSON.parse(localMessages);
-            console.log('🍳 [useSessionChat] Loaded', parsedMessages.length, 'messages for anonymous session');
             setMessages(parsedMessages);
           } catch (error) {
-            console.error('🍳 [useSessionChat] Error parsing local messages:', error);
+            console.error('Error parsing local messages:', error);
             localStorage.removeItem(`messages_${sessionIdToLoad}`);
             setMessages([]);
           }
         } else {
-          console.log('🍳 [useSessionChat] No messages found for anonymous session');
           setMessages([]);
         }
         return;
@@ -308,13 +326,10 @@ export const useSessionChat = (sessionId) => {
       }));
 
       // Get AI response with conversation history for better context
-      console.log('🍳 [FRONTEND] Sending message to AI:', messageText.substring(0, 100) + (messageText.length > 100 ? '...' : ''));
       const aiResponse = await chatWithAI(messageText, sessionId, history);
-      console.log('🍳 [FRONTEND] AI response received:', aiResponse);
       
       if (aiResponse && aiResponse.response) {
         const detectedRecipes = aiResponse.response.detectedRecipes || [];
-        console.log('🍳 [FRONTEND] Processing AI response with', detectedRecipes.length, 'detected recipes:', detectedRecipes);
         
         const aiMessage = {
           id: `ai_${Date.now()}`,
@@ -325,10 +340,7 @@ export const useSessionChat = (sessionId) => {
         };
 
         // Add AI response to UI
-        setMessages(prev => {
-          console.log('🍳 [FRONTEND] Adding message to chat with', detectedRecipes.length, 'recipes');
-          return [...prev, aiMessage];
-        });
+        setMessages(prev => [...prev, aiMessage]);
 
         // Save AI message (localStorage for anonymous users)
         if (!user || sessionId.startsWith('anon_')) {
