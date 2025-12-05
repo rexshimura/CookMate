@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn, Bookmark } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
@@ -508,38 +508,16 @@ export default function Home({ favoritesHook, collectionsHook }) {
     }
   };
 
-  // Favorites handlers
-  const handleShowFavorites = () => {
+  // Unified Library handlers
+  const handleShowLibrary = () => {
     if (!user) {
-      showAuthPrompt('Please sign in to view your favorite recipes.');
+      showAuthPrompt('Please sign in to view your library of recipes.');
       return;
     }
     
-    // Use the unified modal instead of separate modals
+    // Use the unified modal
     showFavoritesCollectionsModal({
-      recipe: null, // When opening from favorites view, no specific recipe
-      onAction: (action, data) => {
-        if (action === 'favorite') {
-          // Handle favorite action if needed
-          console.log('Favorite action:', data);
-        } else if (action === 'collection') {
-          // Handle collection action if needed
-          console.log('Collection action:', data);
-        }
-      }
-    });
-  };
-
-  // Collections handlers
-  const handleShowCollections = () => {
-    if (!user) {
-      showAuthPrompt('Please sign in to view and manage your recipe collections.');
-      return;
-    }
-    
-    // Use the unified modal instead of navigating to separate page
-    showFavoritesCollectionsModal({
-      recipe: null, // When opening from collections view, no specific recipe
+      recipe: null, // When opening from library view, no specific recipe
       onAction: (action, data) => {
         if (action === 'favorite') {
           // Handle favorite action if needed
@@ -707,8 +685,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
           onCreateSession={handleCreateNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
-          onShowFavorites={handleShowFavorites}
-          onShowCollections={handleShowCollections}
+          onShowLibrary={handleShowLibrary}
           onLogout={handleLogout}
           isLoggingOut={isLoggingOut}
           collapsed={sidebarCollapsed}
@@ -723,11 +700,11 @@ export default function Home({ favoritesHook, collectionsHook }) {
             </div>
             <div className="flex items-center gap-2">
               <button 
-                onClick={handleShowFavorites}
-                className="p-2 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-full transition-all duration-200 hover:scale-105"
-                title="My Favorites"
+                onClick={handleShowLibrary}
+                className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-full transition-all duration-200 hover:scale-105"
+                title="My Library"
               >
-                <Heart className="w-5 h-5" />
+                <Bookmark className="w-5 h-5" />
               </button>
               {!user && (
                 <button 
@@ -843,8 +820,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
         onCreateSession={handleCreateNewChat}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
-        onShowFavorites={handleShowFavorites}
-        onShowCollections={handleShowCollections}
+        onShowLibrary={handleShowLibrary}
         onLogout={handleLogout}
         sessionsLoading={sessionsLoading}
         isLoggingOut={isLoggingOut}

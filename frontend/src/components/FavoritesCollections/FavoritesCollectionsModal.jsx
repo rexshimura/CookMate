@@ -6,7 +6,8 @@ import { getRecipeDetails } from '../../utils/api.js';
 
 const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction, favoritesHook, collectionsHook }) => {
   const [activeTab, setActiveTab] = useState('favorites');
-  const { user } = useAuth();
+  const [isCreating, setIsCreating] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
   const { favorites, toggleFavorite, loading: favoritesLoading, isFavorite } = favoritesHook || { favorites: [] };
   const { collections, addRecipeToCollection, loading: collectionsLoading, createNewCollection } = collectionsHook || { collections: [] };
   const { showRecipeDetail } = useModal();
@@ -27,7 +28,7 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction, favorite
   // Refresh collections data when modal opens
   useEffect(() => {
     if (isOpen && activeTab === 'collections') {
-      loadCollections();
+      // Collections are automatically loaded by the hook
     }
   }, [isOpen, activeTab]);
 
@@ -52,6 +53,16 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction, favorite
       }
     } catch (error) {
       console.error('Failed to add to collection:', error);
+    }
+  };
+
+  const handleCreateCollection = async () => {
+    try {
+      await createNewCollection({ name: newCollectionName });
+      setIsCreating(false);
+      setNewCollectionName('');
+    } catch (error) {
+      console.error('Failed to create collection:', error);
     }
   };
 
@@ -225,6 +236,49 @@ const FavoritesCollectionsModal = ({ isOpen, onClose, recipe, onAction, favorite
 
           {activeTab === 'collections' && (
             <div className="space-y-4">
+              {/* Create Collection Section */}
+              {!isCreating ? (
+                <button
+                  onClick={() => setIsCreating(true)}
+                  className="w-full p-4 border-2 border-dashed border-orange-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition-colors group"
+                >
+                  <div className="flex items-center justify-center gap-2 text-orange-600 group-hover:text-orange-700">
+                    <Plus className="w-5 h-5" />
+                    <span className="font-medium">New Collection</span>
+                  </div>
+                </button>
+              ) : (
+                <div className="bg-white rounded-lg border border-stone-200 p-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCollectionName}
+                      onChange={(e) => setNewCollectionName(e.target.value)}
+                      placeholder="Collection name..."
+                      className="flex-1 px-3 py-2 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleCreateCollection}
+                      disabled={!newCollectionName.trim()}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsCreating(false);
+                        setNewCollectionName('');
+                      }}
+                      className="px-4 py-2 bg-stone-200 text-stone-700 rounded-md hover:bg-stone-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {collectionsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
