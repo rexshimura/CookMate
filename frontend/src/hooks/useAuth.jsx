@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { transferAnonymousSessions, hasAnonymousSessions } from '../utils/sessionManager';
 
 // Auth Context
 export const AuthContext = createContext();
@@ -82,6 +83,35 @@ export const AuthProvider = ({ children }) => {
         await updateProfile(firebaseUser, { displayName });
       }
 
+      // Check if user has anonymous sessions that need to be transferred
+      if (hasAnonymousSessions()) {
+        console.log('🔄 [Auth] Transferring anonymous sessions to new user account...');
+        
+        try {
+          const transferResult = await transferAnonymousSessions(firebaseUser.uid);
+          
+          if (transferResult.success && transferResult.transferredCount > 0) {
+            console.log(`✅ [Auth] Successfully transferred ${transferResult.transferredCount} sessions`);
+            
+            // Dispatch custom event to notify other components about the transfer
+            window.dispatchEvent(new CustomEvent('sessionsTransferred', {
+              detail: { 
+                transferredCount: transferResult.transferredCount,
+                totalSessions: transferResult.totalSessions || 0,
+                successRate: transferResult.successRate || 0,
+                errors: transferResult.errors || [],
+                userId: firebaseUser.uid 
+              }
+            }));
+          } else if (transferResult.errors && transferResult.errors.length > 0) {
+            console.warn('⚠️ [Auth] Some sessions failed to transfer:', transferResult.errors);
+          }
+        } catch (transferError) {
+          console.error('❌ [Auth] Error transferring sessions:', transferError);
+          // Don't fail the sign-up if session transfer fails
+        }
+      }
+
       return { success: true, user: firebaseUser };
     } catch (error) {
       console.error('Sign up error:', error);
@@ -118,6 +148,36 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       
       const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Check if user has anonymous sessions that need to be transferred
+      if (hasAnonymousSessions()) {
+        console.log('🔄 [Auth] Transferring anonymous sessions to authenticated user...');
+        
+        try {
+          const transferResult = await transferAnonymousSessions(firebaseUser.uid);
+          
+          if (transferResult.success && transferResult.transferredCount > 0) {
+            console.log(`✅ [Auth] Successfully transferred ${transferResult.transferredCount} sessions`);
+            
+            // Dispatch custom event to notify other components about the transfer
+            window.dispatchEvent(new CustomEvent('sessionsTransferred', {
+              detail: { 
+                transferredCount: transferResult.transferredCount,
+                totalSessions: transferResult.totalSessions || 0,
+                successRate: transferResult.successRate || 0,
+                errors: transferResult.errors || [],
+                userId: firebaseUser.uid 
+              }
+            }));
+          } else if (transferResult.errors && transferResult.errors.length > 0) {
+            console.warn('⚠️ [Auth] Some sessions failed to transfer:', transferResult.errors);
+          }
+        } catch (transferError) {
+          console.error('❌ [Auth] Error transferring sessions:', transferError);
+          // Don't fail the sign-in if session transfer fails
+        }
+      }
+      
       return { success: true, user: firebaseUser };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -156,6 +216,11 @@ export const AuthProvider = ({ children }) => {
       // Clear local storage and session data first
       localStorage.removeItem('firebase:authUser');
       localStorage.removeItem('cookmate_session_data');
+      
+      // Dispatch event to notify other components about logout before signing out
+      window.dispatchEvent(new CustomEvent('userLoggingOut', {
+        detail: { timestamp: new Date().toISOString() }
+      }));
       
       // Sign out from Firebase
       await signOut(auth);

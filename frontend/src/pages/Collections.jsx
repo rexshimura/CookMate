@@ -110,9 +110,7 @@ const Collections = () => {
     if (!formData.name.trim()) return;
 
     try {
-      console.log('🍳 [Collections] Creating collection with data:', formData);
       const result = await createCollection(formData);
-      console.log('🍳 [Collections] Create collection result:', result);
       
       // Backend returns { message, collection } - check for collection field instead of success
       if (result && result.collection) {
@@ -123,19 +121,12 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        console.log('✅ Collection created successfully:', result.message);
       } else {
-        console.error('❌ Unexpected response format:', result);
         // Show user-friendly error without crashing
         alert('Failed to create collection: Unexpected response from server');
       }
     } catch (error) {
-      console.error('❌ Failed to create collection:', error);
-      console.error('❌ Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('Failed to create collection:', error);
       
       // Show user-friendly error without crashing the page
       const errorMessage = error.message || 'Unknown error occurred';
@@ -159,12 +150,11 @@ const Collections = () => {
         if (selectedCollectionId) {
           loadCollectionRecipes(selectedCollectionId);
         }
-        console.log('✅ Collection updated successfully:', result.message);
       } else {
-        console.error('❌ Unexpected response format:', result);
+        console.error('Unexpected response format:', result);
       }
     } catch (error) {
-      console.error('❌ Failed to update collection:', error);
+      console.error('Failed to update collection:', error);
     }
   };
 

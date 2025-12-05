@@ -525,6 +525,26 @@ function isValidRecipe(text) {
     return false;
   }
   
+  // SPECIFIC EXCLUSIONS for category headers and non-recipe terms
+  const categoryHeaders = [
+    'main courses', 'main course', 'main dishes', 'main dish', 'entrees', 'entree', 'entrées', 'entrée',
+    'desserts', 'dessert', 'sweet treats', 'sweet treat', 'cakes', 'cake', 'pies', 'pie',
+    'appetizers', 'appetizer', 'starters', 'starter', 'hors d\'oeuvres', 'hors doeuvres',
+    'beverages', 'beverage', 'drinks', 'drink', 'cocktails', 'cocktail',
+    'international cuisine', 'world cuisine', 'cuisines', 'cuisine',
+    'breakfast', 'brunch', 'lunch', 'dinner', 'supper',
+    'sides', 'side dish', 'side dishes', 'salads', 'salad', 'soups', 'soup', 'stews', 'stew',
+    'vegetarian', 'vegan', 'gluten-free', 'gluten free', 'dairy-free', 'dairy free', 'low-carb', 'low carb',
+    'quick meals', 'quick meal', 'easy recipes', 'easy recipe', 'simple recipes', 'simple recipe',
+    'healthy recipes', 'healthy recipe', 'comfort food', 'comfort foods',
+    'ingredients', 'instructions', 'directions', 'method', 'tips', 'nutrition', 'safety'
+  ];
+  
+  if (categoryHeaders.some(header => lowerText === header || lowerText.includes(header))) {
+    console.log('❌ [VALIDATION] Failed: detected as category header or non-recipe term');
+    return false;
+  }
+  
   // Must not end with common non-recipe endings (but allow certain dish types)
   if (/[.!?]$/.test(text.trim())) {
     console.log('❌ [VALIDATION] Failed: ends with punctuation');

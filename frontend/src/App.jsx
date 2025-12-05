@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Import all modal components
 import AuthPromptModal from './components/AuthPromptModal.jsx';
+import SessionTransferNotification from './components/SessionTransferNotification.jsx';
 import CollectionsModal from './pages/Components/UI/CollectionsModal.jsx';
 import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
 import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
@@ -161,6 +162,9 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
         colors={collectionFormModalState.colors || []}
         icons={collectionFormModalState.icons || []}
       />
+
+      {/* Session Transfer Notification */}
+      <SessionTransferNotification />
     </ModalContext.Provider>
   );
 };

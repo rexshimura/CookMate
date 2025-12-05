@@ -32,9 +32,7 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
     setError(null);
 
     try {
-      console.log('🔍 [RECIPE-DETAIL-MODAL] Fetching details for:', recipeName);
       const result = await fetchRecipeDetails(recipeName);
-      console.log('📡 [RECIPE-DETAIL-MODAL] Fetch result:', result);
 
       if (result.success && result.recipe) {
         // Validate and sanitize recipe data before setting
@@ -53,12 +51,6 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
           youtubeUrl: typeof result.recipe.youtubeUrl === 'string' ? result.recipe.youtubeUrl : null,
           youtubeSearchQuery: typeof result.recipe.youtubeSearchQuery === 'string' ? result.recipe.youtubeSearchQuery : `${recipeName} recipe tutorial`
         };
-
-        console.log('✅ [RECIPE-DETAIL-MODAL] Sanitized recipe data:', {
-          title: sanitizedRecipe.title,
-          ingredientsCount: sanitizedRecipe.ingredients.length,
-          instructionsCount: sanitizedRecipe.instructions.length
-        });
 
         setRecipeData(sanitizedRecipe);
       } else {
@@ -189,8 +181,6 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
 
   useEffect(() => {
     if (isOpen && recipeName) {
-      console.log('🔍 [RECIPE-DETAIL-MODAL] Recipe changed or modal opened:', recipeName);
-
       // Complete reset of all state to prevent stale data
       setRecipeData(null);
       setError(null);

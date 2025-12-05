@@ -85,15 +85,13 @@ const RecipeCard = ({
         recipeData = recipe;
       }
       
-      console.log('🗑️ [RecipeCard] Final computed recipeId:', recipeId);
+
       
       // Toggle favorite status
       const isCurrentlyFavorited = localIsFavorited || isFavorited;
       
       if (isCurrentlyFavorited) {
         // Remove from favorites
-        console.log('🗑️ [RecipeCard] Starting favorites removal for recipeId:', recipeId);
-        console.log('🗑️ [RecipeCard] Recipe data:', recipeData || recipe);
         
         // Validate recipe ID before making API call
         if (!recipeId) {
@@ -107,13 +105,12 @@ const RecipeCard = ({
           if (result.success !== false) {
             setLocalIsFavorited(false);
             if (onRemoveFromFavorites) {
-              console.log('🗑️ [RecipeCard] Calling remove from favorites callback');
               onRemoveFromFavorites(recipeData || recipe);
             }
             
             // Force a brief delay to allow backend to update before potential reload
             setTimeout(() => {
-              console.log('🔄 [RecipeCard] Triggering favorites reload after removal');
+              // Reload favorites data if needed
             }, 100);
           } else {
             console.error('🗑️ [RecipeCard] Remove from favorites failed:', result.error);
@@ -202,48 +199,34 @@ const RecipeCard = ({
 
   // Remove from collection
   const handleRemoveFromCollection = async (collectionId) => {
-    console.log('🗑️ [RecipeCard] Remove from collection initiated');
-    console.log('🗑️ [RecipeCard] Collection ID:', collectionId);
-    console.log('🗑️ [RecipeCard] Recipe:', recipe);
-    
     if (!recipe) {
-      console.error('❌ [RecipeCard] No recipe provided');
       return;
     }
     
     if (!collectionId) {
-      console.error('❌ [RecipeCard] No collection ID provided');
       return;
     }
     
     // Check authentication
     if (!user) {
-      console.log('⚠️ [RecipeCard] User not authenticated, showing auth prompt');
       if (requireAuth) {
         requireAuth('remove recipes from collections');
       }
       return;
     }
     
-    console.log('✅ [RecipeCard] User authenticated, proceeding with collection removal');
-    
     try {
       let recipeId = getRecipeId(recipe);
       
-      console.log('🆔 [RecipeCard] Final recipe ID:', recipeId);
-      console.log('🚀 [RecipeCard] Calling removeRecipeFromCollection API...');
-      
       const result = await removeRecipeFromCollection(collectionId, recipeId);
-      console.log('📡 [RecipeCard] API result:', result);
       
       if (result.success !== false) {
-        console.log('✅ [RecipeCard] Successfully removed from collection');
         if (onRemoveFromCollection) onRemoveFromCollection(collectionId, recipe);
       } else {
-        console.error('❌ [RecipeCard] API returned failure:', result.error);
+        console.error('Failed to remove from collection:', result.error);
       }
     } catch (error) {
-      console.error('❌ [RecipeCard] Failed to remove from collection:', error);
+      console.error('Failed to remove from collection:', error);
       // Show user-friendly error feedback
       if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
         alert('Please sign in again to manage your collections.');

@@ -8,6 +8,7 @@ import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
 import ErrorMessage from '../../components/ErrorMessage.jsx';
+
 import { useModal } from '../../App.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from '../Components/UI/useConfirmation.jsx';
 
@@ -40,8 +41,15 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
-  // Current session state
-  const [currentSessionId, setCurrentSessionId] = useState(null);
+  // Current session state - persist to localStorage
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    // Try to restore session from localStorage on initialization
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('currentSessionId');
+      return saved || null;
+    }
+    return null;
+  });
   
   // Call ALL hooks at the top level - this fixes the React hook error
   const { 
@@ -79,6 +87,9 @@ export default function Home() {
   // Logout state management
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
+  // Session migration notification
+  const [showSessionMigrationNotice, setShowSessionMigrationNotice] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -94,6 +105,17 @@ export default function Home() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  // Validate current session exists when sessions load (runs once on mount)
+  useEffect(() => {
+    if (currentSessionId && sessions.length > 0 && !sessionsLoading) {
+      const sessionExists = sessions.some(s => s.id === currentSessionId);
+      if (!sessionExists) {
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+      }
+    }
+  }, []); // Empty dependency array - run once on mount
 
   useEffect(() => {
     let lastScrollY = 0;
@@ -115,7 +137,6 @@ export default function Home() {
     const setupScrollListener = () => {
       const container = messagesContainerRef.current;
       if (container) {
-        console.log('✅ [SCROLL] Adding scroll listener to container');
         container.addEventListener('scroll', handleScroll);
         handleScroll(); // Check initial position
         return true;
@@ -146,12 +167,38 @@ export default function Home() {
   };
 
   // CRITICAL: This useEffect MUST be called before any conditional returns
-  // Initialize with existing session if available
+  // Initialize with existing session if available and validate it exists
   useEffect(() => {
-    if (!currentSessionId && sessions.length > 0 && !sessionsLoading) {
-      setCurrentSessionId(sessions[0].id);
+    if (sessions.length > 0 && !sessionsLoading) {
+      // Check if current session still exists in the sessions list
+      const currentSessionExists = sessions.some(s => s.id === currentSessionId);
+      
+      if (!currentSessionId || !currentSessionExists) {
+        // If no current session or it doesn't exist, use the first available session
+        const newSessionId = sessions[0].id;
+        setCurrentSessionId(newSessionId);
+        localStorage.setItem('currentSessionId', newSessionId);
+      }
+    } else if (sessions.length === 0 && currentSessionId) {
+      // No sessions available, clear current session
+      setCurrentSessionId(null);
+      localStorage.removeItem('currentSessionId');
     }
-  }, [sessions, currentSessionId, sessionsLoading]);
+  }, [sessions, sessionsLoading]);
+
+  // Additional effect to ensure current session persists during any updates
+  useEffect(() => {
+    if (currentSessionId && sessions.length > 0) {
+      const sessionExists = sessions.some(s => s.id === currentSessionId);
+      if (!sessionExists) {
+        const firstSession = sessions[0];
+        if (firstSession) {
+          setCurrentSessionId(firstSession.id);
+          localStorage.setItem('currentSessionId', firstSession.id);
+        }
+      }
+    }
+  }, [sessions]);
 
   // Load collections when user is authenticated
   useEffect(() => {
@@ -159,6 +206,66 @@ export default function Home() {
       loadCollections();
     }
   }, [user]);
+
+  // Handle user state changes - migrate sessions when going from anonymous to authenticated
+  const [previousUserId, setPreviousUserId] = useState(null);
+  
+  useEffect(() => {
+    const currentUserId = user?.uid || 'anonymous';
+    
+    if (previousUserId && previousUserId !== currentUserId) {
+      if (previousUserId === 'anonymous' && currentUserId !== 'anonymous') {
+        // User transitioned from anonymous to authenticated
+        
+        // Check if we have anonymous sessions to migrate
+        const anonymousSessions = localStorage.getItem('anonymous_sessions');
+        let hadSessions = false;
+        
+        if (anonymousSessions) {
+          try {
+            const sessions = JSON.parse(anonymousSessions);
+            if (sessions && sessions.length > 0) {
+              hadSessions = true;
+              
+              // Show migration notice
+              setShowSessionMigrationNotice(true);
+              
+              // Clear current state to force user to create new authenticated sessions
+              setCurrentSessionId(null);
+              localStorage.removeItem('currentSessionId');
+              clearMessages();
+            } else {
+              // No anonymous sessions, just clear current state
+              setCurrentSessionId(null);
+              localStorage.removeItem('currentSessionId');
+              clearMessages();
+            }
+          } catch (error) {
+            setCurrentSessionId(null);
+            localStorage.removeItem('currentSessionId');
+            clearMessages();
+          }
+        } else {
+          // No anonymous sessions, just clear current state
+          setCurrentSessionId(null);
+          localStorage.removeItem('currentSessionId');
+          clearMessages();
+        }
+      } else if (previousUserId !== 'anonymous' && currentUserId === 'anonymous') {
+        // User logged out
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+        clearMessages();
+      } else {
+        // User switched between different authenticated accounts
+        setCurrentSessionId(null);
+        localStorage.removeItem('currentSessionId');
+        clearMessages();
+      }
+    }
+    
+    setPreviousUserId(currentUserId);
+  }, [user, clearMessages]);
 
 
 
@@ -216,6 +323,8 @@ export default function Home() {
       if (newSession) {
         setCurrentSessionId(newSession.id);
         if (isMobile) setSidebarOpen(false);
+        // Save to localStorage for persistence
+        localStorage.setItem('currentSessionId', newSession.id);
       }
     } catch (error) {
       console.error('Failed to create new chat:', error);
@@ -225,6 +334,10 @@ export default function Home() {
   const handleSelectSession = (session) => {
     setCurrentSessionId(session.id);
     if (isMobile) setSidebarOpen(false);
+    // Save to localStorage for persistence
+    if (session.id) {
+      localStorage.setItem('currentSessionId', session.id);
+    }
   };
 
   const handleDeleteSession = async (sessionId, e) => {
@@ -241,13 +354,20 @@ export default function Home() {
         if (sessionId === currentSessionId) {
           const remainingSessions = sessions.filter(s => s.id !== sessionId);
           if (remainingSessions.length > 0) {
-            setCurrentSessionId(remainingSessions[0].id);
+            const newCurrentSessionId = remainingSessions[0].id;
+            setCurrentSessionId(newCurrentSessionId);
+            localStorage.setItem('currentSessionId', newCurrentSessionId);
           } else {
             setCurrentSessionId(null);
+            localStorage.removeItem('currentSessionId');
             clearMessages();
           }
         }
         
+        // Clean up localStorage if the deleted session was the current one
+        if (sessionId === currentSessionId) {
+          localStorage.removeItem('currentSessionId');
+        }
 
       } catch (error) {
         console.error('Failed to delete session:', error);
@@ -259,8 +379,6 @@ export default function Home() {
     const confirmed = await confirmLogout();
     
     if (confirmed) {
-      console.log('🔄 [Home] User confirmed logout, starting process...');
-      
       // Set loading state
       setIsLoggingOut(true);
       setError(null);
@@ -271,31 +389,22 @@ export default function Home() {
         const result = await logout();
         
         if (result.success) {
-          console.log('✅ [Home] Logout successful, clearing local state...');
-          
           // Clear local state
           setCurrentSessionId(null);
+          localStorage.removeItem('currentSessionId');
           clearMessages();
           
           // Modal states are cleared automatically when user logs out
           
           // Show success feedback
           setShowSuccessMessage(true);
-          console.log('🎉 [Home] Logout completed successfully');
-          
-          // Redirect to landing page after successful logout
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 2000);
           
         } else {
-          console.error('❌ [Home] Logout failed:', result.error);
           setError(result.error || 'Failed to sign out. Please try again.');
           setShowError(true);
         }
         
       } catch (error) {
-        console.error('❌ [Home] Unexpected logout error:', error);
         setError('An unexpected error occurred. Please try again.');
         setShowError(true);
       } finally {
@@ -369,22 +478,17 @@ export default function Home() {
   };
 
   const loadFavoriteRecipes = async () => {
-    console.log('🔄 [Home] Loading fresh favorites data...');
     setFavoritesLoading(true);
     try {
       const result = await getFavorites();
-      console.log('🔄 [Home] Fresh favorites data received:', result);
       // The new collections-based API returns { collection: {...}, recipes: [...] }
       if (result && result.recipes) {
-        console.log('🔄 [Home] Setting favorites recipes:', result.recipes.length, 'recipes');
         setFavoriteRecipes(result.recipes || []);
         setFavoriteCollectionId(result.collection?.id || null);
       } else {
-        console.log('🔄 [Home] No favorites found, setting empty array');
         setFavoriteRecipes([]);
       }
     } catch (error) {
-      console.error('Failed to load favorites:', error);
       setFavoriteRecipes([]);
     } finally {
       setFavoritesLoading(false);
@@ -392,11 +496,9 @@ export default function Home() {
   };
 
   const loadCollections = async () => {
-    console.log('📚 [Home] Loading collections...');
     setCollectionsLoading(true);
     try {
       const result = await getCollections();
-      console.log('📚 [Home] Collections API result:', result);
       
       // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
       let collections = [];
@@ -404,20 +506,12 @@ export default function Home() {
         collections = result.collections;
       } else if (Array.isArray(result)) {
         collections = result;
-      } else {
-        console.warn('⚠️ [Home] Unexpected collections response format:', result);
       }
       
-      console.log('📚 [Home] Loaded collections:', collections);
       setCollections(collections);
       
     } catch (error) {
-      console.error('❌ [Home] Exception loading collections:', error);
-      console.error('❌ [Home] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      // Error handling without debug logging
     } finally {
       setCollectionsLoading(false);
     }
@@ -623,7 +717,28 @@ export default function Home() {
                   </div>
                   <div className="text-left">
                     <h4 className="text-green-800 font-semibold text-sm">Successfully signed out!</h4>
-                    <p className="text-green-700 text-xs">Redirecting to home page...</p>
+                    <p className="text-green-700 text-xs">You can continue browsing or sign in again.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Session Migration Notice */}
+              {showSessionMigrationNotice && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl animate-slideUp shadow-lg shadow-blue-200/30 max-w-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-blue-800 font-semibold text-sm">Welcome back!</h4>
+                    <p className="text-blue-700 text-xs">
+                      You're now signed in. Your anonymous sessions have been cleared, but you can start fresh with your authenticated account.
+                    </p>
+                    <button 
+                      onClick={() => setShowSessionMigrationNotice(false)}
+                      className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Got it
+                    </button>
                   </div>
                 </div>
               )}
@@ -649,6 +764,7 @@ export default function Home() {
         {/* Confirmation Dialogs - Include logout dialog even in empty state */}
         <DeleteDialog />
         <LogoutDialog />
+
       </div>
     );
   }
@@ -730,7 +846,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h4 className="text-green-800 font-semibold">Successfully signed out!</h4>
-                  <p className="text-green-700 text-sm">Redirecting to home page...</p>
+                  <p className="text-green-700 text-sm">You can continue browsing or sign in again.</p>
                 </div>
               </div>
             )}
@@ -745,7 +861,8 @@ export default function Home() {
                 <p className="text-stone-600">Start your cooking conversation!</p>
               </div>
             ) : (
-              messages.map((message) => (
+              messages.map((message) => {
+                return (
                 <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${message.isUser ? 'bg-stone-800 text-white' : 'bg-white border border-stone-200 text-orange-600'}`}>
                     {message.isUser ? user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'A' : <Flame className="w-5 h-5 fill-orange-500" />}
@@ -785,7 +902,8 @@ export default function Home() {
                     <span className="text-[11px] text-stone-400 mt-1.5 px-1 font-medium">{formatTime(message.timestamp)}</span>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
             {isTyping && (
                <div className="flex gap-4 animate-slideUp">
@@ -859,6 +977,7 @@ export default function Home() {
       {/* Confirmation Dialogs */}
       <DeleteDialog />
       <LogoutDialog />
+
     </div>
   );
 }

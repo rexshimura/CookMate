@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChefHat, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase"; 
+import { useAuth } from '../../hooks/useAuth.jsx';
 import { useNavigate } from "react-router-dom";
 
 
@@ -11,6 +10,7 @@ export default function SigninPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const { signIn } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -19,14 +19,18 @@ export default function SigninPage() {
     setError("");
 
     try {
-      // THE REAL FIREBASE LOGIN
-      await signInWithEmailAndPassword(auth, email, password);
+      // Use our custom signIn function that includes session transfer
+      const result = await signIn(email, password);
       
-      // If successful, redirect to Home
-      navigate("/home");
+      if (result.success) {
+        // If successful, redirect to Home
+        navigate("/home");
+      } else {
+        setError(result.error || "Sign in failed. Please try again.");
+      }
     } catch (error) {
       console.error("Login Error:", error);
-      setError("Invalid email or password. Please try again.");
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

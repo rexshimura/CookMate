@@ -73,12 +73,11 @@ const CollectionManager = ({
         if (onCollectionRefresh) {
           onCollectionRefresh();
         }
-        console.log('✅ Collection deleted successfully:', result.message);
       } else {
-        console.error('❌ Unexpected response format:', result);
+        console.error('Unexpected response format:', result);
       }
     } catch (error) {
-      console.error('❌ Failed to delete collection:', error);
+      console.error('Failed to delete collection:', error);
       // Silent error handling
     } finally {
       setDeleteConfirmDialog({
