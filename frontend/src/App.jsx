@@ -1,6 +1,8 @@
 import React, { useState, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth.jsx';
+import { useFavorites } from './hooks/useFavorites.js';
+import { useCollections } from './hooks/useCollections.js';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
@@ -34,7 +36,7 @@ export const useModal = () => {
 };
 
 // Centralized Modal Manager Component
-const ModalManager = ({ modalStates, modalActions, children }) => {
+const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHook, children }) => {
   const {
     authPromptState,
     collectionsModalState,
@@ -150,6 +152,9 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
         handleFetchRecipeDetails={favoritesModalState.handleFetchRecipeDetails}
         user={favoritesModalState.user}
         requireAuth={favoritesModalState.requireAuth}
+        // New unified architecture props
+        favoritesHook={favoritesHook}
+        collectionsHook={collectionsHook}
       />
 
       {/* Collection Form Modal */}
@@ -170,6 +175,10 @@ const ModalManager = ({ modalStates, modalActions, children }) => {
 };
 
 function App() {
+  // Initialize Unified Collections Architecture hooks
+  const favoritesHook = useFavorites();
+  const collectionsHook = useCollections();
+
   // Centralized Modal States
   const [authPromptState, setAuthPromptState] = useState({
     isOpen: false,
@@ -307,20 +316,28 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <ModalManager modalStates={{
-            authPromptState,
-            collectionsModalState,
-            confirmationState,
-            recipeDetailModalState,
-            favoritesModalState,
-            collectionFormModalState
-          }} modalActions={modalActions}>
+          <ModalManager 
+            modalStates={{
+              authPromptState,
+              collectionsModalState,
+              confirmationState,
+              recipeDetailModalState,
+              favoritesModalState,
+              collectionFormModalState
+            }} 
+            modalActions={modalActions}
+            favoritesHook={favoritesHook}
+            collectionsHook={collectionsHook}
+          >
             <div className="App">
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/home" element={
                   <ProtectedRoute requireAuth={false}>
-                    <Home />
+                    <Home 
+                      favoritesHook={favoritesHook}
+                      collectionsHook={collectionsHook}
+                    />
                   </ProtectedRoute>
                 } />
                 <Route path="/collections" element={<Collections />} />

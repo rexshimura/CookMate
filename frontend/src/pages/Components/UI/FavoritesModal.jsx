@@ -17,9 +17,15 @@ const FavoritesModal = ({
   handleCreateCollectionCallback,
   handleFetchRecipeDetails,
   user,
-  requireAuth
+  requireAuth,
+  // New unified architecture props
+  favoritesHook,
+  collectionsHook
 }) => {
   if (!isOpen) return null;
+
+  const derivedFavorites = favoritesHook?.favorites ?? favoriteRecipes ?? [];
+  const derivedLoading = favoritesHook?.loading ?? favoritesLoading ?? false;
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -51,12 +57,12 @@ const FavoritesModal = ({
 
         {/* Favorites Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
-          {favoritesLoading ? (
+          {derivedLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="w-8 h-8 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
               <span className="ml-3 text-stone-600 font-medium">Loading favorites...</span>
             </div>
-          ) : favoriteRecipes.length === 0 ? (
+          ) : derivedFavorites.length === 0 ? (
             <div className="text-center py-8">
               <div className="w-20 h-20 bg-gradient-to-br from-pink-100 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-pink-200/60">
                 <Heart className="w-10 h-10 text-stone-300" />
@@ -67,9 +73,9 @@ const FavoritesModal = ({
           ) : (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-stone-700 mb-4 tracking-wide">
-                You have {favoriteRecipes.length} favorite recipe{favoriteRecipes.length !== 1 ? 's' : ''}
+                You have {derivedFavorites.length} favorite recipe{derivedFavorites.length !== 1 ? 's' : ''}
               </h3>
-              {favoriteRecipes.map((recipe, index) => (
+              {derivedFavorites.map((recipe, index) => (
                 <RecipeCard
                   key={`favorites_recipe_${index}_${recipe.id || recipe.title || recipe.name}`}
                   recipe={recipe}
@@ -77,6 +83,12 @@ const FavoritesModal = ({
                   isLoading={false}
                   isFavorited={true}
                   collections={collections}
+                  // New unified architecture props
+                  favoritesHook={favoritesHook}
+                  collectionsHook={collectionsHook}
+                  toggleFavorite={favoritesHook?.toggleFavorite}
+                  isFavorite={favoritesHook?.isFavorite}
+                  // Legacy props for backward compatibility
                   onAddToFavorites={handleAddToFavoritesCallback}
                   onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                   onAddToCollection={handleAddToCollectionCallback}

@@ -1,12 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle, Trash2 } from 'lucide-react';
-import { 
-  addToFavorites, 
-  removeFromFavorites,
-  checkIsFavorite,
-  addRecipeToCollection,
-  removeRecipeFromCollection
-} from '../../../utils/api.js';
+import React, { useRef } from 'react';
+import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle } from 'lucide-react';
+import { generateRecipeId } from '../../../utils/ids.js';
 import { useModal } from '../../../App.jsx';
 
 const RecipeCard = ({ 
@@ -22,25 +16,22 @@ const RecipeCard = ({
   fetchRecipeDetails,
   user = null,
   requireAuth = null,
-  onCreateCollection = null
-  ,
+  onCreateCollection = null,
   // Optional: when viewing a specific collection (or favorites), pass its id so
   // the card can show a direct "remove" button for that collection.
-  collectionId = null
+  collectionId = null,
+  // New props for unified collections architecture
+  favoritesHook = null,
+  collectionsHook = null,
+  toggleFavorite = null,
+  isFavorite = null
 }) => {
-  const [localIsFavorited, setLocalIsFavorited] = useState(isFavorited);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
   const collectionsButtonRef = useRef(null);
   const { showCollectionsModal } = useModal();
 
-  // Get recipe ID for consistency
+  // Get recipe ID for consistency using the new utility
   const getRecipeId = (recipeObj = recipe) => {
-    if (!recipeObj) return '';
-    if (typeof recipeObj === 'string') {
-      return recipeObj.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    }
-    // Check for various ID field possibilities
-    return recipeObj.id || recipeObj.savedId || recipeObj.title?.toLowerCase().replace(/[^a-z0-9]/g, '_') || '';
+    return generateRecipeId(recipeObj);
   };
 
   // Check if the recipe is already in a specific collection
@@ -51,10 +42,10 @@ const RecipeCard = ({
     return collection?.recipes?.some(r => r.id === recipeId);
   };
 
-  // Add/remove from favorites (toggle functionality)
+  // Handle favorites using the new unified architecture with debouncing
   const handleAddToFavorites = async (e) => {
     e?.stopPropagation();
-    if (!recipe || favoritesLoading) return;
+    if (!recipe) return;
     
     // Check authentication
     if (!user) {
@@ -63,99 +54,49 @@ const RecipeCard = ({
       }
       return;
     }
-    
-    setFavoritesLoading(true);
-    try {
-      let recipeData = recipe;
-      let recipeId;
-      
-      // Get recipe ID and data - handle both string and object recipes
-      if (typeof recipe === 'string') {
-        // If recipe is just a string, we need to fetch full details
-        if (fetchRecipeDetails) {
-          const result = await fetchRecipeDetails(recipe);
-          if (result.success) {
-            recipeData = result.recipe;
-          }
-        }
-        recipeId = getRecipeId(recipe);
-      } else {
-        // For object recipes, use the improved ID generation
-        recipeId = getRecipeId(recipe);
-        recipeData = recipe;
-      }
-      
 
+    // Check if we have the new hooks available
+    if (toggleFavorite && favoritesHook) {
+      // Prevent multiple rapid clicks
+      if (favoritesHook.loading) {
+        console.log('⏳ [RecipeCard] Favorites operation in progress, ignoring rapid click');
+        return;
+      }
       
-      // Toggle favorite status
-      const isCurrentlyFavorited = localIsFavorited || isFavorited;
-      
-      if (isCurrentlyFavorited) {
-        // Remove from favorites
-        
-        // Validate recipe ID before making API call
-        if (!recipeId) {
-          console.error('🗑️ [RecipeCard] ERROR: No valid recipeId found');
-          alert('Unable to remove recipe: Invalid recipe identifier');
-          return;
-        }
-        
-        try {
-          const result = await removeFromFavorites(recipeId);
-          if (result.success !== false) {
-            setLocalIsFavorited(false);
-            if (onRemoveFromFavorites) {
-              onRemoveFromFavorites(recipeData || recipe);
-            }
-            
-            // Force a brief delay to allow backend to update before potential reload
-            setTimeout(() => {
-              // Reload favorites data if needed
-            }, 100);
-          } else {
-            console.error('🗑️ [RecipeCard] Remove from favorites failed:', result.error);
+      try {
+        console.log('💖 [RecipeCard] Toggling favorite for:', recipe.title || recipe);
+        await toggleFavorite(recipe);
+        // The hook will handle optimistic updates and error handling
+      } catch (error) {
+        console.error('Failed to toggle favorite:', error);
+        // Show user-friendly error feedback
+        alert(error.message || 'Failed to update favorites');
+      }
+      return;
+    }
+
+    // Fallback to legacy callback approach
+    if (typeof recipe === 'string') {
+      if (fetchRecipeDetails) {
+        const result = await fetchRecipeDetails(recipe);
+        if (result.success) {
+          if (isFavorited && onRemoveFromFavorites) {
+            onRemoveFromFavorites(result.recipe);
+          } else if (!isFavorited && onAddToFavorites) {
+            onAddToFavorites(result.recipe);
           }
-        } catch (error) {
-          console.error('Failed to remove from favorites:', error);
-          // Show user-friendly error feedback
-          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-            alert('Please sign in again to manage your favorites.');
-          } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-            alert('This recipe is no longer available in your favorites.');
-          } else {
-            alert(`Failed to remove from favorites: ${error.message}`);
-          }
-          // Revert UI state on error
-          setLocalIsFavorited(true);
-        }
-      } else {
-        // Add to favorites
-        try {
-          const result = await addToFavorites(recipeId, recipeData);
-          if (result.success !== false) {
-            setLocalIsFavorited(true);
-            if (onAddToFavorites) onAddToFavorites(recipeData || recipe);
-          }
-        } catch (error) {
-          console.error('Failed to add to favorites:', error);
-          // Show user-friendly error feedback
-          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-            alert('Please sign in again to manage your favorites.');
-          } else {
-            alert(`Failed to add to favorites: ${error.message}`);
-          }
-          // Revert UI state on error
-          setLocalIsFavorited(false);
         }
       }
-    } catch (error) {
-      console.error('Failed to toggle favorite status:', error);
-    } finally {
-      setFavoritesLoading(false);
+    } else {
+      if (isFavorited && onRemoveFromFavorites) {
+        onRemoveFromFavorites(recipe);
+      } else if (!isFavorited && onAddToFavorites) {
+        onAddToFavorites(recipe);
+      }
     }
   };
 
-  // Add to collection
+  // Handle collections using the new unified architecture
   const handleAddToCollection = async (collectionId, e) => {
     e?.stopPropagation();
 
@@ -169,11 +110,23 @@ const RecipeCard = ({
       return;
     }
 
+    // Check if we have the new hooks available
+    if (collectionsHook && collectionsHook.addRecipeToCollection) {
+      try {
+        await collectionsHook.addRecipeToCollection(collectionId, recipe);
+        // The hook will handle optimistic updates and error handling
+      } catch (error) {
+        console.error('Failed to add to collection:', error);
+        alert(error.message || 'Failed to add recipe to collection');
+      }
+      return;
+    }
+
+    // Fallback to legacy callback approach
     try {
       let recipeData = recipe;
       let recipeId;
 
-      // If recipe is just a string, we need to fetch full details
       if (typeof recipe === 'string') {
         if (fetchRecipeDetails) {
           const result = await fetchRecipeDetails(recipe);
@@ -187,10 +140,8 @@ const RecipeCard = ({
         recipeData = recipe;
       }
 
-      const result = await addRecipeToCollection(collectionId, recipeId, recipeData);
-
-      if (result.success) {
-        if (onAddToCollection) onAddToCollection(collectionId, recipeData || recipe);
+      if (onAddToCollection) {
+        onAddToCollection(collectionId, recipeData || recipe);
       }
     } catch (error) {
       console.error('Failed to add to collection:', error);
@@ -199,13 +150,7 @@ const RecipeCard = ({
 
   // Remove from collection
   const handleRemoveFromCollection = async (collectionId) => {
-    if (!recipe) {
-      return;
-    }
-    
-    if (!collectionId) {
-      return;
-    }
+    if (!recipe || !collectionId) return;
     
     // Check authentication
     if (!user) {
@@ -214,33 +159,30 @@ const RecipeCard = ({
       }
       return;
     }
-    
+
+    // Check if we have the new hooks available
+    if (collectionsHook && collectionsHook.removeRecipeFromCollection) {
+      try {
+        await collectionsHook.removeRecipeFromCollection(collectionId, recipe);
+        // The hook will handle optimistic updates and error handling
+      } catch (error) {
+        console.error('Failed to remove from collection:', error);
+        alert(error.message || 'Failed to remove recipe from collection');
+      }
+      return;
+    }
+
+    // Fallback to legacy callback approach
     try {
       let recipeId = getRecipeId(recipe);
       
-      const result = await removeRecipeFromCollection(collectionId, recipeId);
-      
-      if (result.success !== false) {
-        if (onRemoveFromCollection) onRemoveFromCollection(collectionId, recipe);
-      } else {
-        console.error('Failed to remove from collection:', result.error);
+      if (onRemoveFromCollection) {
+        onRemoveFromCollection(collectionId, recipe);
       }
     } catch (error) {
       console.error('Failed to remove from collection:', error);
-      // Show user-friendly error feedback
-      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-        alert('Please sign in again to manage your collections.');
-      } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-        alert('This collection is no longer available.');
-      } else {
-        alert(`Failed to remove from collection: ${error.message}`);
-      }
     }
   };
-
-  useEffect(() => {
-    setLocalIsFavorited(isFavorited);
-  }, [isFavorited]);
 
   if (isLoading) {
     return (
@@ -304,7 +246,7 @@ const RecipeCard = ({
               <h4 className="font-semibold text-stone-800 group-hover:text-orange-700 transition-colors truncate text-sm sm:text-base leading-tight">
                 {getRecipeName()}
               </h4>
-              {(localIsFavorited || isFavorited) && (
+              {((isFavorite && isFavorite(recipe)) || isFavorited) && (
                 <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500 fill-pink-500 flex-shrink-0" />
               )}
             </div>
@@ -336,15 +278,20 @@ const RecipeCard = ({
           <div className="flex items-center gap-0.5 sm:gap-1 opacity-100 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity duration-300">
             {/* Favorites Button */}
             <button
-              onClick={handleAddToFavorites}
-              disabled={favoritesLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling to parent card click
+                handleAddToFavorites(e);
+              }}
+              disabled={favoritesHook?.loading}
               className={`p-2 rounded-full transition-all hover:scale-110 ${
-                localIsFavorited || isFavorited
+                ((isFavorite && isFavorite(recipe)) || isFavorited)
                   ? 'text-pink-600 bg-pink-50 hover:bg-pink-100' 
                   : 'text-stone-400 hover:text-pink-600 hover:bg-pink-50'
-              } ${favoritesLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${favoritesHook?.loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={((isFavorite && isFavorite(recipe)) || isFavorited) ? 'Remove from favorites' : 'Add to favorites'}
             >
-              <Heart className={`w-4 h-4 ${(localIsFavorited || isFavorited) ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${((isFavorite && isFavorite(recipe)) || isFavorited) ? 'fill-current' : ''}`} />
             </button>
 
             {/* Collections Dropdown Button */}
@@ -369,16 +316,6 @@ const RecipeCard = ({
                 <Folder className="w-4 h-4" />
               </button>
             </div>
-            {/* Direct Remove From Collection Button (visible when card is shown inside a specific collection) */}
-            {collectionId && isRecipeInCollection(collectionId) && (
-              <button
-                onClick={(e) => { e?.stopPropagation(); handleRemoveFromCollection(collectionId); }}
-                className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all hover:scale-110"
-                title="Remove from this collection"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
           </div>
 
           {/* Arrow Button - HIDDEN ON MOBILE to fix clutter */}

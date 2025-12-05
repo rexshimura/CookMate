@@ -102,13 +102,32 @@ const detectRecipesFromText = (text) => {
   return results;
 };
 
-export default function Home() {
+export default function Home({ favoritesHook, collectionsHook }) {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
   const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
+  
+  // Use unified hooks for favorites and collections
+  const { 
+    favorites, 
+    loading: favoritesLoading, 
+    error: favoritesError,
+    toggleFavorite,
+    isFavorite 
+  } = favoritesHook;
+  
+  const {
+    collections,
+    loading: collectionsLoading,
+    error: collectionsError,
+    createNewCollection,
+    addRecipeToCollection,
+    removeRecipeFromCollection,
+    isRecipeInCollection
+  } = collectionsHook;
   
   // --- Hooks & state (must run every render) ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -141,14 +160,8 @@ export default function Home() {
   // Recipe modal state
   const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
   
-  // Favorites state
-  const [favoriteRecipes, setFavoriteRecipes] = useState([]);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  // Legacy state for backward compatibility (will be removed)
   const [favoriteCollectionId, setFavoriteCollectionId] = useState(null);
-
-  // Collections state
-  const [collections, setCollections] = useState([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
 
   // Error state management
   const [error, setError] = useState(null);
@@ -270,12 +283,7 @@ export default function Home() {
     }
   }, [sessions]);
 
-  // Load collections when user is authenticated
-  useEffect(() => {
-    if (user) {
-      loadCollections();
-    }
-  }, [user]);
+  // Collections are now loaded automatically by the hook when user is authenticated
 
   // Handle user state changes - migrate sessions when going from anonymous to authenticated
   const [previousUserId, setPreviousUserId] = useState(null);
@@ -507,11 +515,11 @@ export default function Home() {
       return;
     }
     
-    // Load fresh data and show centralized modal
-    loadFavoriteRecipes();
+    // Use hook data directly
+    const favoriteCollectionId = collections.find(col => col.isDefault)?.id || null;
     
     showFavoritesModal({
-      favoriteRecipes,
+      favoriteRecipes: favorites,
       favoritesLoading,
       collections,
       favoriteCollectionId,
@@ -545,79 +553,32 @@ export default function Home() {
     return true;
   };
 
-  const loadFavoriteRecipes = async () => {
-    setFavoritesLoading(true);
-    try {
-      const result = await getFavorites();
-      // The new collections-based API returns { collection: {...}, recipes: [...] }
-      if (result && result.recipes) {
-        setFavoriteRecipes(result.recipes || []);
-        setFavoriteCollectionId(result.collection?.id || null);
-      } else {
-        setFavoriteRecipes([]);
-      }
-    } catch (error) {
-      setFavoriteRecipes([]);
-    } finally {
-      setFavoritesLoading(false);
-    }
-  };
-
-  const loadCollections = async () => {
-    setCollectionsLoading(true);
-    try {
-      const result = await getCollections();
-      
-      // Handle both response structures: {success: true, collections: [...]} and {collections: [...]}
-      let collections = [];
-      if (result && result.collections) {
-        collections = result.collections;
-      } else if (Array.isArray(result)) {
-        collections = result;
-      }
-      
-      setCollections(collections);
-      
-    } catch (error) {
-      // Error handling without debug logging
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
+  // Load functions removed - hooks handle this automatically
 
   const handleFavoriteRecipeClick = (recipeName) => {
     // Open recipe details using the modal system
     handleRecipeClick(recipeName);
   };
 
+  // Legacy callback functions for backward compatibility with old modals
   const handleAddToFavoritesCallback = (recipeData) => {
-    setFavoriteRecipes(prev => [...prev, recipeData]);
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy add to favorites callback - using hooks instead');
   };
 
   const handleRemoveFromFavoritesCallback = (recipeData) => {
-    setFavoriteRecipes(prev => prev.filter(fav => 
-      fav.id !== recipeData.id && 
-      fav.title !== recipeData.title && 
-      fav.name !== recipeData.name
-    ));
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy remove from favorites callback - using hooks instead');
   };
 
   const handleAddToCollectionCallback = (collectionId, recipeData) => {
-    setCollections(prev => prev.map(collection =>
-      collection.id === collectionId
-        ? { ...collection, recipeCount: (collection.recipeCount || 0) + 1 }
-        : collection
-    ));
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy add to collection callback - using hooks instead');
   };
 
-  // Handle remove from collection callback
   const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
-    // Update the specific collection's recipe count locally
-    setCollections(prev => prev.map(collection => 
-      collection.id === collectionId 
-        ? { ...collection, recipeCount: Math.max((collection.recipeCount || 0) - 1, 0) }
-        : collection
-    ));
+    // Hooks handle this automatically - this is just for legacy modal compatibility
+    console.log('Legacy remove from collection callback - using hooks instead');
   };
 
   // Handle create collection callback
@@ -626,14 +587,7 @@ export default function Home() {
     window.location.href = '/collections';
   };
 
-  // Helper function to check if a recipe is favorited
-  const isRecipeFavorited = (recipeName) => {
-    return favoriteRecipes.some(fav => 
-      fav.title === recipeName || 
-      fav.name === recipeName ||
-      fav.id === recipeName
-    );
-  };
+  // Helper function removed - using hook's isFavorite instead
 
   // Error handling functions
   const handleDismissError = () => {
@@ -965,8 +919,14 @@ export default function Home() {
                             recipe={recipe}
                             onClick={handleRecipeClick}
                             isLoading={recipeDetailsLoading}
-                            isFavorited={isRecipeFavorited(recipe)}
+                            isFavorited={isFavorite(recipe)}
                             collections={collections}
+                            // New unified architecture props
+                            favoritesHook={favoritesHook}
+                            collectionsHook={collectionsHook}
+                            toggleFavorite={toggleFavorite}
+                            isFavorite={isFavorite}
+                            // Legacy props for backward compatibility
                             onAddToFavorites={handleAddToFavoritesCallback}
                             onRemoveFromFavorites={handleRemoveFromFavoritesCallback}
                             onAddToCollection={handleAddToCollectionCallback}
