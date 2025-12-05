@@ -363,8 +363,7 @@ function extractRecipesFromResponse(response) {
   const recipes = [];
   const uniqueRecipes = new Set(); // Prevent duplicates
   
-  console.log('🍳 [RECIPE DETECTION] Starting extraction from response');
-  console.log('🍳 [RECIPE DETECTION] Response length:', response.length);
+
   
   // Helper function to clean and validate recipe names
   const cleanRecipeName = (name) => {
@@ -397,33 +396,17 @@ function extractRecipesFromResponse(response) {
   // Helper function to add recipe if valid and unique
   const addRecipe = (recipeName, source = 'unknown') => {
     const cleaned = cleanRecipeName(recipeName);
-    console.log(`🔍 [ADD_RECIPE] Attempting to add recipe from ${source}: "${cleaned}"`);
     
-    if (!cleaned) {
-      console.log(`❌ [ADD_RECIPE] Empty recipe name`);
-      return false;
-    }
-    
-    if (cleaned.length < 3 || cleaned.length > 80) {
-      console.log(`❌ [ADD_RECIPE] Invalid length: "${cleaned}"`);
-      return false;
-    }
-    
-    if (uniqueRecipes.has(cleaned.toLowerCase())) {
-      console.log(`❌ [ADD_RECIPE] Duplicate recipe: "${cleaned}"`);
+    if (!cleaned || cleaned.length < 3 || cleaned.length > 80 || uniqueRecipes.has(cleaned.toLowerCase())) {
       return false;
     }
     
     const validationResult = isValidRecipe(cleaned);
-    console.log(`🔍 [ADD_RECIPE] Validation result for "${cleaned}":`, validationResult);
     
     if (validationResult) {
       recipes.push(cleaned);
       uniqueRecipes.add(cleaned.toLowerCase());
-      console.log(`✅ [RECIPE DETECTION] Added recipe from ${source}: "${cleaned}"`);
       return true;
-    } else {
-      console.log(`❌ [RECIPE DETECTION] Rejected recipe from ${source}: "${cleaned}" (validation failed)`);
     }
     return false;
   };
@@ -473,7 +456,6 @@ function extractRecipesFromResponse(response) {
       continue;
     }
     
-    console.log('🔍 [EXTRACTION] Found numbered recipe candidate:', candidate);
     addRecipe(candidate, 'numbered_list');
   }
   
@@ -481,7 +463,6 @@ function extractRecipesFromResponse(response) {
   const titlePattern = /^(?:recipe\s*:?\s*|recipe\s+name\s*:?\s*|dish\s*:?\s*|try\s*:?\s*|make\s*:?\s*|here\'?s\s*:?\s*|here\'s\s*:?\s*)([A-Z][^.!?\n\r]{5,80})/gim;
   while ((match = titlePattern.exec(response)) !== null) {
     const recipeName = match[1].trim();
-    console.log('🔍 [EXTRACTION] Found titled recipe:', recipeName);
     addRecipe(recipeName, 'titled_recipe');
   }
   
@@ -498,11 +479,8 @@ function extractRecipesFromResponse(response) {
   
   // IMPROVED FALLBACK: More intelligent line analysis
   if (recipes.length === 0) {
-    console.log('🍳 [RECIPE DETECTION] No recipes found with patterns, trying intelligent fallback...');
-    
     const lines = response.split('\n');
     
-    console.log('🍳 [RECIPE DETECTION] Testing lines for potential recipes:');
     for (const line of lines) {
       const trimmed = line.trim();
       
@@ -528,14 +506,10 @@ function extractRecipesFromResponse(response) {
       const strongRecipeIndicators = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta)\b/i;
       
       if (strongRecipeIndicators.test(trimmed)) {
-        console.log('🍳 [RECIPE DETECTION] Found potential recipe line:', trimmed);
         addRecipe(trimmed, 'intelligent_fallback');
       }
     }
   }
-  
-  console.log('🍳 [RECIPE DETECTION] Final extracted recipes:', recipes);
-  console.log('🍳 [RECIPE DETECTION] Total count:', recipes.length);
   
   return recipes;
 }
@@ -543,24 +517,18 @@ function extractRecipesFromResponse(response) {
 // Improved recipe validation function with better international support and less aggressive filtering
 function isValidRecipe(text) {
   if (!text || text.length === 0) {
-    console.log('❌ [VALIDATION] Failed: empty text');
     return false;
   }
   
   const lowerText = text.toLowerCase().trim();
   
-  console.log('🔍 [VALIDATION] Checking:', text);
-  console.log('🔍 [VALIDATION] Lowercase:', lowerText);
-  
   // Basic length check - more lenient
   if (text.length < 3 || text.length > 80) {
-    console.log('❌ [VALIDATION] Failed: invalid length (' + text.length + ')');
     return false;
   }
   
   // Must start with capital letter or number
   if (!/^[A-Z0-9]/.test(text.trim())) {
-    console.log('❌ [VALIDATION] Failed: does not start with capital letter or number');
     return false;
   }
   
@@ -579,7 +547,6 @@ function isValidRecipe(text) {
   
   // Check for excluded terms (more precise matching)
   if (excludeTerms.some(term => lowerText === term || lowerText.includes(term))) {
-    console.log('❌ [VALIDATION] Failed: contains excluded term');
     return false;
   }
   
@@ -587,11 +554,9 @@ function isValidRecipe(text) {
   const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta|korean|chinese|italian|mexican|indian|thai|french|mediterranean)\b/i;
   
   const foodKeywordMatch = foodKeywords.test(lowerText);
-  console.log('🔍 [VALIDATION] Food keywords check for "' + text + '":', foodKeywordMatch);
   
   // If food keywords found, it's likely a valid recipe
   if (foodKeywordMatch) {
-    console.log('✅ [VALIDATION] Passed - has food keywords');
     return true;
   }
   
@@ -611,7 +576,6 @@ function isValidRecipe(text) {
   
   // Check if text matches cooking instruction patterns
   if (instructionPatterns.some(pattern => pattern.test(text))) {
-    console.log('❌ [VALIDATION] Failed: matches cooking instruction pattern');
     return false;
   }
   
@@ -632,20 +596,16 @@ function isValidRecipe(text) {
   );
   
   if (looksLikeDishName) {
-    console.log('✅ [VALIDATION] Passed - looks like legitimate dish name');
     return true;
   }
   
-  console.log('❌ [VALIDATION] Failed: no food keywords and doesn\'t look like dish name');
   return false;
 }
 
 // Test function to validate "Korean-Style BBQ Beef Tacos"
 function testRecipeValidation() {
-  console.log('\n🧪 [TEST] Testing recipe validation with "Korean-Style BBQ Beef Tacos"...');
   const testRecipe = "Korean-Style BBQ Beef Tacos";
   const result = isValidRecipe(testRecipe);
-  console.log('🧪 [TEST] Result for "' + testRecipe + '":', result);
   return result;
 }
 
@@ -782,8 +742,7 @@ That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinega
   const data = await response.json();
   const aiResponse = data.choices[0]?.message?.content;
   
-  console.log('[DEBUG] AI Response Length:', aiResponse ? aiResponse.length : 'null');
-  console.log('[DEBUG] AI Response Preview:', aiResponse ? aiResponse.substring(0, 200) + '...' : 'null');
+
   
   if (!aiResponse) {
     throw new Error('No response generated from Groq API');
@@ -847,14 +806,12 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     }
     
     // Generate AI response using Groq with fallback handling
-    console.log('🍳 [CHAT] Generating AI response for message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
     
     let aiReply;
     try {
       aiReply = await callGroqAI(message, history);
-      console.log('🍳 [CHAT] AI response generated, length:', aiReply.length);
     } catch (aiError) {
-      console.error('❌ [CHAT] AI service failed, using fallback response:', aiError.message);
+      console.error('AI service failed, using fallback response:', aiError.message);
       
       // Create a helpful fallback response based on the message content
       const ingredientList = extractIngredients(message);
@@ -897,21 +854,11 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
         await Promise.all(detectedRecipes.map(recipeName => 
           storeDetectedRecipe(recipeName, req.userId)
         ));
-        console.log('✅ Stored detected recipes:', detectedRecipes);
       } catch (storeError) {
-        console.warn('⚠️ Failed to store some detected recipes:', storeError);
+        console.warn('Failed to store some detected recipes:', storeError);
         // Continue without storing - don't block the response
       }
-    } else {
-      console.log('⚠️ [CHAT] No recipes detected - this may be the source of the bug!');
-      console.log('⚠️ [CHAT] This is what the AI response looked like:');
-      console.log('⚠️ [CHAT] Response preview:', aiReply.substring(0, 500) + (aiReply.length > 500 ? '...' : ''));
     }
-    
-    console.log('🍳 [CHAT] Full AI Response (for debugging):');
-    console.log(aiReply);
-    console.log('🍳 [CHAT] Extracted recipes:', detectedRecipes);
-    console.log('🍳 [CHAT] Number of recipes found:', detectedRecipes.length);
     
     res.status(200).json({
       response: {
@@ -1067,10 +1014,8 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
     
     // STEP 1: Skip cache for now to always get fresh AI-generated data
     // This ensures users always get full recipe details, not placeholder text
-    console.log('🔄 Always generating fresh recipe details for:', recipeName);
 
     // STEP 2: If no stored data found, generate new recipe details
-    console.log('🔄 No stored recipe found, generating new details for:', recipeName);
     
     // Create a detailed prompt for recipe details generation
     const detailPrompt = `Create detailed recipe information for "${recipeName}". Please provide the recipe in this exact JSON format:
@@ -1101,8 +1046,6 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
     // Parse JSON response from AI with improved error handling
     let recipeData;
     try {
-      console.log('🔍 [RECIPE-DETAILS] AI Response preview:', aiResponse.substring(0, 200) + '...');
-      
       // Try multiple parsing strategies
       let jsonString = '';
       let jsonStart = aiResponse.indexOf('{');
@@ -1110,7 +1053,6 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
       
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
         jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
-        console.log('🔍 [RECIPE-DETAILS] Extracted JSON:', jsonString);
         recipeData = JSON.parse(jsonString);
       } else {
         throw new Error('No valid JSON structure found in response');
@@ -1129,12 +1071,8 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
         recipeData.instructions = [recipeData.instructions].filter(Boolean);
       }
       
-      console.log('✅ [RECIPE-DETAILS] Successfully parsed recipe data:', recipeData.title);
-      
     } catch (parseError) {
-      console.error('❌ [RECIPE-DETAILS] Failed to parse AI recipe details response:', parseError);
-      console.log('📄 [RECIPE-DETAILS] Raw AI Response for debugging:');
-      console.log(aiResponse);
+      console.error('Failed to parse AI recipe details response:', parseError);
       
       // Intelligent fallback: try to extract structured data from text
       try {
@@ -1185,13 +1123,12 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
             tips: ["Use fresh ingredients for best results", "Taste and adjust seasoning as needed"],
             youtubeSearchQuery: `${recipeName} recipe tutorial`
           };
-          console.log('✅ [RECIPE-DETAILS] Successfully extracted structured data from text fallback');
         } else {
           throw new Error('Could not extract structured data from text fallback');
         }
         
       } catch (fallbackError) {
-        console.error('❌ [RECIPE-DETAILS] Text fallback also failed:', fallbackError);
+        console.error('Text fallback also failed:', fallbackError);
         // Final fallback with safe, minimal data
         recipeData = {
           title: recipeName,
@@ -1222,7 +1159,6 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
     
     // Cache the generated recipe for consistency
     recipeCache.set(recipeName, recipeData);
-    console.log('✅ Recipe cached for consistency:', recipeName);
     
     // Save recipe to Firestore if user is authenticated
     let savedRecipeId = null;
@@ -1283,7 +1219,7 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
             aiSuggestions = JSON.parse(jsonString);
           }
         } catch (parseError) {
-          console.log('Failed to parse AI suggestions, using fallback');
+          // Failed to parse AI suggestions, using fallback
         }
         
         if (aiSuggestions.length > 0) {
