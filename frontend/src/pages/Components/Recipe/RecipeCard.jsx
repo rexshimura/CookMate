@@ -69,8 +69,6 @@ const RecipeCard = ({
         // The hook will handle optimistic updates and error handling
       } catch (error) {
         console.error('Failed to toggle favorite:', error);
-        // Show user-friendly error feedback
-        alert(error.message || 'Failed to update favorites');
       }
       return;
     }
@@ -117,7 +115,6 @@ const RecipeCard = ({
         // The hook will handle optimistic updates and error handling
       } catch (error) {
         console.error('Failed to add to collection:', error);
-        alert(error.message || 'Failed to add recipe to collection');
       }
       return;
     }
@@ -167,7 +164,6 @@ const RecipeCard = ({
         // The hook will handle optimistic updates and error handling
       } catch (error) {
         console.error('Failed to remove from collection:', error);
-        alert(error.message || 'Failed to remove recipe from collection');
       }
       return;
     }

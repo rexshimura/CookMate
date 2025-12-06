@@ -209,17 +209,17 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4" style={{ zIndex: 9999 }}>
+      {/* Backdrop - Lighter and less intrusive */}
       <div
-        className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl z-[119]"
+        className="absolute inset-0 bg-black/30 backdrop-blur-sm z-[119]"
         onClick={() => {
           onClose();
         }}
       />
 
-      {/* Modal */}
-      <div className="relative bg-gradient-to-b from-white via-stone-50 to-stone-100 sm:rounded-2xl shadow-2xl shadow-stone-900/10 border-t sm:border border-stone-200/60 backdrop-blur-xl w-full max-w-4xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden transition-all duration-500 ease-out flex flex-col sm:block">
+      {/* Modal - Improved contrast and clarity */}
+      <div className="relative bg-white sm:rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200 w-full max-w-4xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden transition-all duration-300 ease-out flex flex-col sm:block">
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-4 md:p-6 relative flex-shrink-0">
           <div className="flex items-center justify-between">

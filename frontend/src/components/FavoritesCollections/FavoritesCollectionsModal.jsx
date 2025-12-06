@@ -261,14 +261,7 @@ const FavoritesCollectionsModal = ({
                     collectionsHook.removeRecipeFromCollection(collection.id, recipe);
                   }
                 }}
-                onRecipeClick={(recipe) => {
-                  // Close library modal first, then open recipe detail
-                  onClose();
-                  // Small delay to ensure modal is closed before opening recipe detail
-                  setTimeout(() => {
-                    handleRecipeClick(recipe);
-                  }, 100);
-                }}
+                onRecipeClick={handleRecipeClick}
               />
             ))}
           </div>
@@ -358,14 +351,7 @@ const FavoritesCollectionsModal = ({
                       key={fav.id}
                       recipe={fav}
                       onRemove={() => toggleFavorite(fav)}
-                      onRecipeClick={(recipe) => {
-                        // Close library modal first, then open recipe detail
-                        onClose();
-                        // Small delay to ensure modal is closed before opening recipe detail
-                        setTimeout(() => {
-                          handleRecipeClick(recipe);
-                        }, 100);
-                      }}
+                      onRecipeClick={handleRecipeClick}
                     />
                   ))}
                 </div>

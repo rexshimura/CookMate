@@ -839,23 +839,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
-            {/* Show sign-in prompt for non-authenticated users when there are no messages */}
-            {!user && messages.length === 0 && (
-              <div className="text-center py-8 bg-gradient-to-b from-blue-50/50 to-stone-50/50 rounded-2xl border border-blue-200/60">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <LogIn className="w-6 h-6 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-stone-800 mb-2">Sign in to unlock more features!</h3>
-                <p className="text-stone-600 mb-4">Save your favorite recipes, create collections, and sync your cooking sessions across devices.</p>
-                <button 
-                  onClick={handleSignIn}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 mx-auto"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </button>
-              </div>
-            )}
+          
 
             {/* Error Message Display */}
             {showError && error && (

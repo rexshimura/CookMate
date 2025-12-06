@@ -8,7 +8,6 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Import all modal components
 import AuthPromptModal from './components/AuthPromptModal.jsx';
-import SessionTransferNotification from './components/SessionTransferNotification.jsx';
 import CollectionsModal from './pages/Components/UI/CollectionsModal.jsx';
 import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
 import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
@@ -167,9 +166,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         icons={collectionFormModalState.icons || []}
       />
 
-      {/* Session Transfer Notification */}
-      <SessionTransferNotification />
-
       {/* Unified Favorites & Collections Modal */}
       <FavoritesCollectionsModal
         isOpen={favoritesCollectionsModalState.isOpen}
@@ -304,6 +300,9 @@ function App() {
 
     // Recipe Detail Modal Actions
     showRecipeDetail: (options) => {
+      // First, ensure the other modal is closed to prevent conflicts.
+      setFavoritesCollectionsModalState(prev => ({ ...prev, isOpen: false }));
+      // Then, open the recipe detail modal.
       setRecipeDetailModalState({ 
         isOpen: true, 
         ...options 

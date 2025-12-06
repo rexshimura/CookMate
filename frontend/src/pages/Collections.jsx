@@ -152,7 +152,6 @@ const Collections = () => {
       await createNewCollection(formData);
     } catch (error) {
       console.error('Failed to create collection:', error);
-      alert(`Failed to create collection: ${error.message}`);
     }
   };
 
@@ -164,12 +163,11 @@ const Collections = () => {
       }
     } catch (error) {
       console.error('Failed to delete collection:', error);
-      alert(`Failed to delete collection: ${error.message}`);
     }
   };
 
   const startEditing = (collection) => {
-    alert('Editing collections is temporarily disabled.');
+    // Editing collections is temporarily disabled
   };
 
   const handleCollectionSelect = (collectionId) => {
@@ -215,7 +213,6 @@ const Collections = () => {
       await addRecipeToCollection(collectionId, recipeData);
     } catch (error) {
       console.error('Failed to add recipe to collection:', error);
-      alert(`Failed to add recipe: ${error.message}`);
     }
   };
 
@@ -224,7 +221,6 @@ const Collections = () => {
       await removeRecipeFromCollection(collectionId, recipeData);
     } catch (error) {
       console.error('Failed to remove recipe from collection:', error);
-      alert(`Failed to remove recipe: ${error.message}`);
     }
   };
 
@@ -247,11 +243,9 @@ const Collections = () => {
           setTimeout(() => {
             window.location.href = '/';
           }, 1000);
-        } else {
-          alert(result.error || 'Failed to sign out. Please try again.');
         }
       } catch (error) {
-        alert('An unexpected error occurred. Please try again.');
+        console.error('Logout error:', error);
       } finally {
         setIsLoggingOut(false);
       }
