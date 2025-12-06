@@ -41,6 +41,14 @@ const FavoritesCollectionsModal = ({
       setIsCreating(false);
       setNewCollectionName('');
       setViewingCollection(null);
+    } else {
+      // Refresh data when modal opens to ensure we have the latest favorites
+      if (favoritesHook?.refreshFavorites) {
+        favoritesHook.refreshFavorites();
+      }
+      if (collectionsHook?.refreshCollections) {
+        collectionsHook.refreshCollections();
+      }
     }
   }, [isOpen]);
 
@@ -298,7 +306,7 @@ const FavoritesCollectionsModal = ({
           >
             <div className="flex items-center justify-center gap-2">
               <Heart className={`w-4 h-4 ${activeTab === 'favorites' ? 'fill-current' : ''}`} />
-              Favorites ({favorites.length})
+              Favorites {favoritesLoading ? '(...)' : `(${favorites.length})`}
             </div>
             {activeTab === 'favorites' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600"></div>

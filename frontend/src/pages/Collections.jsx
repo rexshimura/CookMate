@@ -25,7 +25,8 @@ const Collections = () => {
     deleteCollection,
     addRecipeToCollection,
     removeRecipeFromCollection,
-    refreshCollections
+    refreshCollections,
+    isRecipeInCollection
   } = useCollections();
 
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
@@ -417,6 +418,18 @@ const Collections = () => {
                           isFavorited={true} 
                           user={user}
                           collections={collections}
+                          // Pass the collections hook for the new isSavedInCollection logic
+                          collectionsHook={{
+                            collections,
+                            loading: collectionsLoading,
+                            error: collectionsError,
+                            createNewCollection,
+                            deleteCollection,
+                            addRecipeToCollection,
+                            removeRecipeFromCollection,
+                            refreshCollections,
+                            isRecipeInCollection
+                          }}
                           requireAuth={requireAuth}
                           collectionId={currentCollection?.id}
                           onAddToFavorites={handleAddToFavoritesCallback}

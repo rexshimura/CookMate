@@ -38,6 +38,11 @@ const RecipeCard = ({
     return collection?.recipes?.some(r => r.id === recipeId);
   };
 
+  // Check if recipe is saved in ANY collection (for the folder icon glow)
+  const isSavedInCollection = collectionsHook?.collections?.some(col => 
+    col.recipes?.some(r => r.id === generateRecipeId(recipe))
+  );
+
   // Handle favorites using the new unified architecture with debouncing
   const handleAddToFavorites = async (e) => {
     e?.stopPropagation();
@@ -212,9 +217,14 @@ const RecipeCard = ({
                   initialTab: 'collections' 
                 });
               }}
-              className="p-2 text-stone-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-all hover:scale-110"
+              className={`p-2 rounded-full transition-all hover:scale-110 ${
+                isSavedInCollection
+                  ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' 
+                  : 'text-stone-400 hover:text-orange-600 hover:bg-orange-50'
+              }`}
+              title="Save to Collection"
             >
-              <Folder className="w-4 h-4" />
+              <Folder className={`w-4 h-4 ${isSavedInCollection ? 'fill-current' : ''}`} />
             </button>
           </div>
 

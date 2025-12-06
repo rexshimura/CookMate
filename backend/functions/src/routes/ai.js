@@ -1059,9 +1059,24 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: 'Recipe name is required' });
     }
     
-    // STEP 1: Skip cache for now to always get fresh AI-generated data
-    // This ensures users always get full recipe details, not placeholder text
-
+    // 1. CHECK CACHE FIRST: Don't call AI if we already have the recipe
+    try {
+      // Use the existing helper to find the recipe in Firestore
+      const cachedRecipe = await getStoredRecipe(recipeName);
+      
+      if (cachedRecipe && cachedRecipe.ingredients && cachedRecipe.instructions) {
+        console.log('✅ Serving recipe from cache:', recipeName);
+        return res.status(200).json({
+          message: 'Recipe retrieved from cache',
+          recipe: cachedRecipe,
+          savedRecipeId: cachedRecipe.id,
+          userId: req.userId
+        });
+      }
+    } catch (cacheError) {
+      console.warn('Cache check failed, proceeding to generation:', cacheError);
+    }
+    
     // STEP 2: If no stored data found, generate new recipe details
     
     // Create a detailed prompt for recipe details generation

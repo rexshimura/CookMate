@@ -412,63 +412,36 @@ export const cleanupOrphanedData = () => {
   }
 };
 
-// Generate session title from first message
 export const generateSessionTitle = (firstMessage) => {
-  if (!firstMessage || firstMessage.trim().length === 0) {
-    return 'New Cooking Session';
-  }
-
-  const cleanedMessage = firstMessage.trim();
+  if (!firstMessage || firstMessage.trim().length === 0) return 'New Cooking Session';
+  const cleanMsg = firstMessage.trim();
   
-  // Common patterns to look for at the beginning of messages
-  const patterns = [
-    /^i want to (cook|make|prepare) (.+)/i,
-    /^help me (cook|make|prepare) (.+)/i,
-    /^how to (cook|make|prepare) (.+)/i,
-    /^can you help me (.+)/i,
-    /^i have (.+) and want to (.+)/i,
-    /^recipe for (.+)/i,
-    /^what can i make with (.+)/i,
-    /^cooking (.+)/i,
-    /^make (.+)/i,
-    /^cook (.+)/i,
-    /^(.+?) recipe/i
+  // 1. Regex for explicit requests ("Recipe for X")
+  const explicitPatterns = [
+    /recipe for (.+)/i, /how to (?:cook|make|bake|prepare) (.+)/i,
+    /ingredients for (.+)/i, /i want to make (.+)/i
   ];
-
-  // Try to match patterns for better titles
-  for (const pattern of patterns) {
-    const match = cleanedMessage.match(pattern);
-    if (match) {
-      const title = match[2] || match[1];
-      return title.trim().length > 0 ? 
-        title.charAt(0).toUpperCase() + title.slice(1).toLowerCase() : 
-        'New Cooking Session';
+  for (const pattern of explicitPatterns) {
+    const match = cleanMsg.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim().replace(/[.?!]+$/, '').charAt(0).toUpperCase() + match[1].trim().slice(1);
     }
   }
 
-  // If no pattern matches, take first meaningful words but clean them up
-  const words = cleanedMessage.split(' ').filter(word => word.length > 0);
+  // 2. Smart Word Filtering (Ignore "Give me a...")
+  const words = cleanMsg.split(/\s+/);
+  const stopWords = new Set(['hi','hello','please','can','you','give','me','a','the','i','want','need','recipe','how','to','make','cook','whats']);
   
-  if (words.length === 0) return 'New Cooking Session';
-  
-  // Remove common starting words that don't make good titles
-  const skipWords = ['i', 'me', 'my', 'to', 'the', 'a', 'an', 'and', 'or', 'but', 'so', 'want', 'need', 'have'];
-  const meaningfulWords = words.filter(word => !skipWords.includes(word.toLowerCase()));
-  
-  if (meaningfulWords.length === 0) {
-    return words.slice(0, 3).map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ') || 'New Cooking Session';
+  let startIndex = 0;
+  while (startIndex < words.length && stopWords.has(words[startIndex].toLowerCase().replace(/[^a-z]/g, ''))) {
+    startIndex++;
   }
 
-  // Take up to 4 meaningful words
-  const titleWords = meaningfulWords.slice(0, 4);
-  const title = titleWords.map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
+  // If we filtered everything, fallback to first few words
+  if (startIndex >= words.length) return words.slice(0, 3).join(' ') + '...';
 
-  // Ensure title isn't too long
-  return title.length > 50 ? title.substring(0, 47) + '...' : title;
+  // Return the meaningful subject (next 3-4 words)
+  return words.slice(startIndex, startIndex + 4).join(' ').replace(/[.?!]+$/, '');
 };
 
 export default {

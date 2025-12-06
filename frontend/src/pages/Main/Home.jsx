@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
 import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.js';
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
+import RecipeCardLoader from '../Components/Recipe/RecipeCardLoader.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
 import ErrorMessage from '../../components/ErrorMessage.jsx';
@@ -912,9 +913,19 @@ export default function Home({ favoritesHook, collectionsHook }) {
               })
             )}
             {isTyping && (
-               <div className="flex gap-4 animate-slideUp">
-                 <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center"><Flame className="w-5 h-5 text-orange-500" /></div>
-                 <div className="px-5 py-4 bg-white border border-stone-200 rounded-2xl rounded-tl-sm text-stone-500 text-sm italic">Thinking...</div>
+               <div className="flex flex-col gap-2 animate-slideUp">
+                 <div className="flex gap-4">
+                   <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center">
+                     <Flame className="w-5 h-5 text-orange-500" />
+                   </div>
+                   <div className="px-5 py-4 bg-white border border-stone-200 rounded-2xl rounded-tl-sm text-stone-500 text-sm italic">
+                     Thinking...
+                   </div>
+                 </div>
+                 {/* NEW: Visual cue that a recipe card is coming */}
+                 <div className="pl-14 max-w-[85%]">
+                    <RecipeCardLoader />
+                 </div>
                </div>
             )}
             {chatError && (

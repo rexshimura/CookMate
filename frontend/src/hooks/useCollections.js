@@ -63,8 +63,14 @@ export const useCollections = () => {
   }, []);
 
   const addRecipeToCollectionById = useCallback(async (colId, recipe) => {
-    const res = await addRecipeToCollection(colId, generateRecipeId(recipe), recipe);
-    await loadCollections(); // Sync
+    // FIX: Ensure recipe is always an object before sending to API
+    // If it's a string (title), wrap it. If it's already an object, use it.
+    const recipeData = typeof recipe === 'string' 
+      ? { title: recipe, id: generateRecipeId(recipe) } 
+      : { ...recipe, id: generateRecipeId(recipe) };
+
+    const res = await addRecipeToCollection(colId, generateRecipeId(recipe), recipeData);
+    await loadCollections(); // Sync UI
     return res;
   }, [loadCollections]);
 
