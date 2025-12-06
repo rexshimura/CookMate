@@ -121,42 +121,56 @@ async function getStoredRecipe(recipeName) {
   try {
     const recipeId = generateConsistentRecipeId(recipeName);
     
-    // STEP 1: Check in-memory cache first (for immediate testing)
+    // STEP 1: Check in-memory cache first
     if (recipeCache.has(recipeName)) {
-      console.log('✅ Found recipe in memory cache:', recipeName);
-      return recipeCache.get(recipeName);
+      const cached = recipeCache.get(recipeName);
+      // Validation: Don't return cache if it's just a placeholder
+      if (cached.ingredients && cached.ingredients.length > 0 && !cached.ingredients[0].includes('Click on the recipe')) {
+        console.log('✅ Found full recipe in memory cache:', recipeName);
+        return cached;
+      }
     }
     
-    // STEP 2: Try to get from detected recipes first
+    // STEP 2: Check MAIN recipes collection (Full Details) - PRIORITY!
+    try {
+      const mainRecipe = await db.collection('recipes').doc(recipeId).get();
+      if (mainRecipe.exists) {
+        console.log('✅ Found full recipe in main collection:', recipeId);
+        return mainRecipe.data();
+      }
+      
+      // Fallback: Try query if ID match failed
+      const allRecipesSnapshot = await db.collection('recipes')
+        .where('title', '==', recipeName)
+        .limit(1)
+        .get();
+        
+      if (!allRecipesSnapshot.empty) {
+        console.log('✅ Found full recipe via query:', allRecipesSnapshot.docs[0].id);
+        return allRecipesSnapshot.docs[0].data();
+      }
+    } catch (mainError) {
+      console.log('⚠️ Main recipes check failed:', mainError.message);
+    }
+
+    // STEP 3: Check detected recipes (Placeholders) - LAST RESORT
+    // Only use this if we really have nothing else, but notify caller it might be incomplete
     try {
       const detectedRecipe = await db.collection('detectedRecipes').doc(recipeId).get();
       if (detectedRecipe.exists) {
-        console.log('✅ Found detected recipe:', recipeId);
-        return detectedRecipe.data();
+        const data = detectedRecipe.data();
+        // Only return if it actually has real data, otherwise return null to force AI generation
+        if (data.ingredients && data.ingredients.length > 0 && !data.ingredients[0].includes('Click on the recipe')) {
+           console.log('✅ Found valid detected recipe:', recipeId);
+           return data;
+        }
+        console.log('⚠️ Found placeholder in detectedRecipes, ignoring to force generation:', recipeId);
       }
     } catch (detectedError) {
-      console.log('⚠️ Detected recipes collection not available:', detectedError.message);
+      console.log('⚠️ Detected recipes check failed:', detectedError.message);
     }
 
-    // STEP 3: Try to find in main recipes collection using a simpler approach
-    try {
-      const allRecipesSnapshot = await db.collection('recipes').get();
-      
-      if (!allRecipesSnapshot.empty) {
-        const matchingRecipe = allRecipesSnapshot.docs.find(doc => 
-          doc.data().title === recipeName
-        );
-        
-        if (matchingRecipe) {
-          console.log('✅ Found recipe in main collection:', matchingRecipe.id);
-          return matchingRecipe.data();
-        }
-      }
-    } catch (mainError) {
-      console.log('⚠️ Main recipes collection not available:', mainError.message);
-    }
-
-    console.log('❌ No stored recipe found for:', recipeName);
+    console.log('❌ No valid stored recipe found for:', recipeName);
     return null;
   } catch (error) {
     console.error('❌ Failed to get stored recipe:', error);
@@ -1061,10 +1075,14 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
     
     // 1. CHECK CACHE FIRST: Don't call AI if we already have the recipe
     try {
-      // Use the existing helper to find the recipe in Firestore
       const cachedRecipe = await getStoredRecipe(recipeName);
       
-      if (cachedRecipe && cachedRecipe.ingredients && cachedRecipe.instructions) {
+      // VALIDATION: Ensure it's a real recipe, not a placeholder
+      if (cachedRecipe && 
+          cachedRecipe.ingredients && 
+          cachedRecipe.ingredients.length > 0 && 
+          !cachedRecipe.ingredients[0].includes("Click on the recipe")) {
+            
         console.log('✅ Serving recipe from cache:', recipeName);
         return res.status(200).json({
           message: 'Recipe retrieved from cache',
