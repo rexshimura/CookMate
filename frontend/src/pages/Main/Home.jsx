@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn, Bookmark } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
 import { getRecipeDetails, getFavorites, getCollections } from '../../utils/api.js';
 import RecipeCard from '../Components/Recipe/RecipeCard.jsx';
+import RecipeCardLoader from '../Components/Recipe/RecipeCardLoader.jsx';
 import RecipeDetailModal from '../Components/Recipe/RecipeDetailModal.jsx';
 import Sidebar from '../Components/Utility/Sidebar.jsx';
 import ErrorMessage from '../../components/ErrorMessage.jsx';
@@ -108,7 +109,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
   const { sessions, loading: sessionsLoading, createNewSession, deleteExistingSession } = useSessions();
   const { confirmDelete, ConfirmationDialog: DeleteDialog, isConfirming: isDeleteConfirming } = useDeleteConfirmation();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
-  const { showAuthPrompt, showRecipeDetail, showCollectionsModal, showFavoritesModal } = useModal();
+  const { showAuthPrompt, showRecipeDetail, showFavoritesCollectionsModal } = useModal();
   
   // Use unified hooks for favorites and collections
   const { 
@@ -491,11 +492,8 @@ export default function Home({ favoritesHook, collectionsHook }) {
 
   // Recipe handlers
   const handleRecipeClick = (recipeName) => {
-    showRecipeDetail({
-      recipeName,
-      fetchRecipeDetails: handleFetchRecipeDetails,
-      onAddToFavorites: handleAddToFavoritesCallback
-    });
+    // Navigate to the new page, encoding the name to handle spaces/special chars
+    navigate(`/recipe/${encodeURIComponent(recipeName)}`);
   };
 
   const handleFetchRecipeDetails = async (recipeName) => {
@@ -508,41 +506,26 @@ export default function Home({ favoritesHook, collectionsHook }) {
     }
   };
 
-  // Favorites handlers
-  const handleShowFavorites = () => {
+  // Unified Library handlers
+  const handleShowLibrary = () => {
     if (!user) {
-      showAuthPrompt('Please sign in to view your favorite recipes.');
+      showAuthPrompt('Please sign in to view your library of recipes.');
       return;
     }
     
-    // Use hook data directly
-    const favoriteCollectionId = collections.find(col => col.isDefault)?.id || null;
-    
-    showFavoritesModal({
-      favoriteRecipes: favorites,
-      favoritesLoading,
-      collections,
-      favoriteCollectionId,
-      handleFavoriteRecipeClick,
-      handleAddToFavoritesCallback,
-      handleRemoveFromFavoritesCallback,
-      handleAddToCollectionCallback,
-      handleRemoveFromCollectionCallback,
-      handleCreateCollectionCallback,
-      handleFetchRecipeDetails,
-      user,
-      requireAuth
+    // Use the unified modal
+    showFavoritesCollectionsModal({
+      recipe: null, // When opening from library view, no specific recipe
+      onAction: (action, data) => {
+        if (action === 'favorite') {
+          // Handle favorite action if needed
+          console.log('Favorite action:', data);
+        } else if (action === 'collection') {
+          // Handle collection action if needed
+          console.log('Collection action:', data);
+        }
+      }
     });
-  };
-
-  // Collections handlers
-  const handleShowCollections = () => {
-    if (!user) {
-      showAuthPrompt('Please sign in to view and manage your recipe collections.');
-      return;
-    }
-    // Navigate to collections page
-    window.location.href = '/collections';
   };
 
   const requireAuth = (featureName) => {
@@ -700,8 +683,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
           onCreateSession={handleCreateNewChat}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
-          onShowFavorites={handleShowFavorites}
-          onShowCollections={handleShowCollections}
+          onShowLibrary={handleShowLibrary}
           onLogout={handleLogout}
           isLoggingOut={isLoggingOut}
           collapsed={sidebarCollapsed}
@@ -716,11 +698,11 @@ export default function Home({ favoritesHook, collectionsHook }) {
             </div>
             <div className="flex items-center gap-2">
               <button 
-                onClick={handleShowFavorites}
-                className="p-2 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-full transition-all duration-200 hover:scale-105"
-                title="My Favorites"
+                onClick={handleShowLibrary}
+                className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-full transition-all duration-200 hover:scale-105"
+                title="My Library"
               >
-                <Heart className="w-5 h-5" />
+                <Bookmark className="w-5 h-5" />
               </button>
               {!user && (
                 <button 
@@ -836,8 +818,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
         onCreateSession={handleCreateNewChat}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
-        onShowFavorites={handleShowFavorites}
-        onShowCollections={handleShowCollections}
+        onShowLibrary={handleShowLibrary}
         onLogout={handleLogout}
         sessionsLoading={sessionsLoading}
         isLoggingOut={isLoggingOut}
@@ -856,23 +837,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
 
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth">
           <div className="max-w-3xl mx-auto space-y-8 pb-4">
-            {/* Show sign-in prompt for non-authenticated users when there are no messages */}
-            {!user && messages.length === 0 && (
-              <div className="text-center py-8 bg-gradient-to-b from-blue-50/50 to-stone-50/50 rounded-2xl border border-blue-200/60">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <LogIn className="w-6 h-6 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-stone-800 mb-2">Sign in to unlock more features!</h3>
-                <p className="text-stone-600 mb-4">Save your favorite recipes, create collections, and sync your cooking sessions across devices.</p>
-                <button 
-                  onClick={handleSignIn}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2 mx-auto"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </button>
-              </div>
-            )}
+          
 
             {/* Error Message Display */}
             {showError && error && (
@@ -948,9 +913,19 @@ export default function Home({ favoritesHook, collectionsHook }) {
               })
             )}
             {isTyping && (
-               <div className="flex gap-4 animate-slideUp">
-                 <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center"><Flame className="w-5 h-5 text-orange-500" /></div>
-                 <div className="px-5 py-4 bg-white border border-stone-200 rounded-2xl rounded-tl-sm text-stone-500 text-sm italic">Thinking...</div>
+               <div className="flex flex-col gap-2 animate-slideUp">
+                 <div className="flex gap-4">
+                   <div className="w-10 h-10 rounded-full bg-white border border-stone-200 flex items-center justify-center">
+                     <Flame className="w-5 h-5 text-orange-500" />
+                   </div>
+                   <div className="px-5 py-4 bg-white border border-stone-200 rounded-2xl rounded-tl-sm text-stone-500 text-sm italic">
+                     Thinking...
+                   </div>
+                 </div>
+                 {/* NEW: Visual cue that a recipe card is coming */}
+                 <div className="pl-14 max-w-[85%]">
+                    <RecipeCardLoader />
+                 </div>
                </div>
             )}
             {chatError && (

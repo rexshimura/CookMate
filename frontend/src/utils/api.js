@@ -15,7 +15,7 @@ const getApiBaseUrl = () => {
       }
       console.warn('Invalid VITE_API_BASE_URL format:', envUrl);
     }
-
+    
     // Priority 2: Auto-detect based on development vs production
     if (import.meta.env.DEV) {
       // Development: Use Vite proxy which routes to Firebase Emulator
@@ -71,12 +71,12 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
       ...options,
       headers,
     });
-
+    
     if (!response.ok) {
       // Handle authentication errors with token refresh retry
       if (response.status === 401 && retryCount < 1) {
         console.log('🔄 [API] 401 Unauthorized - attempting token refresh and retry');
-
+        
         // Force refresh the token using the token manager
         try {
           await refreshAuthToken();
@@ -84,11 +84,11 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
         } catch (refreshError) {
           console.error('❌ [API] Token refresh failed during retry:', refreshError);
         }
-
+        
         // Retry the request with a fresh token
         return apiCall(endpoint, options, retryCount + 1);
       }
-
+      
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
     }
@@ -99,7 +99,7 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
     // Enhanced error classification and user-friendly messages
     let userFriendlyError;
     let errorCode = 'UNKNOWN_ERROR';
-
+    
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       userFriendlyError = 'Network connection failed. Please check your internet connection.';
       errorCode = 'NETWORK_ERROR';
@@ -128,20 +128,20 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
       userFriendlyError = error.message || 'An unexpected error occurred. Please try again.';
       errorCode = 'UNKNOWN_ERROR';
     }
-
+    
     // Create enhanced error object
     const enhancedError = new Error(userFriendlyError);
     enhancedError.code = errorCode;
     enhancedError.originalError = error;
     enhancedError.endpoint = endpoint;
     enhancedError.timestamp = new Date().toISOString();
-
+    
     // Retry logic for transient failures
     if (retryCount < RETRY_CONFIG.maxRetries && isRetryableError(enhancedError)) {
       await delay(RETRY_CONFIG.retryDelay * Math.pow(2, retryCount)); // Exponential backoff
       return apiCall(endpoint, options, retryCount + 1);
     }
-
+    
     throw enhancedError;
   }
 }
@@ -153,11 +153,11 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
     if (!message || typeof message !== 'string' || !message.trim()) {
       throw new Error('Message is required and must be a non-empty string');
     }
-
+    
     if (sessionId && typeof sessionId !== 'string') {
       throw new Error('Session ID must be a string if provided');
     }
-
+    
     if (history && !Array.isArray(history)) {
       throw new Error('History must be an array if provided');
     }
@@ -167,7 +167,7 @@ export const chatWithAI = async (message, sessionId = null, history = null) => {
       ...(sessionId && { sessionId }),
       ...(Array.isArray(history) && history.length > 0 ? { history } : {}),
     };
-
+    
     return await apiCall('/api/ai/chat', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -185,7 +185,7 @@ export const generateRecipe = async (ingredients, dietaryPreferences = '', recip
     if (!ingredients) {
       throw new Error('Ingredients are required');
     }
-
+    
     let ingredientsArray;
     if (Array.isArray(ingredients)) {
       ingredientsArray = ingredients.filter(ing => ing && typeof ing === 'string' && ing.trim());
@@ -197,11 +197,11 @@ export const generateRecipe = async (ingredients, dietaryPreferences = '', recip
     } else {
       throw new Error('Ingredients must be a non-empty string or array of strings');
     }
-
+    
     if (dietaryPreferences && typeof dietaryPreferences !== 'string') {
       throw new Error('Dietary preferences must be a string if provided');
     }
-
+    
     if (recipeType && typeof recipeType !== 'string') {
       throw new Error('Recipe type must be a string if provided');
     }
@@ -226,7 +226,7 @@ export const suggestIngredients = async (availableIngredients) => {
     if (!availableIngredients) {
       throw new Error('Available ingredients are required');
     }
-
+    
     let ingredientsArray;
     if (Array.isArray(availableIngredients)) {
       ingredientsArray = availableIngredients.filter(ing => ing && typeof ing === 'string' && ing.trim());
@@ -262,7 +262,7 @@ export const getRecipeDetails = async (recipeName) => {
       method: 'POST',
       body: JSON.stringify({ recipeName: recipeName.trim() }),
     });
-
+    
     return { success: true, recipe: result.recipe, message: result.message };
   } catch (error) {
     // Return safe error response instead of crashing
@@ -310,14 +310,14 @@ export const addToFavorites = async (recipeId, recipeData = null) => {
     if (!recipeId || typeof recipeId !== 'string' || !recipeId.trim()) {
       throw new Error('Recipe ID is required and must be a non-empty string');
     }
-
+    
     if (recipeData !== null && typeof recipeData !== 'object') {
       throw new Error('Recipe data must be an object if provided');
     }
-
+    
     // Get the favorites collection (backend auto-creates if missing)
     const favoritesResult = await apiCall('/api/collections/favorites');
-
+    
     if (favoritesResult && favoritesResult.collection) {
       // Add to the favorites collection
       return await apiCall(`/api/collections/${favoritesResult.collection.id}/recipes`, {
@@ -325,7 +325,7 @@ export const addToFavorites = async (recipeId, recipeData = null) => {
         body: JSON.stringify({ recipeId: recipeId.trim(), recipeData }),
       });
     }
-
+    
     throw new Error('Favorites collection not found');
   } catch (error) {
     throw new Error(error.message || 'Failed to add to favorites');
@@ -338,7 +338,7 @@ export const removeFromFavorites = async (recipeId) => {
     if (!recipeId || typeof recipeId !== 'string' || !recipeId.trim()) {
       throw new Error('Recipe ID is required and must be a non-empty string');
     }
-
+    
     // First get the favorites collection
     const favoritesResult = await apiCall('/api/collections/favorites');
     if (favoritesResult && favoritesResult.collection) {
@@ -361,7 +361,7 @@ export const checkIsFavorite = async (recipeId) => {
     if (!recipeId || typeof recipeId !== 'string' || !recipeId.trim()) {
       return false;
     }
-
+    
     const favoritesResult = await apiCall('/api/collections/favorites');
     if (favoritesResult && favoritesResult.recipes) {
       return favoritesResult.recipes.some(recipe => recipe.id === recipeId.trim());
@@ -389,7 +389,7 @@ export const createCollection = async (collectionData) => {
     if (!collectionData || typeof collectionData !== 'object') {
       throw new Error('Collection data is required and must be an object');
     }
-
+    
     if (!collectionData.name || typeof collectionData.name !== 'string' || !collectionData.name.trim()) {
       throw new Error('Collection name is required and must be a non-empty string');
     }
@@ -413,7 +413,7 @@ export const updateCollection = async (collectionId, updates) => {
     if (!collectionId || typeof collectionId !== 'string' || !collectionId.trim()) {
       throw new Error('Collection ID is required and must be a non-empty string');
     }
-
+    
     if (!updates || typeof updates !== 'object') {
       throw new Error('Updates must be an object');
     }
@@ -446,11 +446,11 @@ export const addRecipeToCollection = async (collectionId, recipeId, recipeData =
     if (!collectionId || typeof collectionId !== 'string' || !collectionId.trim()) {
       throw new Error('Collection ID is required and must be a non-empty string');
     }
-
+    
     if (!recipeId || typeof recipeId !== 'string' || !recipeId.trim()) {
       throw new Error('Recipe ID is required and must be a non-empty string');
     }
-
+    
     if (recipeData !== null && typeof recipeData !== 'object') {
       throw new Error('Recipe data must be an object if provided');
     }
@@ -459,7 +459,7 @@ export const addRecipeToCollection = async (collectionId, recipeId, recipeData =
       method: 'POST',
       body: JSON.stringify({ recipeId: recipeId.trim(), recipeData }),
     });
-
+    
     return result;
   } catch (error) {
     throw new Error(error.message || 'Failed to add recipe to collection');
@@ -471,7 +471,7 @@ export const removeRecipeFromCollection = async (collectionId, recipeId) => {
     if (!collectionId || typeof collectionId !== 'string' || !collectionId.trim()) {
       throw new Error('Collection ID is required and must be a non-empty string');
     }
-
+    
     if (!recipeId || typeof recipeId !== 'string' || !recipeId.trim()) {
       throw new Error('Recipe ID is required and must be a non-empty string');
     }

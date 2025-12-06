@@ -8,18 +8,18 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Import all modal components
 import AuthPromptModal from './components/AuthPromptModal.jsx';
-import SessionTransferNotification from './components/SessionTransferNotification.jsx';
 import CollectionsModal from './pages/Components/UI/CollectionsModal.jsx';
 import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
-import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
 import FavoritesModal from './pages/Components/UI/FavoritesModal.jsx';
 import CollectionFormModal from './pages/Components/UI/CollectionFormModal.jsx';
+import FavoritesCollectionsModal from './components/FavoritesCollections/FavoritesCollectionsModal.jsx';
 import { useDeleteConfirmation, useLogoutConfirmation } from './pages/Components/UI/useConfirmation.jsx';
 
 // Import pages
 import Landing from "./pages/Landing.jsx";
 import Home from "./pages/Main/Home.jsx"
 import Collections from "./pages/Collections.jsx";
+import RecipeDetailsPage from "./pages/RecipeDetailsPage.jsx";
 import SigninPage from "./pages/Auth/Sign-In.jsx";
 import SignupPage from "./pages/Auth/Sign-Up.jsx";
 import './App.css';
@@ -41,9 +41,9 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     authPromptState,
     collectionsModalState,
     confirmationState,
-    recipeDetailModalState,
     favoritesModalState,
-    collectionFormModalState
+    collectionFormModalState,
+    favoritesCollectionsModalState
   } = modalStates;
 
   const {
@@ -53,12 +53,12 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     hideCollectionsModal,
     showConfirmation,
     hideConfirmation,
-    showRecipeDetail,
-    hideRecipeDetail,
     showFavoritesModal,
     hideFavoritesModal,
     showCollectionFormModal,
-    hideCollectionFormModal
+    hideCollectionFormModal,
+    showFavoritesCollectionsModal,
+    hideFavoritesCollectionsModal
   } = modalActions;
 
   return (
@@ -75,9 +75,7 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
       showConfirmation,
       hideConfirmation,
       
-      // Recipe Detail Modal
-      showRecipeDetail,
-      hideRecipeDetail,
+
       
       // Favorites Modal
       showFavoritesModal,
@@ -85,7 +83,11 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
       
       // Collection Form Modal
       showCollectionFormModal,
-      hideCollectionFormModal
+      hideCollectionFormModal,
+      
+      // Unified Favorites & Collections Modal
+      showFavoritesCollectionsModal,
+      hideFavoritesCollectionsModal
     }}>
       {children}
       
@@ -96,15 +98,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         isOpen={authPromptState.isOpen}
         onClose={hideAuthPrompt}
         message={authPromptState.message}
-      />
-
-      {/* Recipe Detail Modal */}
-      <RecipeDetailModal
-        recipeName={recipeDetailModalState.recipeName}
-        isOpen={recipeDetailModalState.isOpen}
-        onClose={hideRecipeDetail}
-        fetchRecipeDetails={recipeDetailModalState.fetchRecipeDetails}
-        onAddToFavorites={recipeDetailModalState.onAddToFavorites}
       />
 
       {/* Collections Modal */}
@@ -168,8 +161,15 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         icons={collectionFormModalState.icons || []}
       />
 
-      {/* Session Transfer Notification */}
-      <SessionTransferNotification />
+      {/* Unified Favorites & Collections Modal */}
+      <FavoritesCollectionsModal
+        isOpen={favoritesCollectionsModalState.isOpen}
+        onClose={hideFavoritesCollectionsModal}
+        recipe={favoritesCollectionsModalState.recipe}
+        onAction={favoritesCollectionsModalState.onAction}
+        favoritesHook={favoritesHook}
+        collectionsHook={collectionsHook}
+      />
     </ModalContext.Provider>
   );
 };
@@ -209,12 +209,7 @@ function App() {
     loading: false
   });
 
-  const [recipeDetailModalState, setRecipeDetailModalState] = useState({
-    isOpen: false,
-    recipeName: '',
-    fetchRecipeDetails: null,
-    onAddToFavorites: null
-  });
+
 
   const [favoritesModalState, setFavoritesModalState] = useState({
     isOpen: false,
@@ -240,6 +235,12 @@ function App() {
     onSubmit: null,
     colors: [],
     icons: []
+  });
+
+  const [favoritesCollectionsModalState, setFavoritesCollectionsModalState] = useState({
+    isOpen: false,
+    recipe: null,
+    onAction: null
   });
 
   // Centralized Modal Actions
@@ -278,16 +279,7 @@ function App() {
       setConfirmationState(prev => ({ ...prev, loading }));
     },
 
-    // Recipe Detail Modal Actions
-    showRecipeDetail: (options) => {
-      setRecipeDetailModalState({ 
-        isOpen: true, 
-        ...options 
-      });
-    },
-    hideRecipeDetail: () => {
-      setRecipeDetailModalState(prev => ({ ...prev, isOpen: false }));
-    },
+
 
     // Favorites Modal Actions
     showFavoritesModal: (options) => {
@@ -309,6 +301,17 @@ function App() {
     },
     hideCollectionFormModal: () => {
       setCollectionFormModalState(prev => ({ ...prev, isOpen: false }));
+    },
+
+    // Unified Favorites & Collections Modal Actions
+    showFavoritesCollectionsModal: (options) => {
+      setFavoritesCollectionsModalState({ 
+        isOpen: true, 
+        ...options
+      });
+    },
+    hideFavoritesCollectionsModal: () => {
+      setFavoritesCollectionsModalState(prev => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -321,9 +324,9 @@ function App() {
               authPromptState,
               collectionsModalState,
               confirmationState,
-              recipeDetailModalState,
               favoritesModalState,
-              collectionFormModalState
+              collectionFormModalState,
+              favoritesCollectionsModalState
             }} 
             modalActions={modalActions}
             favoritesHook={favoritesHook}
@@ -339,6 +342,12 @@ function App() {
                       collectionsHook={collectionsHook}
                     />
                   </ProtectedRoute>
+                } />
+                <Route path="/recipe/:name" element={
+                  <RecipeDetailsPage 
+                    favoritesHook={favoritesHook} 
+                    collectionsHook={collectionsHook} 
+                  />
                 } />
                 <Route path="/collections" element={<Collections />} />
 

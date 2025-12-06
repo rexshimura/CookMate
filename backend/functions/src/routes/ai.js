@@ -7,9 +7,14 @@ const recipeCache = new Map();
 
 // Helper function to generate consistent recipe ID
 function generateConsistentRecipeId(recipeName) {
-  return recipeName.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '_')
+  if (!recipeName) return '';
+  return recipeName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '_')  // Replace special chars with _
+    .replace(/\s+/g, '_')          // Replace spaces with _
+    .replace(/_+/g, '_')           // Remove duplicate _
+    .replace(/^_|_$/g, '')         // Trim leading/trailing _
     .substring(0, 50);
 }
 
@@ -17,10 +22,7 @@ function generateConsistentRecipeId(recipeName) {
 async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
   try {
     // Generate a clean recipe ID from title
-    const recipeId = recipeData.title.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 50) + '_' + Date.now();
+    const recipeId = generateConsistentRecipeId(recipeData.title);
 
     const recipeDoc = {
       id: recipeId,
@@ -54,9 +56,17 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
 }
 
 // Helper function to store detected recipe data
-async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
+async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
   try {
-    const recipeId = generateConsistentRecipeId(recipeName);
+    // SAFEGUARD: Handle both Object and String inputs
+    const recipeTitle = typeof recipeInput === 'string' ? recipeInput : recipeInput?.title;
+    
+    if (!recipeTitle) {
+      console.warn('⚠️ Skipping storage: Missing title');
+      return null;
+    }
+
+    const recipeId = generateConsistentRecipeId(recipeTitle);
     
     try {
       // Check if recipe already exists
@@ -70,13 +80,13 @@ async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
       // Generate basic recipe data for detected recipes
       const recipeData = {
         id: recipeId,
-        title: recipeName,
-        description: `A delicious ${recipeName} recipe to try`,
+        title: recipeTitle,
+        description: `A delicious ${recipeTitle} recipe to try`,
         ingredients: ["Click on the recipe card to get detailed ingredients"],
         instructions: ["Click on the recipe card to get detailed instructions"],
         cookingTime: "Varies",
-        servings: "4",
-        difficulty: "Medium",
+        servings: recipeInput?.servings || "4",
+        difficulty: recipeInput?.difficulty || "Medium",
         estimatedCost: "Moderate",
         nutritionInfo: {
           calories: "Varies",
@@ -85,7 +95,7 @@ async function storeDetectedRecipe(recipeName, userId = 'anonymous') {
           fat: "Varies"
         },
         tips: ["Click on the recipe to get detailed cooking tips"],
-        youtubeSearchQuery: `${recipeName} recipe tutorial`,
+        youtubeSearchQuery: `${recipeTitle} recipe tutorial`,
         userId: userId,
         createdAt: new Date().toISOString(),
         isDetected: true
@@ -167,6 +177,8 @@ const verifyAuthToken = async (req, res, next) => {
     }
     
     const token = authHeader.split('Bearer ')[1];
+    
+    // For real Firebase authentication
     const { admin } = require('../config/firebase');
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;
@@ -363,8 +375,7 @@ function extractRecipesFromResponse(response) {
   const recipes = [];
   const uniqueRecipes = new Set(); // Prevent duplicates
   
-  console.log('🍳 [RECIPE DETECTION] Starting extraction from response');
-  console.log('🍳 [RECIPE DETECTION] Response length:', response.length);
+
   
   // Helper function to clean and validate recipe names
   const cleanRecipeName = (name) => {
@@ -397,33 +408,17 @@ function extractRecipesFromResponse(response) {
   // Helper function to add recipe if valid and unique
   const addRecipe = (recipeName, source = 'unknown') => {
     const cleaned = cleanRecipeName(recipeName);
-    console.log(`🔍 [ADD_RECIPE] Attempting to add recipe from ${source}: "${cleaned}"`);
     
-    if (!cleaned) {
-      console.log(`❌ [ADD_RECIPE] Empty recipe name`);
-      return false;
-    }
-    
-    if (cleaned.length < 3 || cleaned.length > 80) {
-      console.log(`❌ [ADD_RECIPE] Invalid length: "${cleaned}"`);
-      return false;
-    }
-    
-    if (uniqueRecipes.has(cleaned.toLowerCase())) {
-      console.log(`❌ [ADD_RECIPE] Duplicate recipe: "${cleaned}"`);
+    if (!cleaned || cleaned.length < 3 || cleaned.length > 80 || uniqueRecipes.has(cleaned.toLowerCase())) {
       return false;
     }
     
     const validationResult = isValidRecipe(cleaned);
-    console.log(`🔍 [ADD_RECIPE] Validation result for "${cleaned}":`, validationResult);
     
     if (validationResult) {
       recipes.push(cleaned);
       uniqueRecipes.add(cleaned.toLowerCase());
-      console.log(`✅ [RECIPE DETECTION] Added recipe from ${source}: "${cleaned}"`);
       return true;
-    } else {
-      console.log(`❌ [RECIPE DETECTION] Rejected recipe from ${source}: "${cleaned}" (validation failed)`);
     }
     return false;
   };
@@ -473,7 +468,6 @@ function extractRecipesFromResponse(response) {
       continue;
     }
     
-    console.log('🔍 [EXTRACTION] Found numbered recipe candidate:', candidate);
     addRecipe(candidate, 'numbered_list');
   }
   
@@ -481,7 +475,6 @@ function extractRecipesFromResponse(response) {
   const titlePattern = /^(?:recipe\s*:?\s*|recipe\s+name\s*:?\s*|dish\s*:?\s*|try\s*:?\s*|make\s*:?\s*|here\'?s\s*:?\s*|here\'s\s*:?\s*)([A-Z][^.!?\n\r]{5,80})/gim;
   while ((match = titlePattern.exec(response)) !== null) {
     const recipeName = match[1].trim();
-    console.log('🔍 [EXTRACTION] Found titled recipe:', recipeName);
     addRecipe(recipeName, 'titled_recipe');
   }
   
@@ -498,11 +491,8 @@ function extractRecipesFromResponse(response) {
   
   // IMPROVED FALLBACK: More intelligent line analysis
   if (recipes.length === 0) {
-    console.log('🍳 [RECIPE DETECTION] No recipes found with patterns, trying intelligent fallback...');
-    
     const lines = response.split('\n');
     
-    console.log('🍳 [RECIPE DETECTION] Testing lines for potential recipes:');
     for (const line of lines) {
       const trimmed = line.trim();
       
@@ -528,14 +518,10 @@ function extractRecipesFromResponse(response) {
       const strongRecipeIndicators = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta)\b/i;
       
       if (strongRecipeIndicators.test(trimmed)) {
-        console.log('🍳 [RECIPE DETECTION] Found potential recipe line:', trimmed);
         addRecipe(trimmed, 'intelligent_fallback');
       }
     }
   }
-  
-  console.log('🍳 [RECIPE DETECTION] Final extracted recipes:', recipes);
-  console.log('🍳 [RECIPE DETECTION] Total count:', recipes.length);
   
   return recipes;
 }
@@ -543,24 +529,31 @@ function extractRecipesFromResponse(response) {
 // Improved recipe validation function with better international support and less aggressive filtering
 function isValidRecipe(text) {
   if (!text || text.length === 0) {
-    console.log('❌ [VALIDATION] Failed: empty text');
     return false;
   }
+  const lower = text.toLowerCase().trim();
+  
+  // 1. REJECT INSTRUCTIONS: If it starts with a verb, it's not a title.
+  // e.g. "Crack the egg", "Pour the milk", "Heat the pan"
+  const cookingVerbs = /^(crack|pour|mix|stir|heat|add|place|put|whisk|boil|fry|bake|roast|slice|chop|mince|peel|cut|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|microwave|freeze|chill|refrigerate|wash|clean|dry|pat|season|taste|adjust)/i;
+  
+  if (cookingVerbs.test(text)) {
+    console.log(`Rejecting instruction-like title: "${text}"`);
+    return false;
+  }
+
+  // 2. REJECT LONG SENTENCES: Titles are rarely longer than 10 words
+  if (text.split(' ').length > 10) return false;
   
   const lowerText = text.toLowerCase().trim();
   
-  console.log('🔍 [VALIDATION] Checking:', text);
-  console.log('🔍 [VALIDATION] Lowercase:', lowerText);
-  
   // Basic length check - more lenient
   if (text.length < 3 || text.length > 80) {
-    console.log('❌ [VALIDATION] Failed: invalid length (' + text.length + ')');
     return false;
   }
   
   // Must start with capital letter or number
   if (!/^[A-Z0-9]/.test(text.trim())) {
-    console.log('❌ [VALIDATION] Failed: does not start with capital letter or number');
     return false;
   }
   
@@ -579,7 +572,6 @@ function isValidRecipe(text) {
   
   // Check for excluded terms (more precise matching)
   if (excludeTerms.some(term => lowerText === term || lowerText.includes(term))) {
-    console.log('❌ [VALIDATION] Failed: contains excluded term');
     return false;
   }
   
@@ -587,11 +579,9 @@ function isValidRecipe(text) {
   const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta|korean|chinese|italian|mexican|indian|thai|french|mediterranean)\b/i;
   
   const foodKeywordMatch = foodKeywords.test(lowerText);
-  console.log('🔍 [VALIDATION] Food keywords check for "' + text + '":', foodKeywordMatch);
   
   // If food keywords found, it's likely a valid recipe
   if (foodKeywordMatch) {
-    console.log('✅ [VALIDATION] Passed - has food keywords');
     return true;
   }
   
@@ -611,7 +601,6 @@ function isValidRecipe(text) {
   
   // Check if text matches cooking instruction patterns
   if (instructionPatterns.some(pattern => pattern.test(text))) {
-    console.log('❌ [VALIDATION] Failed: matches cooking instruction pattern');
     return false;
   }
   
@@ -632,20 +621,16 @@ function isValidRecipe(text) {
   );
   
   if (looksLikeDishName) {
-    console.log('✅ [VALIDATION] Passed - looks like legitimate dish name');
     return true;
   }
   
-  console.log('❌ [VALIDATION] Failed: no food keywords and doesn\'t look like dish name');
   return false;
 }
 
 // Test function to validate "Korean-Style BBQ Beef Tacos"
 function testRecipeValidation() {
-  console.log('\n🧪 [TEST] Testing recipe validation with "Korean-Style BBQ Beef Tacos"...');
   const testRecipe = "Korean-Style BBQ Beef Tacos";
   const result = isValidRecipe(testRecipe);
-  console.log('🧪 [TEST] Result for "' + testRecipe + '":', result);
   return result;
 }
 
@@ -699,7 +684,43 @@ async function callGroqAI(message, conversationHistory = []) {
 
   const systemMessage = {
     role: "system",
-    content: "You are CookMate, a comprehensive AI cooking assistant with extensive culinary knowledge. You can help with a wide range of cooking-related tasks:\n\n**CORE CAPABILITIES:**\n\n1. **Celebrity Chefs & Cooking Personalities**: You know about famous chefs like Gordon Ramsay, Julia Child, Anthony Bourdain, Ina Garten, Bobby Flay, Giada De Laurentiis, Jamie Oliver, Nigella Lawson, Martha Stewart, Wolfgang Puck, and many others. Share interesting facts about their cooking styles, signature dishes, and contributions to cuisine.\n\n2. **Recipe Details**: When asked for a recipe, always provide:\n   - Complete ingredient list with measurements\n   - Step-by-step cooking instructions\n   - Cooking time, prep time, and servings\n   - Difficulty level\n   - Tips and variations\n\n3. **Ingredient-Based Suggestions**: When users list ingredients, suggest delicious recipes using those ingredients. Be creative and practical.\n\n4. **Health & Nutrition**: Provide information about the nutritional benefits of foods, cooking methods, and ingredient combinations. Include vitamins, minerals, and health benefits.\n\n5. **Safety Guidelines**: Always include food safety information when relevant:\n   - Proper cooking temperatures\n   - Food storage guidelines\n   - Handling raw meats safely\n   - Cross-contamination prevention\n   - Proper hygiene practices\n\n6. **About Yourself**: When asked \"Who are you?\" explain that you are CookMate, an AI cooking assistant created by John Mark P. Magdasal and John Paul Mahilom. You were built to help people cook better by providing recipes, cooking advice, and culinary guidance.\n\n**CRITICAL FORMATTING REQUIREMENTS:** When you provide recipes, you MUST format them with the recipe name in **bold** at the very beginning, followed by ingredients and instructions. This is essential for recipe card detection.\n\n**Example Format (MUST FOLLOW THIS):**\n\n**Chicken Adobo**\n\n1. **Ingredients**:\n   - 1 lb chicken pieces\n   - 1/2 cup vinegar\n   - 1/4 cup soy sauce\n   - 3 cloves garlic, minced\n   - 1 bay leaf\n   - 1 tsp black pepper\n\n2. **Instructions**:\n   - Heat oil in a pan and sauté garlic until fragrant\n   - Add chicken and cook until lightly browned\n   - Add vinegar, soy sauce, bay leaf, and pepper\n   - Simmer for 15-20 minutes until chicken is tender\n   - Serve hot with steamed rice\n\n**Multiple Recipes**: When suggesting multiple recipes, start each recipe name with **Recipe Name** format.\n\nAlways be informative, helpful, and safety-conscious. Keep responses conversational and engaging, like a knowledgeable friend who loves cooking and cares about your well-being."
+    content: `You are CookMate, a comprehensive AI cooking assistant. Your primary goal is to provide a helpful and engaging conversational experience about cooking, while also extracting key recipe information in a structured format.
+
+**Conversational Response:**
+First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking.
+
+**Structured JSON Output:**
+After the conversational text, you MUST include a structured JSON object. This JSON object should be enclosed in \`\`\`json code blocks. The JSON should contain a single key, "recipes," which is an array of recipe objects. For each recipe mentioned or implied in the user's request, create a JSON object with the following fields:
+
+- "title": The name of the recipe (e.g., "Chicken Adobo").
+- "servings": The number of servings as a string (e.g., "4-6").
+- "difficulty": The difficulty level (e.g., "Easy", "Medium", "Hard").
+
+**CRITICAL:** The \`\`\`json block MUST be the VERY LAST part of your response. There should be no text or characters after the closing \`\`\` of the JSON block.
+
+**Example Interaction:**
+
+User: "I'm thinking of making some adobo and maybe some sinigang."
+
+Your Response:
+That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup. Do you have a preference for which one you'd like to make?
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "title": "Chicken Adobo",
+      "servings": "4",
+      "difficulty": "Easy"
+    },
+    {
+      "title": "Pork Sinigang",
+      "servings": "6",
+      "difficulty": "Medium"
+    }
+  ]
+}
+\`\`\``
   };
   
   // Prepare conversation messages
@@ -746,8 +767,7 @@ async function callGroqAI(message, conversationHistory = []) {
   const data = await response.json();
   const aiResponse = data.choices[0]?.message?.content;
   
-  console.log('[DEBUG] AI Response Length:', aiResponse ? aiResponse.length : 'null');
-  console.log('[DEBUG] AI Response Preview:', aiResponse ? aiResponse.substring(0, 200) + '...' : 'null');
+
   
   if (!aiResponse) {
     throw new Error('No response generated from Groq API');
@@ -811,14 +831,38 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     }
     
     // Generate AI response using Groq with fallback handling
-    console.log('🍳 [CHAT] Generating AI response for message:', message.substring(0, 100) + (message.length > 100 ? '...' : ''));
     
     let aiReply;
+    let detectedRecipes = [];
+    
     try {
-      aiReply = await callGroqAI(message, history);
-      console.log('🍳 [CHAT] AI response generated, length:', aiReply.length);
+      const fullResponse = await callGroqAI(message, history);
+      
+      // 1. EXTRACT FIRST (Before cleaning)
+      const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          if (parsed.recipes) detectedRecipes = parsed.recipes.map(r => r.title || r.name);
+        } catch (e) { console.error('JSON Parse Error', e); }
+      }
+
+      // 2. CLEANUP SECOND
+      aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
+      if (!aiReply) aiReply = "I found some recipes! Check below.";
+
+      // 3. Fallback Detection (if JSON failed)
+      if (detectedRecipes.length === 0) {
+        detectedRecipes = extractRecipesFromResponse(fullResponse);
+      }
+
+      // 4. Store Data
+      if (detectedRecipes.length > 0) {
+         await Promise.allSettled(detectedRecipes.map(r => storeDetectedRecipe(r, req.userId)));
+      }
+
     } catch (aiError) {
-      console.error('❌ [CHAT] AI service failed, using fallback response:', aiError.message);
+      console.error('AI service failed, using fallback response:', aiError.message);
       
       // Create a helpful fallback response based on the message content
       const ingredientList = extractIngredients(message);
@@ -852,42 +896,23 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
       }
     }
     
-    // Extract recipes from AI response for consistency
-    const detectedRecipes = extractRecipesFromResponse(aiReply);
-    
-    // Store detected recipes for consistency
-    if (detectedRecipes.length > 0) {
-      try {
-        await Promise.all(detectedRecipes.map(recipeName => 
-          storeDetectedRecipe(recipeName, req.userId)
-        ));
-        console.log('✅ Stored detected recipes:', detectedRecipes);
-      } catch (storeError) {
-        console.warn('⚠️ Failed to store some detected recipes:', storeError);
-        // Continue without storing - don't block the response
-      }
-    } else {
-      console.log('⚠️ [CHAT] No recipes detected - this may be the source of the bug!');
-      console.log('⚠️ [CHAT] This is what the AI response looked like:');
-      console.log('⚠️ [CHAT] Response preview:', aiReply.substring(0, 500) + (aiReply.length > 500 ? '...' : ''));
+    // Extract recipes from AI response for consistency (if not already detected)
+    if (detectedRecipes.length === 0) {
+      detectedRecipes = extractRecipesFromResponse(aiReply);
     }
-    
-    console.log('🍳 [CHAT] Full AI Response (for debugging):');
-    console.log(aiReply);
-    console.log('🍳 [CHAT] Extracted recipes:', detectedRecipes);
-    console.log('🍳 [CHAT] Number of recipes found:', detectedRecipes.length);
-    
-    res.status(200).json({
-      response: {
-        message: aiReply,
-        timestamp: new Date().toISOString(),
-        detectedIngredients: extractIngredients(message),
-        detectedRecipes: detectedRecipes,
-        userId: req.userId,
-        isOffTopic: false,
-        redirectToCooking: false
-      }
-    });
+      
+      // 5. Send Response (Ensuring detectedRecipes is included!)
+      res.status(200).json({
+        response: {
+          message: aiReply,
+          timestamp: new Date().toISOString(),
+          detectedIngredients: extractIngredients(message),
+          detectedRecipes: detectedRecipes, // <--- IMPORTANT
+          userId: req.userId,
+          isOffTopic: false,
+          redirectToCooking: false
+        }
+      });
     
   } catch (error) {
     console.error('Chat error:', error);
@@ -941,7 +966,9 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       recipePrompt += `. Recipe type: ${recipeType}`;
     }
     
-    recipePrompt += `. Please provide the recipe in this JSON format:
+    recipePrompt += `. IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.
+
+Please provide the recipe in this JSON format:
 {
   "title": "Recipe Name",
   "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
@@ -957,25 +984,28 @@ Only return the JSON, no additional text.`;
     // Generate recipe using Groq
     const aiResponse = await callGroqAI(recipePrompt);
     
-    // Parse JSON response from AI
+    // Parse JSON response from AI with improved error handling
     let recipeData;
     try {
-      const jsonStart = aiResponse.indexOf('{');
-      const jsonEnd = aiResponse.lastIndexOf('}');
+      // Clean up markdown code blocks if they exist
+      const cleanedResponse = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      const jsonStart = cleanedResponse.indexOf('{');
+      const jsonEnd = cleanedResponse.lastIndexOf('}');
+      
       if (jsonStart !== -1 && jsonEnd !== -1) {
-        const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+        const jsonString = cleanedResponse.substring(jsonStart, jsonEnd + 1);
         recipeData = JSON.parse(jsonString);
       } else {
-        throw new Error('No JSON found in response');
+        throw new Error('No JSON brackets found');
       }
     } catch (parseError) {
-      console.error('Failed to parse AI recipe response:', parseError);
+      console.error("JSON Parse Failed. Raw AI response:", aiResponse);
       // Fallback to basic recipe structure
       recipeData = {
         title: "AI Generated Recipe",
         ingredients: ingredients || ["Please specify ingredients"],
         instructions: aiResponse.split('\n').filter(line => line.trim()),
-        cookingTime: "Varies",
+        cookingTime: "30-45 minutes", // More specific than "Varies"
         servings: "4",
         difficulty: "Medium",
         description: aiResponse
@@ -1029,15 +1059,30 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: 'Recipe name is required' });
     }
     
-    // STEP 1: Skip cache for now to always get fresh AI-generated data
-    // This ensures users always get full recipe details, not placeholder text
-    console.log('🔄 Always generating fresh recipe details for:', recipeName);
-
+    // 1. CHECK CACHE FIRST: Don't call AI if we already have the recipe
+    try {
+      // Use the existing helper to find the recipe in Firestore
+      const cachedRecipe = await getStoredRecipe(recipeName);
+      
+      if (cachedRecipe && cachedRecipe.ingredients && cachedRecipe.instructions) {
+        console.log('✅ Serving recipe from cache:', recipeName);
+        return res.status(200).json({
+          message: 'Recipe retrieved from cache',
+          recipe: cachedRecipe,
+          savedRecipeId: cachedRecipe.id,
+          userId: req.userId
+        });
+      }
+    } catch (cacheError) {
+      console.warn('Cache check failed, proceeding to generation:', cacheError);
+    }
+    
     // STEP 2: If no stored data found, generate new recipe details
-    console.log('🔄 No stored recipe found, generating new details for:', recipeName);
     
     // Create a detailed prompt for recipe details generation
-    const detailPrompt = `Create detailed recipe information for "${recipeName}". Please provide the recipe in this exact JSON format:
+    const detailPrompt = `Create detailed recipe information for "${recipeName}". IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.
+
+Please provide the recipe in this exact JSON format:
 {
   "title": "${recipeName}",
   "description": "Brief appetizing description of the dish",
@@ -1065,16 +1110,16 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
     // Parse JSON response from AI with improved error handling
     let recipeData;
     try {
-      console.log('🔍 [RECIPE-DETAILS] AI Response preview:', aiResponse.substring(0, 200) + '...');
+      // Clean up markdown code blocks if they exist
+      const cleanedResponse = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       
       // Try multiple parsing strategies
       let jsonString = '';
-      let jsonStart = aiResponse.indexOf('{');
-      let jsonEnd = aiResponse.lastIndexOf('}');
+      let jsonStart = cleanedResponse.indexOf('{');
+      let jsonEnd = cleanedResponse.lastIndexOf('}');
       
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
-        console.log('🔍 [RECIPE-DETAILS] Extracted JSON:', jsonString);
+        jsonString = cleanedResponse.substring(jsonStart, jsonEnd + 1);
         recipeData = JSON.parse(jsonString);
       } else {
         throw new Error('No valid JSON structure found in response');
@@ -1093,12 +1138,8 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
         recipeData.instructions = [recipeData.instructions].filter(Boolean);
       }
       
-      console.log('✅ [RECIPE-DETAILS] Successfully parsed recipe data:', recipeData.title);
-      
     } catch (parseError) {
-      console.error('❌ [RECIPE-DETAILS] Failed to parse AI recipe details response:', parseError);
-      console.log('📄 [RECIPE-DETAILS] Raw AI Response for debugging:');
-      console.log(aiResponse);
+      console.error('Failed to parse AI recipe details response:', parseError);
       
       // Intelligent fallback: try to extract structured data from text
       try {
@@ -1141,21 +1182,20 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
             difficulty: "Medium",
             estimatedCost: "$10-15",
             nutritionInfo: {
-              calories: "Per serving",
-              protein: "Protein content varies",
-              carbs: "Carbohydrate content varies", 
-              fat: "Fat content varies"
+              calories: "350-450 per serving",
+              protein: "20-30 grams",
+              carbs: "30-40 grams", 
+              fat: "15-25 grams"
             },
             tips: ["Use fresh ingredients for best results", "Taste and adjust seasoning as needed"],
             youtubeSearchQuery: `${recipeName} recipe tutorial`
           };
-          console.log('✅ [RECIPE-DETAILS] Successfully extracted structured data from text fallback');
         } else {
           throw new Error('Could not extract structured data from text fallback');
         }
         
       } catch (fallbackError) {
-        console.error('❌ [RECIPE-DETAILS] Text fallback also failed:', fallbackError);
+        console.error('Text fallback also failed:', fallbackError);
         // Final fallback with safe, minimal data
         recipeData = {
           title: recipeName,
@@ -1186,7 +1226,6 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
     
     // Cache the generated recipe for consistency
     recipeCache.set(recipeName, recipeData);
-    console.log('✅ Recipe cached for consistency:', recipeName);
     
     // Save recipe to Firestore if user is authenticated
     let savedRecipeId = null;
@@ -1247,7 +1286,7 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
             aiSuggestions = JSON.parse(jsonString);
           }
         } catch (parseError) {
-          console.log('Failed to parse AI suggestions, using fallback');
+          // Failed to parse AI suggestions, using fallback
         }
         
         if (aiSuggestions.length > 0) {

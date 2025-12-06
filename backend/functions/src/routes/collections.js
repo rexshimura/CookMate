@@ -19,24 +19,6 @@ const verifyAuthToken = async (req, res, next) => {
     const token = authHeader.split('Bearer ')[1];
     console.log(' Token extracted, length:', token ? token.length : 0);
     
-    // In development mode, accept mock tokens
-    if (process.env.NODE_ENV === 'development' || token === 'mock-token') {
-      console.log(' Development mode: Using mock authentication');
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-      return next();
-    }
-    
-    // For production mode, verify Firebase tokens
-    if (admin.apps.length === 0) {
-      console.warn(' Firebase not initialized in production mode, using mock auth');
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-      return next();
-    }
-    
-    console.log(' Firebase Admin SDK is initialized, proceeding with token verification...');
-    
     // For real Firebase authentication
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);

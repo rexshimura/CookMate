@@ -11,7 +11,8 @@ import {
   LogIn,
   Trash2,
   Sparkles,
-  Clock
+  Clock,
+  Bookmark
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -27,8 +28,7 @@ const Sidebar = ({
   onCreateSession,
   onSelectSession,
   onDeleteSession,
-  onShowFavorites,
-  onShowCollections,
+  onShowLibrary,
   onLogout,
   sessionsLoading,
   collapsed
@@ -141,38 +141,21 @@ const Sidebar = ({
           )}
         </button>
 
-        {/* Favorites - Circle Icon */}
+        {/* My Library - Circle Icon */}
         <button
-          onClick={onShowFavorites}
-          title="My Favorites"
+          onClick={onShowLibrary}
+          title="My Library"
           className={`
             relative overflow-hidden group flex-shrink-0
             flex items-center justify-center
             w-12 h-12 rounded-full
-            bg-gradient-to-br from-pink-500 to-rose-600 text-white 
+            bg-gradient-to-br from-amber-500 to-orange-600 text-white 
             shadow-lg hover:shadow-xl hover:scale-105 active:scale-95
             transition-all duration-300
           `}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 delay-75"></div>
-          <Heart className="w-5 h-5 fill-current" />
-        </button>
-
-        {/* Collections - Circle Icon */}
-        <button
-          onClick={onShowCollections}
-          title="My Collections"
-          className={`
-            relative overflow-hidden group flex-shrink-0
-            flex items-center justify-center
-            w-12 h-12 rounded-full
-            bg-gradient-to-br from-blue-600 to-indigo-700 text-white 
-            shadow-lg hover:shadow-xl hover:scale-105 active:scale-95
-            transition-all duration-300
-          `}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 delay-150"></div>
-          <Folder className="w-5 h-5 fill-current" />
+          <Bookmark className="w-5 h-5 fill-current" />
         </button>
       </div>
 

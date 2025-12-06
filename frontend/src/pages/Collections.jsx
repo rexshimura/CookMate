@@ -2,247 +2,90 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChefHat, Clock, Users, X, Lock, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
-import CollectionManager from './Components/Collections/CollectionManager.jsx';
+import { useCollections } from '../hooks/useCollections.js';
+
 import RecipeCard from './Components/Recipe/RecipeCard.jsx';
-import { getCollections, getCollectionRecipes, createCollection, updateCollection, getRecipeDetails } from '../utils/api.js';
+import { getRecipeDetails } from '../utils/api.js';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import { useModal } from '../App.jsx';
 import { useLogoutConfirmation } from './Components/UI/useConfirmation.jsx';
 import SimpleLogoutDialog, { LogoutButton, UserMenu } from '../components/SimpleLogoutDialog.jsx';
-
-// NEW: Helper to decide if a string is likely a recipe name (not a category/header)
-const categoryKeywords = [
-  'cuisine','food','vegan','vegetarian','dessert','desserts','breakfast',
-  'lunch','dinner','snack','comfort','seafood','global','bbq','grilling',
-  'baking','healthy','quick','easy','popular','classic','options','recipes',
-  'categories','meals','sides'
-];
-
-const dishKeywords = [
-  'chicken','beef','pork','salmon','fish','shrimp','pasta','spaghetti',
-  'risotto','curry','biryani','taco','burger','cake','pie','stew','sushi',
-  'ramen','lasagna','omelette','pancake','salad','paella','noodle','sandwich',
-  'parmesan','parmesan','meatloaf','parmesan','parmesan'
-];
-
-const normalizeText = (t = '') => ('' + t).replace(/[*_`~]/g, '').trim();
-
-const extractName = (item) => {
-  if (!item) return '';
-  if (typeof item === 'string') return normalizeText(item);
-  if (item.title) return normalizeText(item.title);
-  if (item.name) return normalizeText(item.name);
-  return '';
-};
-
-const isRecipeName = (text) => {
-  if (!text) return false;
-  const cleaned = extractName(text);
-  if (!cleaned) return false;
-  if (cleaned.length < 2 || cleaned.length > 120) return false;
-
-  const lower = cleaned.toLowerCase();
-
-  // Immediate reject if it contains obvious category words as whole words
-  for (const kw of categoryKeywords) {
-    if (new RegExp(`\\b${kw}\\b`).test(lower)) return false;
-  }
-
-  // Accept if contains a strong dish keyword
-  for (const kw of dishKeywords) {
-    if (lower.includes(kw)) return true;
-  }
-
-  // Heuristic: title-case multi-word strings are likely dish names (e.g., "Spaghetti Bolognese")
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  if (words.length >= 2 && words.length <= 5) {
-    const titleCaseCount = words.filter(w => /^[A-Z][a-z]/.test(w)).length;
-    if (titleCaseCount >= Math.max(1, Math.ceil(words.length / 2))) return true;
-  }
-
-  // If it's a single word but not a generic label and looks like a food (letters only, not short like 'the', 'and')
-  if (words.length === 1 && /^[A-Za-z'-]{3,30}$/.test(words[0])) {
-    // accept short single-word dish names like "Risotto", "Tiramisu"
-    return true;
-  }
-
-  // Otherwise, treat as category / ambiguous -> reject
-  return false;
-};
 
 const Collections = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, logout } = useAuth();
   const { showAuthPrompt, showRecipeDetail, showCollectionFormModal } = useModal();
   const { confirmLogout, ConfirmationDialog: LogoutDialog, isConfirming: isLogoutConfirming } = useLogoutConfirmation();
+
+  const {
+    collections,
+    loading: collectionsLoading,
+    error: collectionsError,
+    createNewCollection,
+    deleteCollection,
+    addRecipeToCollection,
+    removeRecipeFromCollection,
+    refreshCollections,
+    isRecipeInCollection
+  } = useCollections();
+
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [collectionRecipes, setCollectionRecipes] = useState([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [currentCollection, setCurrentCollection] = useState(null);
-  const [collections, setCollections] = useState([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [collectionsRefreshKey, setCollectionsRefreshKey] = useState(0);
 
-  // --- MOVED UP: ensure these functions are initialized before any useEffect uses them ---
-  const loadAllCollectionRecipes = async () => {
-    setLoadingRecipes(true);
-    try {
-      const collectionsResult = await getCollections();
-      if (!collectionsResult || !collectionsResult.collections) {
-        console.error('Failed to load collections for All Recipes view');
-        setCollectionRecipes([]);
+  useEffect(() => {
+    const fetchRecipes = () => {
+      if (collectionsLoading) return;
+
+      if (selectedCollectionId === null) {
+        setLoadingRecipes(true);
+        const allRecipes = collections.flatMap(c =>
+          (c.recipes || []).map(r => ({
+            ...r,
+            collectionName: c.name,
+            collectionColor: c.color
+          }))
+        );
+        setCollectionRecipes(allRecipes);
         setCurrentCollection({
           id: null,
           name: 'All Recipes',
-          description: 'All recipes from your collections',
+          description: `${allRecipes.length} recipes from ${collections.length} collections`,
           color: '#FF6B6B',
           icon: 'folder'
         });
-        return;
-      }
-
-      const allRecipes = [];
-      const collectionsList = collectionsResult.collections;
-
-      for (const collection of collectionsList) {
-        try {
-          const collectionResult = await getCollectionRecipes(collection.id);
-          if (collectionResult && collectionResult.recipes) {
-            // FILTER: only include items that look like actual recipe names
-            const recipesWithCollection = collectionResult.recipes
-              .map(recipe => ({
-                ...recipe,
-                collectionName: collection.name,
-                collectionColor: collection.color
-              }))
-              .filter(r => {
-                const candidate = extractName(r);
-                if (!isRecipeName(candidate)) {
-                  // skip category-like item
-                  return false;
-                }
-                return true;
-              });
-            allRecipes.push(...recipesWithCollection);
-          }
-        } catch (error) {
-          console.error(`Failed to load recipes from collection ${collection.name}:`, error);
+        setLoadingRecipes(false);
+      } else {
+        setLoadingRecipes(true);
+        const collection = collections.find(c => c.id === selectedCollectionId);
+        if (collection) {
+          setCollectionRecipes(collection.recipes || []);
+          setCurrentCollection(collection);
+        } else {
+          setCollectionRecipes([]);
+          setCurrentCollection(null);
         }
+        setLoadingRecipes(false);
       }
+    };
 
-      setCollectionRecipes(allRecipes);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: `${allRecipes.length} recipes from ${collectionsList.length} collection${collectionsList.length !== 1 ? 's' : ''}`,
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-
-    } catch (error) {
-      console.error('Failed to load all collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection({
-        id: null,
-        name: 'All Recipes',
-        description: 'Failed to load recipes',
-        color: '#FF6B6B',
-        icon: 'folder'
-      });
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
-
-  const loadCollectionRecipes = async (collectionId) => {
-    if (!collectionId) {
-      await loadAllCollectionRecipes();
-      return;
-    }
-
-    setLoadingRecipes(true);
-    try {
-      const result = await getCollectionRecipes(collectionId);
-      if (result && result.recipes !== undefined && result.collection !== undefined) {
-        // FILTER: remove category-like items from API response before setting state
-        const filtered = (result.recipes || []).filter(r => isRecipeName(extractName(r)));
-        setCollectionRecipes(filtered);
-        setCurrentCollection(result.collection);
-      } else {
-        console.error('Unexpected response format:', result);
-        setCollectionRecipes([]);
-        setCurrentCollection(null);
-      }
-    } catch (error) {
-      console.error('Failed to load collection recipes:', error);
-      setCollectionRecipes([]);
-      setCurrentCollection(null);
-    } finally {
-      setLoadingRecipes(false);
-    }
-  };
-
-  const loadCollections = async () => {
-    console.log('📚 [Collections] Loading collections...');
-    setCollectionsLoading(true);
-    try {
-      const result = await getCollections();
-      console.log('📚 [Collections] Collections API result:', result);
-
-      let collectionsList = [];
-      if (result && result.collections) {
-        collectionsList = result.collections;
-      } else if (Array.isArray(result)) {
-        collectionsList = result;
-      } else {
-        console.warn('⚠️ [Collections] Unexpected collections response format:', result);
-      }
-
-      console.log('📚 [Collections] Loaded collections:', collectionsList);
-      setCollections(collectionsList);
-
-    } catch (error) {
-      console.error('❌ [Collections] Exception loading collections:', error);
-      console.error('❌ [Collections] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
-  // --- END MOVED SECTION ---
-
-  // Move useEffect hooks here to ensure they're always called
-  useEffect(() => {
-    // Load recipes for the initially selected collection (if any)
-    if (selectedCollectionId) {
-      loadCollectionRecipes(selectedCollectionId);
-    } else {
-      // Load "All Recipes" view when no specific collection is selected
-      loadCollectionRecipes(null);
-    }
-  }, [selectedCollectionId]);
+    fetchRecipes();
+  }, [selectedCollectionId, collections, collectionsLoading]);
 
   useEffect(() => {
-    // Load collections when user is authenticated
     if (user) {
-      loadCollections();
+      refreshCollections();
     }
-  }, [user]);
+  }, [user, refreshCollections]);
 
-  // Show auth prompt if not authenticated instead of redirecting
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-stone-800 relative overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
         </div>
-
-        {/* Header */}
         <div className="bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 relative z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between py-6">
@@ -266,12 +109,9 @@ const Collections = () => {
             </div>
           </div>
         </div>
-
-        {/* Main Content - Sign In Prompt */}
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="bg-gradient-to-b from-white/80 via-stone-50/80 to-stone-100/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 p-12 text-center relative overflow-hidden group transition-all duration-500 ease-out hover:shadow-3xl hover:shadow-stone-900/15">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none rounded-2xl"></div>
-            
             <div className="relative z-10">
               <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg shadow-blue-200/50">
                 <ChefHat className="w-12 h-12 text-white" />
@@ -280,8 +120,8 @@ const Collections = () => {
                 Welcome to Recipe Collections
               </h2>
               <p className="text-stone-600 mb-8 max-w-lg mx-auto leading-relaxed text-lg">
-                Sign in to create and manage your personalized recipe collections. 
-                Organize your favorite recipes into categories like "Quick Dinners", 
+                Sign in to create and manage your personalized recipe collections.
+                Organize your favorite recipes into categories like "Quick Dinners",
                 "Healthy Meals", or "My Fried Recipes".
               </p>
               <button
@@ -297,10 +137,9 @@ const Collections = () => {
       </div>
     );
   }
-  
-  // Predefined colors and icons for collections
+
   const colorOptions = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
     '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'
   ];
 
@@ -308,84 +147,32 @@ const Collections = () => {
     'folder', 'heart', 'star', 'bookmark', 'tag', 'chef-hat', 'clock'
   ];
 
-  // Create collection
   const handleCreateCollection = async (formData) => {
     if (!formData.name.trim()) return;
-
     try {
-      const result = await createCollection(formData);
-      
-      // Backend returns { message, collection } - check for collection field instead of success
-      if (result && result.collection) {
-        // Trigger refresh of CollectionManager
-        setCollectionsRefreshKey(prev => prev + 1);
-        // Reload collections to reflect the new collection
-        loadCollections();
-        if (selectedCollectionId) {
-          loadCollectionRecipes(selectedCollectionId);
-        }
-      } else {
-        // Show user-friendly error without crashing
-        alert('Failed to create collection: Unexpected response from server');
-      }
+      await createNewCollection(formData);
     } catch (error) {
       console.error('Failed to create collection:', error);
-      
-      // Show user-friendly error without crashing the page
-      const errorMessage = error.message || 'Unknown error occurred';
-      alert(`Failed to create collection: ${errorMessage}`);
     }
   };
 
-  // Update collection
-  const handleUpdateCollection = async (formData, collection) => {
-    if (!collection || !formData.name.trim()) return;
-
+  const handleDeleteCollection = async (collectionId) => {
     try {
-      const result = await updateCollection(collection.id, formData);
-      
-      // Backend returns { message, collection } - check for collection field
-      if (result && result.collection) {
-        // Trigger refresh of CollectionManager
-        setCollectionsRefreshKey(prev => prev + 1);
-        // Reload collections to reflect the update
-        loadCollections();
-        if (selectedCollectionId) {
-          loadCollectionRecipes(selectedCollectionId);
-        }
-      } else {
-        console.error('Unexpected response format:', result);
+      await deleteCollection(collectionId);
+      if (selectedCollectionId === collectionId) {
+        setSelectedCollectionId(null);
       }
     } catch (error) {
-      console.error('Failed to update collection:', error);
+      console.error('Failed to delete collection:', error);
     }
   };
 
-  // Start editing
   const startEditing = (collection) => {
-    showCollectionFormModal({
-      mode: 'edit',
-      collection,
-      onSubmit: (formData) => handleUpdateCollection(formData, collection),
-      colors: colorOptions,
-      icons: iconOptions
-    });
+    // Editing collections is temporarily disabled
   };
 
-  // Handle collection refresh from CollectionManager
-  const handleCollectionRefresh = () => {
-    loadCollections();
-    if (selectedCollectionId) {
-      loadCollectionRecipes(selectedCollectionId);
-    }
-  };
-
-
-
-  // Handle collection selection
   const handleCollectionSelect = (collectionId) => {
     setSelectedCollectionId(collectionId);
-    loadCollectionRecipes(collectionId);
   };
 
   const handleRecipeClick = (recipeName) => {
@@ -406,9 +193,6 @@ const Collections = () => {
     }
   };
 
-
-
-  // Login prompt handlers
   const requireAuth = (featureName) => {
     if (!user) {
       showAuthPrompt(`Please sign in to use ${featureName}.`);
@@ -417,33 +201,30 @@ const Collections = () => {
     return true;
   };
 
-  // Handle add to favorites callback
   const handleAddToFavoritesCallback = (recipeData) => {
     console.log('Added to favorites:', recipeData);
   };
 
-  // Handle remove from favorites callback
   const handleRemoveFromFavoritesCallback = (recipeData) => {
     console.log('Removed from favorites:', recipeData);
   };
 
-  // Handle add to collection callback  
-  const handleAddToCollectionCallback = (collectionId, recipeData) => {
-    console.log('Added to collection:', collectionId, recipeData);
-  };
-
-  // Handle remove from collection callback
-  const handleRemoveFromCollectionCallback = (collectionId, recipeData) => {
-    console.log('Removed from collection:', collectionId, recipeData);
-    // Refresh the current collection to show updated recipes
-    if (selectedCollectionId) {
-      loadCollectionRecipes(selectedCollectionId);
+  const handleAddToCollectionCallback = async (collectionId, recipeData) => {
+    try {
+      await addRecipeToCollection(collectionId, recipeData);
+    } catch (error) {
+      console.error('Failed to add recipe to collection:', error);
     }
-    // Also refresh collections to update recipe counts
-    loadCollections();
   };
 
-  // Handle create collection callback
+  const handleRemoveFromCollectionCallback = async (collectionId, recipeData) => {
+    try {
+      await removeRecipeFromCollection(collectionId, recipeData);
+    } catch (error) {
+      console.error('Failed to remove recipe from collection:', error);
+    }
+  };
+
   const handleCreateCollectionCallback = () => {
     showCollectionFormModal({
       mode: 'create',
@@ -453,35 +234,19 @@ const Collections = () => {
     });
   };
 
-  // Handle logout with confirmation
   const handleLogout = async () => {
     const confirmed = await confirmLogout();
-    
     if (confirmed) {
-      console.log('🔄 [Collections] User confirmed logout, starting process...');
-      
-      // Set loading state
       setIsLoggingOut(true);
-      
       try {
         const result = await logout();
-        
         if (result.success) {
-          console.log('✅ [Collections] Logout successful, redirecting...');
-          
-          // Redirect to landing page after successful logout
           setTimeout(() => {
             window.location.href = '/';
           }, 1000);
-          
-        } else {
-          console.error('❌ [Collections] Logout failed:', result.error);
-          alert(result.error || 'Failed to sign out. Please try again.');
         }
-        
       } catch (error) {
-        console.error('❌ [Collections] Unexpected logout error:', error);
-        alert('An unexpected error occurred. Please try again.');
+        console.error('Logout error:', error);
       } finally {
         setIsLoggingOut(false);
       }
@@ -490,17 +255,11 @@ const Collections = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-stone-50 to-stone-100 font-sans text-stone-800 relative overflow-hidden">
-      
-      {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,theme(colors.stone.400)_1px,transparent_0)] [background-size:24px_24px]"></div>
       </div>
-
-      {/* Floating decorative elements */}
       <div className="absolute top-20 right-20 w-40 h-40 bg-gradient-to-br from-blue-200 to-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob"></div>
       <div className="absolute bottom-20 left-20 w-40 h-40 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-blob animation-delay-2000"></div>
-      
-      {/* Logout Loading Overlay */}
       {isLoggingOut && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/80 backdrop-blur-xl">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
@@ -512,8 +271,6 @@ const Collections = () => {
           </div>
         </div>
       )}
-
-      {/* Header */}
       <div className="bg-gradient-to-r from-white/80 via-stone-50/80 to-white/80 backdrop-blur-xl border-b border-stone-200/60 shadow-xl shadow-stone-900/5 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
@@ -526,7 +283,6 @@ const Collections = () => {
               </button>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200/50 overflow-hidden group relative">
-                  {/* Shimmer effect */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                   <ChefHat className="w-6 h-6 text-white relative z-10" />
                 </div>
@@ -536,7 +292,6 @@ const Collections = () => {
                 </div>
               </div>
             </div>
-            {/* Authentication status indicator and logout - Only show when user is logged in */}
             {user && (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm text-stone-600">
@@ -555,44 +310,74 @@ const Collections = () => {
           </div>
         </div>
       </div>
-
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Collections Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-gradient-to-b from-white/80 via-stone-50/80 to-stone-100/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 p-6 relative overflow-hidden group transition-all duration-500 ease-out hover:shadow-3xl hover:shadow-stone-900/15">
-              
-              {/* Shimmer effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none rounded-2xl"></div>
-              
-              <CollectionManager 
-                key={collectionsRefreshKey}
-                selectedCollectionId={selectedCollectionId}
-                onCollectionSelect={handleCollectionSelect}
-                onCreateCollection={handleCreateCollectionCallback}
-                onEditCollection={startEditing}
-                onCollectionRefresh={handleCollectionRefresh}
-              />
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-stone-800">Collections</h3>
+                  <button
+                    onClick={handleCreateCollectionCallback}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                  >
+                    <span>Create Collection</span>
+                  </button>
+                </div>
+                {collectionsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-12 bg-stone-200/70 rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : collections.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-stone-500">No collections yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => handleCollectionSelect(null)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedCollectionId === null ? 'border-orange-300 bg-orange-50' : 'border-stone-200 hover:bg-stone-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-stone-800">All Recipes</span>
+                        {selectedCollectionId === null && <span className="text-orange-600">✓</span>}
+                      </div>
+                    </div>
+                    {collections.map(collection => (
+                      <div
+                        key={collection.id}
+                        onClick={() => handleCollectionSelect(collection.id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedCollectionId === collection.id ? 'border-orange-300 bg-orange-50' : 'border-stone-200 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-stone-800">{collection.name}</span>
+                          {selectedCollectionId === collection.id && <span className="text-orange-600">✓</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Recipe Display Area */}
           <div className="lg:col-span-2">
             {selectedCollectionId ? (
-              // Show collection recipes
               <div className="bg-gradient-to-b from-white/80 via-stone-50/80 to-stone-100/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 p-6 relative overflow-hidden group transition-all duration-500 ease-out hover:shadow-3xl hover:shadow-stone-900/15">
-                
-                {/* Shimmer effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none rounded-2xl"></div>
-                
                 <div className="relative z-10">
                   <div className="mb-6">
                     <div className="flex items-center gap-3 mb-3">
-                      <div 
+                      <div
                         className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg relative overflow-hidden group"
                         style={{ backgroundColor: currentCollection?.color || '#FF6B6B' }}
                       >
-                        {/* Shimmer effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                         <ChefHat className="w-6 h-6 text-white relative z-10" />
                       </div>
@@ -607,19 +392,18 @@ const Collections = () => {
                     </div>
                     <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/60 text-blue-700 text-sm font-medium">
                       <Clock className="w-4 h-4 mr-1" />
-                      {currentCollection?.id === null 
+                      {currentCollection?.id === null
                         ? `${collectionRecipes.length} recipe${collectionRecipes.length !== 1 ? 's' : ''} across all collections`
                         : `${collectionRecipes.length} recipe${collectionRecipes.length !== 1 ? 's' : ''} in this collection`
                       }
                     </div>
                   </div>
-
-                  {loadingRecipes ? (
+                  {loadingRecipes || collectionsLoading ? (
                     <div className="space-y-4">
                       {[1, 2, 3].map(i => (
-                        <RecipeCard 
-                          key={i} 
-                          recipe={`Loading recipe ${i}`} 
+                        <RecipeCard
+                          key={i}
+                          recipe={`Loading recipe ${i}`}
                           isLoading={true}
                         />
                       ))}
@@ -631,9 +415,21 @@ const Collections = () => {
                           key={recipe.id || index}
                           recipe={recipe}
                           onClick={handleRecipeClick}
-                          isFavorited={true}
+                          isFavorited={true} 
                           user={user}
                           collections={collections}
+                          // Pass the collections hook for the new isSavedInCollection logic
+                          collectionsHook={{
+                            collections,
+                            loading: collectionsLoading,
+                            error: collectionsError,
+                            createNewCollection,
+                            deleteCollection,
+                            addRecipeToCollection,
+                            removeRecipeFromCollection,
+                            refreshCollections,
+                            isRecipeInCollection
+                          }}
                           requireAuth={requireAuth}
                           collectionId={currentCollection?.id}
                           onAddToFavorites={handleAddToFavoritesCallback}
@@ -659,12 +455,8 @@ const Collections = () => {
                 </div>
               </div>
             ) : (
-              // Show overview/help message
               <div className="bg-gradient-to-b from-white/80 via-stone-50/80 to-stone-100/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 p-8 text-center relative overflow-hidden group transition-all duration-500 ease-out hover:shadow-3xl hover:shadow-stone-900/15">
-                
-                {/* Shimmer effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none rounded-2xl"></div>
-                
                 <div className="relative z-10">
                   <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200/50">
                     <ChefHat className="w-10 h-10 text-white" />
@@ -673,40 +465,15 @@ const Collections = () => {
                     Welcome to Collections
                   </h3>
                   <p className="text-stone-600 mb-8 max-w-lg mx-auto leading-relaxed">
-                    Organize your favorite recipes into custom collections like "Quick Dinners", 
-                    "Healthy Meals", or "My Fried Recipes".
+                    Select a collection from the sidebar to view its recipes, or create a new one to get started.
                   </p>
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 text-left max-w-lg mx-auto border border-blue-200/60 shadow-lg shadow-blue-200/30">
-                    <h4 className="font-bold text-stone-800 mb-3 tracking-wide">How to get started:</h4>
-                    <ol className="text-sm text-stone-700 space-y-2 list-decimal list-inside">
-                      <li className="flex items-center gap-2">
-                        <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                        Create a new collection using the sidebar
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                        Give it a name and choose a color
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                        Add recipes to your collection from recipe details
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span>
-                        Click on any collection to view its recipes
-                      </li>
-                    </ol>
-                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Logout Confirmation Dialog */}
       <LogoutDialog />
-
     </div>
   );
 };

@@ -13,13 +13,6 @@ const verifyAuthToken = async (req, res, next) => {
     
     const token = authHeader.split('Bearer ')[1];
     
-    // In development mode, accept mock tokens or any token
-    if (process.env.NODE_ENV === 'development' || !admin.apps.length) {
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-      return next();
-    }
-    
     // For real Firebase authentication
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.userId = decodedToken.uid;
@@ -27,14 +20,6 @@ const verifyAuthToken = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Auth token verification failed:', error);
-    
-    // In development mode, allow the request to proceed
-    if (process.env.NODE_ENV === 'development') {
-      req.userId = 'mock-user-id';
-      req.user = { uid: 'mock-user-id', email: 'test@example.com' };
-      return next();
-    }
-    
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }; 
