@@ -48,14 +48,21 @@ const FavoritesCollectionsModal = ({
   }, [activeTab]);
 
   const handleRecipeClick = (recipeData) => {
+    // 1. Close the Library modal immediately so it doesn't block the screen
+    if (onClose) onClose();
+    
+    // 2. Open the Recipe Details modal (small delay to ensure smooth transition)
     const recipeName = recipeData.title || recipeData.name || 'Recipe';
-    showRecipeDetail({
-      recipeName,
-      fetchRecipeDetails: async (name) => {
-        const result = await getRecipeDetails(name);
-        return result;
-      }
-    });
+    
+    setTimeout(() => {
+      showRecipeDetail({
+        recipeName,
+        fetchRecipeDetails: async (name) => {
+          const result = await getRecipeDetails(name);
+          return result;
+        }
+      });
+    }, 50); // 50ms delay is enough to let the first modal clear
   };
 
   const handleFavoriteToggle = async (recipeData) => {
@@ -196,13 +203,16 @@ const FavoritesCollectionsModal = ({
                 {isCurrentRecipeInCollection ? 'Added' : 'Add'}
               </button>
             ) : (
-              // If just viewing library, show delete option
-              <button
-                onClick={(e) => handleDeleteCollection(collection.id, e)}
-                className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              // If just viewing library, show delete option (but not for default collections like "My Favorites")
+              !collection.isDefault && (
+                <button
+                  onClick={(e) => handleDeleteCollection(collection.id, e)}
+                  className="p-2 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  title="Delete collection"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )
             )}
           </div>
         </div>

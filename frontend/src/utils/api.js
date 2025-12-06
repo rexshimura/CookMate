@@ -315,7 +315,7 @@ export const addToFavorites = async (recipeId, recipeData = null) => {
       throw new Error('Recipe data must be an object if provided');
     }
     
-    // First get the favorites collection
+    // Get the favorites collection (backend auto-creates if missing)
     const favoritesResult = await apiCall('/api/collections/favorites');
     
     if (favoritesResult && favoritesResult.collection) {
@@ -328,27 +328,6 @@ export const addToFavorites = async (recipeId, recipeData = null) => {
     
     throw new Error('Favorites collection not found');
   } catch (error) {
-    // Check if it's a "not found" error and try to migrate
-    if (error.message.includes('Favorites collection not found')) {
-      try {
-        await migrateFavorites();
-        
-        // Now try to add to favorites again
-        const retryResult = await apiCall('/api/collections/favorites');
-        
-        if (retryResult && retryResult.collection) {
-          return await apiCall(`/api/collections/${retryResult.collection.id}/recipes`, {
-            method: 'POST',
-            body: JSON.stringify({ recipeId: recipeId.trim(), recipeData }),
-          });
-        }
-        
-        throw new Error('Favorites collection still not found after migration');
-      } catch (migrationError) {
-        throw new Error('Failed to create favorites collection: ' + migrationError.message);
-      }
-    }
-    
     throw new Error(error.message || 'Failed to add to favorites');
   }
 };
