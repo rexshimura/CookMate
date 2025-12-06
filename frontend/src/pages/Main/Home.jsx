@@ -491,11 +491,8 @@ export default function Home({ favoritesHook, collectionsHook }) {
 
   // Recipe handlers
   const handleRecipeClick = (recipeName) => {
-    showRecipeDetail({
-      recipeName,
-      fetchRecipeDetails: handleFetchRecipeDetails,
-      onAddToFavorites: handleAddToFavoritesCallback
-    });
+    // Navigate to the new page, encoding the name to handle spaces/special chars
+    navigate(`/recipe/${encodeURIComponent(recipeName)}`);
   };
 
   const handleFetchRecipeDetails = async (recipeName) => {

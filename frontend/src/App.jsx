@@ -10,7 +10,6 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import AuthPromptModal from './components/AuthPromptModal.jsx';
 import CollectionsModal from './pages/Components/UI/CollectionsModal.jsx';
 import ConfirmationDialog from './pages/Components/UI/ConfirmationDialog.jsx';
-import RecipeDetailModal from './pages/Components/Recipe/RecipeDetailModal.jsx';
 import FavoritesModal from './pages/Components/UI/FavoritesModal.jsx';
 import CollectionFormModal from './pages/Components/UI/CollectionFormModal.jsx';
 import FavoritesCollectionsModal from './components/FavoritesCollections/FavoritesCollectionsModal.jsx';
@@ -20,6 +19,7 @@ import { useDeleteConfirmation, useLogoutConfirmation } from './pages/Components
 import Landing from "./pages/Landing.jsx";
 import Home from "./pages/Main/Home.jsx"
 import Collections from "./pages/Collections.jsx";
+import RecipeDetailsPage from "./pages/RecipeDetailsPage.jsx";
 import SigninPage from "./pages/Auth/Sign-In.jsx";
 import SignupPage from "./pages/Auth/Sign-Up.jsx";
 import './App.css';
@@ -41,7 +41,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     authPromptState,
     collectionsModalState,
     confirmationState,
-    recipeDetailModalState,
     favoritesModalState,
     collectionFormModalState,
     favoritesCollectionsModalState
@@ -54,8 +53,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
     hideCollectionsModal,
     showConfirmation,
     hideConfirmation,
-    showRecipeDetail,
-    hideRecipeDetail,
     showFavoritesModal,
     hideFavoritesModal,
     showCollectionFormModal,
@@ -78,9 +75,7 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
       showConfirmation,
       hideConfirmation,
       
-      // Recipe Detail Modal
-      showRecipeDetail,
-      hideRecipeDetail,
+
       
       // Favorites Modal
       showFavoritesModal,
@@ -175,15 +170,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         favoritesHook={favoritesHook}
         collectionsHook={collectionsHook}
       />
-
-      {/* Recipe Detail Modal - Moved to bottom to ensure it renders on top */}
-      <RecipeDetailModal
-        recipeName={recipeDetailModalState.recipeName}
-        isOpen={recipeDetailModalState.isOpen}
-        onClose={hideRecipeDetail}
-        fetchRecipeDetails={recipeDetailModalState.fetchRecipeDetails}
-        onAddToFavorites={recipeDetailModalState.onAddToFavorites}
-      />
     </ModalContext.Provider>
   );
 };
@@ -223,12 +209,7 @@ function App() {
     loading: false
   });
 
-  const [recipeDetailModalState, setRecipeDetailModalState] = useState({
-    isOpen: false,
-    recipeName: '',
-    fetchRecipeDetails: null,
-    onAddToFavorites: null
-  });
+
 
   const [favoritesModalState, setFavoritesModalState] = useState({
     isOpen: false,
@@ -298,19 +279,7 @@ function App() {
       setConfirmationState(prev => ({ ...prev, loading }));
     },
 
-    // Recipe Detail Modal Actions
-    showRecipeDetail: (options) => {
-      // First, ensure the other modal is closed to prevent conflicts.
-      setFavoritesCollectionsModalState(prev => ({ ...prev, isOpen: false }));
-      // Then, open the recipe detail modal.
-      setRecipeDetailModalState({ 
-        isOpen: true, 
-        ...options 
-      });
-    },
-    hideRecipeDetail: () => {
-      setRecipeDetailModalState(prev => ({ ...prev, isOpen: false }));
-    },
+
 
     // Favorites Modal Actions
     showFavoritesModal: (options) => {
@@ -355,7 +324,6 @@ function App() {
               authPromptState,
               collectionsModalState,
               confirmationState,
-              recipeDetailModalState,
               favoritesModalState,
               collectionFormModalState,
               favoritesCollectionsModalState
@@ -375,6 +343,7 @@ function App() {
                     />
                   </ProtectedRoute>
                 } />
+                <Route path="/recipe/:name" element={<RecipeDetailsPage />} />
                 <Route path="/collections" element={<Collections />} />
 
                 <Route path="/signin" element={

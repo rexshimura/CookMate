@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, X, Plus, Folder, Clock, Trash2, Check, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useModal } from '../../App.jsx';
 import { getRecipeDetails } from '../../utils/api.js';
 
@@ -11,6 +12,7 @@ const FavoritesCollectionsModal = ({
   favoritesHook, 
   collectionsHook 
 }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('favorites');
   
   // Local state for creating collections
@@ -48,21 +50,9 @@ const FavoritesCollectionsModal = ({
   }, [activeTab]);
 
   const handleRecipeClick = (recipeData) => {
-    // 1. Close the Library modal immediately so it doesn't block the screen
-    if (onClose) onClose();
-    
-    // 2. Open the Recipe Details modal (small delay to ensure smooth transition)
     const recipeName = recipeData.title || recipeData.name || 'Recipe';
-    
-    setTimeout(() => {
-      showRecipeDetail({
-        recipeName,
-        fetchRecipeDetails: async (name) => {
-          const result = await getRecipeDetails(name);
-          return result;
-        }
-      });
-    }, 50); // 50ms delay is enough to let the first modal clear
+    onClose(); // Close the library modal
+    navigate(`/recipe/${encodeURIComponent(recipeName)}`); // Go to details page
   };
 
   const handleFavoriteToggle = async (recipeData) => {
