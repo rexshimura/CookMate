@@ -10,13 +10,10 @@ const RecipeCard = ({
   isFavorited = false,
   onAddToFavorites,
   onRemoveFromFavorites,
-  onAddToCollection,
-  onRemoveFromCollection,
   collections = [],
   fetchRecipeDetails,
   user = null,
   requireAuth = null,
-  onCreateCollection = null,
   // Optional: when viewing a specific collection (or favorites), pass its id so
   // the card can show a direct "remove" button for that collection.
   collectionId = null,
@@ -26,8 +23,7 @@ const RecipeCard = ({
   toggleFavorite = null,
   isFavorite = null
 }) => {
-  const collectionsButtonRef = useRef(null);
-  const { showCollectionsModal } = useModal();
+  const { showFavoritesCollectionsModal } = useModal();
 
   // Get recipe ID for consistency using the new utility
   const getRecipeId = (recipeObj = recipe) => {
@@ -94,91 +90,7 @@ const RecipeCard = ({
     }
   };
 
-  // Handle collections using the new unified architecture
-  const handleAddToCollection = async (collectionId, e) => {
-    e?.stopPropagation();
 
-    if (!recipe || !collectionId) return;
-
-    // Check authentication
-    if (!user) {
-      if (requireAuth) {
-        requireAuth('add recipes to collections');
-      }
-      return;
-    }
-
-    // Check if we have the new hooks available
-    if (collectionsHook && collectionsHook.addRecipeToCollection) {
-      try {
-        await collectionsHook.addRecipeToCollection(collectionId, recipe);
-        // The hook will handle optimistic updates and error handling
-      } catch (error) {
-        console.error('Failed to add to collection:', error);
-      }
-      return;
-    }
-
-    // Fallback to legacy callback approach
-    try {
-      let recipeData = recipe;
-      let recipeId;
-
-      if (typeof recipe === 'string') {
-        if (fetchRecipeDetails) {
-          const result = await fetchRecipeDetails(recipe);
-          if (result.success) {
-            recipeData = result.recipe;
-          }
-        }
-        recipeId = getRecipeId(recipe);
-      } else {
-        recipeId = getRecipeId(recipe);
-        recipeData = recipe;
-      }
-
-      if (onAddToCollection) {
-        onAddToCollection(collectionId, recipeData || recipe);
-      }
-    } catch (error) {
-      console.error('Failed to add to collection:', error);
-    }
-  };
-
-  // Remove from collection
-  const handleRemoveFromCollection = async (collectionId) => {
-    if (!recipe || !collectionId) return;
-    
-    // Check authentication
-    if (!user) {
-      if (requireAuth) {
-        requireAuth('remove recipes from collections');
-      }
-      return;
-    }
-
-    // Check if we have the new hooks available
-    if (collectionsHook && collectionsHook.removeRecipeFromCollection) {
-      try {
-        await collectionsHook.removeRecipeFromCollection(collectionId, recipe);
-        // The hook will handle optimistic updates and error handling
-      } catch (error) {
-        console.error('Failed to remove from collection:', error);
-      }
-      return;
-    }
-
-    // Fallback to legacy callback approach
-    try {
-      let recipeId = getRecipeId(recipe);
-      
-      if (onRemoveFromCollection) {
-        onRemoveFromCollection(collectionId, recipe);
-      }
-    } catch (error) {
-      console.error('Failed to remove from collection:', error);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -290,28 +202,20 @@ const RecipeCard = ({
               <Heart className={`w-4 h-4 ${((isFavorite && isFavorite(recipe)) || isFavorited) ? 'fill-current' : ''}`} />
             </button>
 
-            {/* Collections Dropdown Button */}
-            <div className="relative">
-              <button
-                ref={collectionsButtonRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  showCollectionsModal({
-                    collections,
-                    recipe,
-                    user,
-                    requireAuth,
-                    onAddToCollection: handleAddToCollection,
-                    onRemoveFromCollection: handleRemoveFromCollection,
-                    onCreateCollection,
-                    triggerRef: collectionsButtonRef
-                  });
-                }}
-                className="p-2 text-stone-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-all hover:scale-110"
-              >
-                <Folder className="w-4 h-4" />
-              </button>
-            </div>
+            {/* Collections Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open the new Unified Modal, defaulting to the 'collections' tab
+                showFavoritesCollectionsModal({ 
+                  recipe, 
+                  initialTab: 'collections' 
+                });
+              }}
+              className="p-2 text-stone-400 hover:text-orange-600 hover:bg-orange-50 rounded-full transition-all hover:scale-110"
+            >
+              <Folder className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Arrow Button - HIDDEN ON MOBILE to fix clutter */}

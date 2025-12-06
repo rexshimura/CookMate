@@ -531,6 +531,19 @@ function isValidRecipe(text) {
   if (!text || text.length === 0) {
     return false;
   }
+  const lower = text.toLowerCase().trim();
+  
+  // 1. REJECT INSTRUCTIONS: If it starts with a verb, it's not a title.
+  // e.g. "Crack the egg", "Pour the milk", "Heat the pan"
+  const cookingVerbs = /^(crack|pour|mix|stir|heat|add|place|put|whisk|boil|fry|bake|roast|slice|chop|mince|peel|cut|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|microwave|freeze|chill|refrigerate|wash|clean|dry|pat|season|taste|adjust)/i;
+  
+  if (cookingVerbs.test(text)) {
+    console.log(`Rejecting instruction-like title: "${text}"`);
+    return false;
+  }
+
+  // 2. REJECT LONG SENTENCES: Titles are rarely longer than 10 words
+  if (text.split(' ').length > 10) return false;
   
   const lowerText = text.toLowerCase().trim();
   
@@ -953,7 +966,9 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       recipePrompt += `. Recipe type: ${recipeType}`;
     }
     
-    recipePrompt += `. Please provide the recipe in this JSON format:
+    recipePrompt += `. IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.
+
+Please provide the recipe in this JSON format:
 {
   "title": "Recipe Name",
   "ingredients": ["1 cup ingredient", "2 tbsp ingredient"],
@@ -969,25 +984,28 @@ Only return the JSON, no additional text.`;
     // Generate recipe using Groq
     const aiResponse = await callGroqAI(recipePrompt);
     
-    // Parse JSON response from AI
+    // Parse JSON response from AI with improved error handling
     let recipeData;
     try {
-      const jsonStart = aiResponse.indexOf('{');
-      const jsonEnd = aiResponse.lastIndexOf('}');
+      // Clean up markdown code blocks if they exist
+      const cleanedResponse = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      const jsonStart = cleanedResponse.indexOf('{');
+      const jsonEnd = cleanedResponse.lastIndexOf('}');
+      
       if (jsonStart !== -1 && jsonEnd !== -1) {
-        const jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+        const jsonString = cleanedResponse.substring(jsonStart, jsonEnd + 1);
         recipeData = JSON.parse(jsonString);
       } else {
-        throw new Error('No JSON found in response');
+        throw new Error('No JSON brackets found');
       }
     } catch (parseError) {
-      console.error('Failed to parse AI recipe response:', parseError);
+      console.error("JSON Parse Failed. Raw AI response:", aiResponse);
       // Fallback to basic recipe structure
       recipeData = {
         title: "AI Generated Recipe",
         ingredients: ingredients || ["Please specify ingredients"],
         instructions: aiResponse.split('\n').filter(line => line.trim()),
-        cookingTime: "Varies",
+        cookingTime: "30-45 minutes", // More specific than "Varies"
         servings: "4",
         difficulty: "Medium",
         description: aiResponse
@@ -1047,7 +1065,9 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
     // STEP 2: If no stored data found, generate new recipe details
     
     // Create a detailed prompt for recipe details generation
-    const detailPrompt = `Create detailed recipe information for "${recipeName}". Please provide the recipe in this exact JSON format:
+    const detailPrompt = `Create detailed recipe information for "${recipeName}". IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.
+
+Please provide the recipe in this exact JSON format:
 {
   "title": "${recipeName}",
   "description": "Brief appetizing description of the dish",
@@ -1075,13 +1095,16 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
     // Parse JSON response from AI with improved error handling
     let recipeData;
     try {
+      // Clean up markdown code blocks if they exist
+      const cleanedResponse = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      
       // Try multiple parsing strategies
       let jsonString = '';
-      let jsonStart = aiResponse.indexOf('{');
-      let jsonEnd = aiResponse.lastIndexOf('}');
+      let jsonStart = cleanedResponse.indexOf('{');
+      let jsonEnd = cleanedResponse.lastIndexOf('}');
       
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-        jsonString = aiResponse.substring(jsonStart, jsonEnd + 1);
+        jsonString = cleanedResponse.substring(jsonStart, jsonEnd + 1);
         recipeData = JSON.parse(jsonString);
       } else {
         throw new Error('No valid JSON structure found in response');
@@ -1144,10 +1167,10 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
             difficulty: "Medium",
             estimatedCost: "$10-15",
             nutritionInfo: {
-              calories: "Per serving",
-              protein: "Protein content varies",
-              carbs: "Carbohydrate content varies", 
-              fat: "Fat content varies"
+              calories: "350-450 per serving",
+              protein: "20-30 grams",
+              carbs: "30-40 grams", 
+              fat: "15-25 grams"
             },
             tips: ["Use fresh ingredients for best results", "Taste and adjust seasoning as needed"],
             youtubeSearchQuery: `${recipeName} recipe tutorial`

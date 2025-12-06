@@ -3,7 +3,7 @@ import { ArrowLeft, ChefHat, Clock, Users, X, Lock, LogOut } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useCollections } from '../hooks/useCollections.js';
-import CollectionManager from './Components/Collections/CollectionManager.jsx';
+
 import RecipeCard from './Components/Recipe/RecipeCard.jsx';
 import { getRecipeDetails } from '../utils/api.js';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
@@ -314,15 +314,56 @@ const Collections = () => {
           <div className="lg:col-span-1">
             <div className="bg-gradient-to-b from-white/80 via-stone-50/80 to-stone-100/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/60 p-6 relative overflow-hidden group transition-all duration-500 ease-out hover:shadow-3xl hover:shadow-stone-900/15">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none rounded-2xl"></div>
-              <CollectionManager
-                collections={collections}
-                loading={collectionsLoading}
-                selectedCollectionId={selectedCollectionId}
-                onCollectionSelect={handleCollectionSelect}
-                onCreateCollection={handleCreateCollectionCallback}
-                onEditCollection={startEditing}
-                onDeleteCollection={handleDeleteCollection}
-              />
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-stone-800">Collections</h3>
+                  <button
+                    onClick={handleCreateCollectionCallback}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                  >
+                    <span>Create Collection</span>
+                  </button>
+                </div>
+                {collectionsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-12 bg-stone-200/70 rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : collections.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-stone-500">No collections yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => handleCollectionSelect(null)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedCollectionId === null ? 'border-orange-300 bg-orange-50' : 'border-stone-200 hover:bg-stone-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-stone-800">All Recipes</span>
+                        {selectedCollectionId === null && <span className="text-orange-600">✓</span>}
+                      </div>
+                    </div>
+                    {collections.map(collection => (
+                      <div
+                        key={collection.id}
+                        onClick={() => handleCollectionSelect(collection.id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedCollectionId === collection.id ? 'border-orange-300 bg-orange-50' : 'border-stone-200 hover:bg-stone-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-stone-800">{collection.name}</span>
+                          {selectedCollectionId === collection.id && <span className="text-orange-600">✓</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="lg:col-span-2">

@@ -176,12 +176,13 @@ const FavoritesCollectionsModal = ({
             {/* If a recipe is actively selected in the modal, show Add/Remove buttons */}
             {recipe ? (
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
+                  
                   if (isCurrentRecipeInCollection) {
-                    removeRecipeFromCollection(collection.id, recipe);
+                    await collectionsHook.removeRecipeFromCollection(collection.id, recipe);
                   } else {
-                    addRecipeToCollection(collection.id, recipe);
+                    await collectionsHook.addRecipeToCollection(collection.id, recipe);
                   }
                 }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
@@ -255,11 +256,9 @@ const FavoritesCollectionsModal = ({
               <SimpleRecipeCard
                 key={recipeData.id}
                 recipe={recipeData}
-                onRemove={(recipe) => {
-                  // Remove recipe from collection
-                  if (collectionsHook && collectionsHook.removeRecipeFromCollection) {
-                    collectionsHook.removeRecipeFromCollection(collection.id, recipe);
-                  }
+                onRemove={async (recipe) => {
+                  // Remove recipe from collection using the hook
+                  await collectionsHook.removeRecipeFromCollection(collection.id, recipe);
                 }}
                 onRecipeClick={handleRecipeClick}
               />
