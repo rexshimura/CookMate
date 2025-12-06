@@ -21,28 +21,24 @@ import {
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { generateRecipeId } from '../utils/ids.js';
 import { 
-  addToFavorites, 
-  removeFromFavorites,
-  checkIsFavorite,
-  getCollections, 
-  addRecipeToCollection,
-  removeRecipeFromCollection,
   getRecipeDetails
 } from '../utils/api.js';
 
-const RecipeDetailsPage = () => {
+const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
   const { name: recipeName } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Use shared hooks instead of local state
+  const { isFavorite, toggleFavorite } = favoritesHook || {};
+  const { isRecipeInCollection, addRecipeToCollection, removeRecipeFromCollection, collections } = collectionsHook || {};
   
   // Core state
   const [recipeData, setRecipeData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
-  const [collections, setCollections] = useState([]);
   const [checkedIngredients, setCheckedIngredients] = useState({});
   const [completedSteps, setCompletedSteps] = useState({});
   
@@ -316,80 +312,12 @@ const RecipeDetailsPage = () => {
     }
   };
 
-  // Load user's collections (only if authenticated)
-  const loadCollections = async () => {
-    if (!user) {
-      setCollections([]);
-      return;
-    }
-    try {
-      const result = await getCollections();
-      if (result.success) {
-        setCollections(result.collections || []);
-      }
-    } catch (error) {
-      console.error('Failed to load collections:', error);
-    }
-  };
-
-  // Check if current recipe is favorited
-  const checkIfFavorited = () => {
-    if (recipeData && collections.length > 0) {
-      try {
-        const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        const favoritesCollection = collections.find(col => col.isFavorites === true);
-        if (favoritesCollection && favoritesCollection.recipes) {
-          const isFav = favoritesCollection.recipes.some(recipe => recipe.id === recipeId);
-          setIsFavorited(isFav);
-        } else {
-          setIsFavorited(false);
-        }
-      } catch (error) {
-        setIsFavorited(false);
-      }
-    } else if (recipeData) {
-      setIsFavorited(false);
-    }
-  };
-
-  // Toggle favorite status (add/remove from favorites)
-  const handleToggleFavorites = async () => {
-    if (!recipeData) return;
-
-    setFavoritesLoading(true);
-    try {
-      const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-
-      if (isFavorited) {
-        try {
-          await removeFromFavorites(recipeId);
-          setIsFavorited(false);
-          loadCollections();
-        } catch (error) {
-          console.error('Failed to remove from favorites:', error);
-        }
-      } else {
-        try {
-          await addToFavorites(recipeId, recipeData);
-          setIsFavorited(true);
-          loadCollections();
-        } catch (error) {
-          console.error('Failed to add to favorites:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to toggle favorite status:', error);
-    } finally {
-      setFavoritesLoading(false);
-    }
-  };
-
   // Add recipe to collection (with auth check)
   const handleAddToCollection = async (collectionId) => {
     if (!recipeData || !collectionId) return;
 
     try {
-      const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const recipeId = recipeData.savedId || generateRecipeId(recipeData.title);
       const result = await addRecipeToCollection(collectionId, recipeId, recipeData);
 
       if (result.success) {
@@ -400,15 +328,6 @@ const RecipeDetailsPage = () => {
     }
   };
 
-  // Check if recipe is in a specific collection
-  const isRecipeInCollection = (collectionId) => {
-    const collection = collections.find(col => col.id === collectionId);
-    if (!collection || !recipeData) return false;
-
-    const recipeId = recipeData.savedId || recipeData.title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    return collection.recipes?.some(recipe => recipe.id === recipeId);
-  };
-
   // Reset state when recipe changes
   useEffect(() => {
     setRecipeData(null);
@@ -416,20 +335,11 @@ const RecipeDetailsPage = () => {
     setLoading(true);
     setCheckedIngredients({});
     setCompletedSteps({});
-    setIsFavorited(false);
     setCurrentSpeakingStep(null);
     stopTimer();
 
     handleFetchDetails();
   }, [recipeName]);
-
-  useEffect(() => {
-    loadCollections();
-  }, [user]);
-
-  useEffect(() => {
-    checkIfFavorited();
-  }, [recipeData, collections]);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -512,16 +422,16 @@ const RecipeDetailsPage = () => {
                   <Share2 className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={handleToggleFavorites}
-                  disabled={favoritesLoading}
+                  onClick={() => toggleFavorite && toggleFavorite(recipeData)}
+                  disabled={favoritesHook?.loading}
                   className={`p-2 rounded-lg transition-all ${
-                    isFavorited 
+                    isFavorite && isFavorite(recipeData)
                       ? 'bg-red-500 hover:bg-red-600 text-white' 
                       : 'hover:bg-white/20'
                   }`}
-                  title={isFavorited ? 'Remove from Favorites' : 'Add to Favorites'}
+                  title={isFavorite && isFavorite(recipeData) ? 'Remove from Favorites' : 'Add to Favorites'}
                 >
-                  <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+                  <Heart className={`w-4 h-4 ${isFavorite && isFavorite(recipeData) ? 'fill-current' : ''}`} />
                 </button>
               </div>
             </div>

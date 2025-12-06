@@ -343,7 +343,12 @@ function App() {
                     />
                   </ProtectedRoute>
                 } />
-                <Route path="/recipe/:name" element={<RecipeDetailsPage />} />
+                <Route path="/recipe/:name" element={
+                  <RecipeDetailsPage 
+                    favoritesHook={favoritesHook} 
+                    collectionsHook={collectionsHook} 
+                  />
+                } />
                 <Route path="/collections" element={<Collections />} />
 
                 <Route path="/signin" element={

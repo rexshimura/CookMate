@@ -7,9 +7,14 @@ const recipeCache = new Map();
 
 // Helper function to generate consistent recipe ID
 function generateConsistentRecipeId(recipeName) {
-  return recipeName.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '_')
+  if (!recipeName) return '';
+  return recipeName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '_')  // Replace special chars with _
+    .replace(/\s+/g, '_')          // Replace spaces with _
+    .replace(/_+/g, '_')           // Remove duplicate _
+    .replace(/^_|_$/g, '')         // Trim leading/trailing _
     .substring(0, 50);
 }
 
@@ -17,10 +22,7 @@ function generateConsistentRecipeId(recipeName) {
 async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
   try {
     // Generate a clean recipe ID from title
-    const recipeId = recipeData.title.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 50) + '_' + Date.now();
+    const recipeId = generateConsistentRecipeId(recipeData.title);
 
     const recipeDoc = {
       id: recipeId,
