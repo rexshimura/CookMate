@@ -209,10 +209,10 @@ const RecipeDetailModal = ({ recipeName, isOpen, onClose, fetchRecipeDetails, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl z-[109]"
+        className="absolute inset-0 bg-stone-900/60 backdrop-blur-xl z-[119]"
         onClick={() => {
           onClose();
         }}

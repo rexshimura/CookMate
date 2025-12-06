@@ -180,7 +180,7 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         collectionsHook={collectionsHook}
       />
 
-      {/* Recipe Detail Modal - Moved to bottom to ensure it's on top */}
+      {/* Recipe Detail Modal - Moved to bottom to ensure it renders on top */}
       <RecipeDetailModal
         recipeName={recipeDetailModalState.recipeName}
         isOpen={recipeDetailModalState.isOpen}
