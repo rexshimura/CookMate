@@ -357,7 +357,15 @@ const FavoritesCollectionsModal = ({
                     <SimpleRecipeCard
                       key={fav.id}
                       recipe={fav}
-                      onRemove={() => toggleFavorite(fav)} 
+                      onRemove={() => toggleFavorite(fav)}
+                      onRecipeClick={(recipe) => {
+                        // Close library modal first, then open recipe detail
+                        onClose();
+                        // Small delay to ensure modal is closed before opening recipe detail
+                        setTimeout(() => {
+                          handleRecipeClick(recipe);
+                        }, 100);
+                      }}
                     />
                   ))}
                 </div>

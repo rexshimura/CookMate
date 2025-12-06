@@ -106,15 +106,6 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         message={authPromptState.message}
       />
 
-      {/* Recipe Detail Modal */}
-      <RecipeDetailModal
-        recipeName={recipeDetailModalState.recipeName}
-        isOpen={recipeDetailModalState.isOpen}
-        onClose={hideRecipeDetail}
-        fetchRecipeDetails={recipeDetailModalState.fetchRecipeDetails}
-        onAddToFavorites={recipeDetailModalState.onAddToFavorites}
-      />
-
       {/* Collections Modal */}
       <CollectionsModal
         isOpen={collectionsModalState.isOpen}
@@ -187,6 +178,15 @@ const ModalManager = ({ modalStates, modalActions, favoritesHook, collectionsHoo
         onAction={favoritesCollectionsModalState.onAction}
         favoritesHook={favoritesHook}
         collectionsHook={collectionsHook}
+      />
+
+      {/* Recipe Detail Modal - Moved to bottom to ensure it's on top */}
+      <RecipeDetailModal
+        recipeName={recipeDetailModalState.recipeName}
+        isOpen={recipeDetailModalState.isOpen}
+        onClose={hideRecipeDetail}
+        fetchRecipeDetails={recipeDetailModalState.fetchRecipeDetails}
+        onAddToFavorites={recipeDetailModalState.onAddToFavorites}
       />
     </ModalContext.Provider>
   );
