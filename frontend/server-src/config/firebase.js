@@ -1,52 +1,53 @@
-// Firebase configuration and initialization
 const admin = require('firebase-admin');
 const dotenv = require('dotenv');
 
-// Load environment variables
 dotenv.config();
 
 let db;
 
 const initializeFirebase = () => {
   try {
-    // 🔍 DEBUG: Log environment variables for debugging
-    console.log('🔍 FIREBASE DEBUG - Environment Variables:');
-    console.log('- FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? 'SET' : 'MISSING');
-    console.log('- admin.apps.length:', admin.apps.length);
+    console.log('🔍 FIREBASE INIT: Starting...');
     
-    // Require Firebase credentials - no mock fallback allowed
     if (!process.env.FIREBASE_ADMIN_CREDENTIALS) {
-      throw new Error('FIREBASE_ADMIN_CREDENTIALS environment variable is required. Please provide your Firebase service account credentials.');
+      throw new Error('MISSING VAR: FIREBASE_ADMIN_CREDENTIALS is not set.');
     }
 
-    console.log('✅ Initializing REAL Firebase with credentials...');
+    // Parse the JSON
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS);
+    } catch (e) {
+      throw new Error('JSON PARSE ERROR: Could not parse FIREBASE_ADMIN_CREDENTIALS. Is it valid JSON?');
+    }
+
+    // 🔍 DEBUG: Print the KEYS only (not values) to check for project_id
+    console.log('🔍 CREDENTIAL KEYS FOUND:', Object.keys(serviceAccount));
+
+    if (!serviceAccount.project_id) {
+       console.error('❌ CRITICAL: "project_id" is missing from the credentials object!');
+    }
+
+    // Fix private key formatting if needed
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+
     if (!admin.apps.length) {
-      try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS);
-        if (serviceAccount.private_key) {
-          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-        }
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          projectId: serviceAccount.project_id
-        });
-        console.log('✅ Firebase Admin SDK initialized successfully');
-      } catch (parseError) {
-        console.error('❌ Failed to parse FIREBASE_ADMIN_CREDENTIALS:', parseError);
-        throw new Error('Invalid FIREBASE_ADMIN_CREDENTIALS JSON format');
-      }
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: serviceAccount.project_id
+      });
+      console.log('✅ Firebase Admin Initialized');
     }
-    db = admin.firestore();
-    console.log('✅ Connected to real Firebase');
 
+    db = admin.firestore();
     return { admin, db };
   } catch (error) {
-    console.error('Firebase initialization error:', error);
+    console.error('🚨 FIREBASE INIT ERROR:', error.message);
     throw error;
   }
 };
 
-// Initialize on module load
 initializeFirebase();
-
 module.exports = { admin, db, initializeFirebase };
