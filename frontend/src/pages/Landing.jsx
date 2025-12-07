@@ -228,7 +228,7 @@ export default function CookMateLanding() {
           
           <div className="text-center max-w-2xl mx-auto mb-16 relative z-10">
             <h2 className="text-3xl font-bold text-stone-900 mb-4 tracking-wide">Why use CookMate?</h2>
-            <p className="text-stone-500 leading-relaxed">Stop worrying about what to cook. Let our advanced AI handle the meal planning so you can enjoy the food.</p>
+            <p className="text-stone-500 leading-relaxed">Turn available ingredients into delicious meals with AI-powered recipes, interactive guides, and smart insights. Stop worrying about what to cook. Let our advanced AI handle the meal planning so you can enjoy the food.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 relative z-10">
