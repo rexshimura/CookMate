@@ -1,1 +1,16 @@
-{"version": 2, "name": "cookmate-frontend", "builds": [{"src": "package.json", "use": "@vercel/static-build", "config": {"distDir": "dist"}}], "routes": [{"src": "/api/(.*)", "dest": "https://us-central1-cookmate-cc941.cloudfunctions.net/api/$1", "status": 200}, {"src": "/(.*)", "dest": "/index.html"}], "env": {"VITE_API_BASE_URL": "https://us-central1-cookmate-cc941.cloudfunctions.net/api"}, "headers": [{"source": "/(.*)", "headers": [{"key": "X-Content-Type-Options", "value": "nosniff"}, {"key": "X-Frame-Options", "value": "DENY"}, {"key": "X-XSS-Protection", "value": "1; mode=block"}]}]}
+{
+  "version": 2,
+  "name": "cookmate-frontend",
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } },
+    { "src": "api/index.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "/api"
+  }
+}

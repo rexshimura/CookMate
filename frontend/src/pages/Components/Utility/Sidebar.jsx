@@ -53,14 +53,15 @@ const Sidebar = ({
 
   const SidebarContent = () => (
     <div className={`
-      h-full flex flex-col transition-all duration-500 ease-out relative overflow-hidden
+      h-full flex flex-col relative overflow-hidden
       bg-gradient-to-b from-white via-stone-50 to-stone-100 
       border-r border-stone-200/60 backdrop-blur-xl shadow-2xl
       ${isMobile 
-          ? 'w-80' // Standard width for mobile drawer
-          : isCollapsed 
-            ? 'w-20' 
-            : 'w-80 lg:w-96'
+          ? 'w-80 transition-transform duration-400 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform' // Mobile uses transform
+          : `transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isCollapsed 
+            ? 'w-20' // Desktop collapsed width
+            : 'w-80 lg:w-96' // Desktop expanded width
+          }`
       } 
     `}>
 
@@ -70,9 +71,9 @@ const Sidebar = ({
       </div>
 
       {/* Header */}
-      <div className={`relative flex-shrink-0 ${isMobile ? 'h-16' : 'h-16'} flex items-center justify-between ${isMobile ? 'px-4' : 'px-5'} border-b border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
+      <div className={`relative flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMobile ? 'h-16' : 'h-16'} flex items-center justify-between ${isMobile ? 'px-4' : 'px-5'} border-b border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
         {!isCollapsed && (
-          <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-3'} text-orange-600 group cursor-pointer`}>
+          <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-3'} text-orange-600 group cursor-pointer transition-all duration-200`}>
             <div className="relative">
               <ChefHat className={`${isMobile ? 'w-8 h-8' : 'w-8 h-8'} transition-all duration-300 group-hover:scale-110 group-hover:rotate-12`} />
               <Sparkles className={`absolute -top-1 -right-1 w-3 h-3 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -112,7 +113,7 @@ const Sidebar = ({
 
       {/* Action Buttons Row */}
       <div className={`
-        relative flex-shrink-0 z-10
+        relative flex-shrink-0 z-10 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
         ${isMobile ? 'p-4' : 'p-4'} 
         flex gap-2 
         ${isCollapsed && !isMobile ? 'flex-col items-center' : 'flex-row items-center'}
@@ -163,7 +164,7 @@ const Sidebar = ({
       <div className="h-px w-full bg-gradient-to-r from-transparent via-stone-200 to-transparent flex-shrink-0 mb-2"></div>
 
       {/* Sessions List */}
-      <div className={`flex-1 overflow-y-auto ${isMobile ? 'px-3' : 'px-3'} pb-4 custom-scrollbar`}>
+      <div className={`flex-1 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMobile ? 'px-3' : 'px-3'} pb-4`}>
         {!isCollapsed && (
           <div className="px-3 py-2 text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">
             Recent Chats
@@ -248,7 +249,7 @@ const Sidebar = ({
       </div>
 
       {/* User Account Footer */}
-      <div className={`flex-shrink-0 ${isMobile ? 'p-4' : 'p-4'} border-t border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
+      <div className={`flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isMobile ? 'p-4' : 'p-4'} border-t border-stone-200/60 bg-white/40 backdrop-blur-sm`}>
         <div className={`
           flex items-center w-full p-2 rounded-xl transition-all duration-200
           ${isCollapsed && !isMobile ? 'justify-center' : 'gap-3'}
@@ -335,7 +336,7 @@ const Sidebar = ({
         {/* Backdrop */}
         <div
           className={`
-            absolute inset-0 bg-stone-900/50 backdrop-blur-sm transition-opacity duration-300 pointer-events-auto
+            absolute inset-0 bg-stone-900/50 backdrop-blur-sm transition-opacity duration-400 pointer-events-auto
             ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
           `}
           onClick={onClose}
@@ -343,7 +344,7 @@ const Sidebar = ({
 
         {/* Sidebar Slide-in */}
         <div className={`
-          absolute left-0 top-0 bottom-0 h-full shadow-2xl transition-transform duration-300 ease-out pointer-events-auto
+          absolute left-0 top-0 bottom-0 h-full shadow-2xl transition-transform duration-400 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform pointer-events-auto
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <SidebarContent />
