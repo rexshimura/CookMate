@@ -7,31 +7,31 @@ let db;
 
 const initializeFirebase = () => {
   try {
-    console.log('🔍 FIREBASE INIT: Starting...');
-    
     if (!process.env.FIREBASE_ADMIN_CREDENTIALS) {
-      throw new Error('MISSING VAR: FIREBASE_ADMIN_CREDENTIALS is not set.');
+      throw new Error('FIREBASE_ADMIN_CREDENTIALS environment variable is required.');
     }
 
-    // Parse the JSON
+    console.log('🔍 Parsing Firebase Credentials...');
     let serviceAccount;
     try {
       serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS);
     } catch (e) {
-      throw new Error('JSON PARSE ERROR: Could not parse FIREBASE_ADMIN_CREDENTIALS. Is it valid JSON?');
+      throw new Error('Failed to parse FIREBASE_ADMIN_CREDENTIALS JSON. Check your Vercel env variable.');
     }
 
-    // 🔍 DEBUG: Print the KEYS only (not values) to check for project_id
-    console.log('🔍 CREDENTIAL KEYS FOUND:', Object.keys(serviceAccount));
-
-    if (!serviceAccount.project_id) {
-       console.error('❌ CRITICAL: "project_id" is missing from the credentials object!');
-    }
-
-    // Fix private key formatting if needed
+    // --- FIX: Robust Private Key Handling ---
     if (serviceAccount.private_key) {
+      // 1. Replace literal "\n" characters with real newlines
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      
+      // 2. Fix potential "quoted" keys (rare edge case)
+      if (serviceAccount.private_key.startsWith('"') && serviceAccount.private_key.endsWith('"')) {
+        serviceAccount.private_key = serviceAccount.private_key.slice(1, -1);
+      }
+    } else {
+      console.error('❌ CRITICAL: "private_key" field is missing in the credentials JSON!');
     }
+    // ----------------------------------------
 
     if (!admin.apps.length) {
       admin.initializeApp({
@@ -44,8 +44,9 @@ const initializeFirebase = () => {
     db = admin.firestore();
     return { admin, db };
   } catch (error) {
-    console.error('🚨 FIREBASE INIT ERROR:', error.message);
-    throw error;
+    console.error('🚨 Firebase Initialization Error:', error.message);
+    // Do not throw here, allow the app to start so we can see the logs
+    return { admin: null, db: null };
   }
 };
 
