@@ -1,9 +1,5 @@
-const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
-
-// Initialize Firebase Admin SDK
-admin.initializeApp();
 
 // Initialize Express app
 const app = express();
