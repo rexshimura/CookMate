@@ -17,7 +17,8 @@ import {
   Timer, 
   Scale, 
   AlertCircle, 
-  Award 
+  Award,
+  Youtube 
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -295,7 +296,9 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
           estimatedCost: typeof result.recipe.estimatedCost === 'string' ? result.recipe.estimatedCost : 'Moderate',
           nutritionInfo: typeof result.recipe.nutritionInfo === 'object' && result.recipe.nutritionInfo ? result.recipe.nutritionInfo : {},
           tips: Array.isArray(result.recipe.tips) ? result.recipe.tips : [],
-          youtubeUrl: typeof result.recipe.youtubeUrl === 'string' ? result.recipe.youtubeUrl : null,
+          youtubeUrl: (typeof result.recipe.youtubeUrl === 'string' && result.recipe.youtubeUrl) 
+            ? result.recipe.youtubeUrl 
+            : `https://www.youtube.com/results?search_query=${encodeURIComponent(recipeName + ' recipe tutorial')}`,
           youtubeSearchQuery: typeof result.recipe.youtubeSearchQuery === 'string' ? result.recipe.youtubeSearchQuery : `${recipeName} recipe tutorial`
         };
 
@@ -414,6 +417,16 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
 
               {/* Share and Favorite */}
               <div className="flex items-center gap-2">
+                {/* YouTube Button */}
+                <a
+                  href={recipeData.youtubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                  title="Watch on YouTube"
+                >
+                  <Youtube className="w-4 h-4" />
+                </a>
                 <button
                   onClick={handleShare}
                   className="p-2 hover:bg-white/20 rounded-lg transition-colors"
