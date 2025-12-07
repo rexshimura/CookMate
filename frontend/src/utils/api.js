@@ -21,8 +21,8 @@ const getApiBaseUrl = () => {
       // Development: Use Vite proxy which routes to Firebase Emulator
       return '/api';
     } else {
-      // Production: Use Firebase Functions
-      return 'https://us-central1-cookmate-cc941.cloudfunctions.net/api';
+      // Production: Use Vercel serverless functions (relative path)
+      return '';
     }
   } catch (error) {
     console.error('Error determining API base URL:', error);

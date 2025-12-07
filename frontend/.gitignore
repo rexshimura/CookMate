@@ -31,3 +31,4 @@ dist-ssr
 # Firebase
 .firebase/
 .firebaserc
+.vercel
