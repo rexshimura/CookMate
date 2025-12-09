@@ -5,9 +5,8 @@ import {
   ChefHat, 
   X, 
   MessageSquare, 
-  Heart, 
-  Folder, 
-  LogOut, 
+  Folder,
+  LogOut,
   LogIn,
   Trash2,
   Sparkles,
@@ -34,7 +33,7 @@ const Sidebar = ({
   collapsed
 }) => {
   const navigate = useNavigate();
-  
+
   const formatTime = (date) => {
     if (!date) return '';
     const messageDate = date.toDate ? date.toDate() : new Date(date);
@@ -221,7 +220,13 @@ const Sidebar = ({
                           e.stopPropagation();
                           onDeleteSession(session.id, e);
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                        /* MODIFIED HERE:
+                          Added conditional opacity based on isMobile prop
+                        */
+                        className={`
+                          p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all
+                          ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                        `}
                         title="Delete"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
