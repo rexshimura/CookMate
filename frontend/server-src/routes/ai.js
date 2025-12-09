@@ -809,7 +809,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isDeveloperResponse: true,
-          redirectToCooking: false
+          redirectToCooking: false,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }
@@ -824,7 +825,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isIdentityResponse: true,
-          redirectToCooking: false
+          redirectToCooking: false,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }
@@ -839,7 +841,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isOffTopic: true,
-          redirectToCooking: true
+          redirectToCooking: true,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }

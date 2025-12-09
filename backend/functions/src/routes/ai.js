@@ -574,8 +574,8 @@ function isValidRecipe(text) {
   // This is the "Strict" part. If it doesn't mention food, it's not a recipe card.
   const foodKeywords = new RegExp(
     '\\b(' +
-    // Proteins
-    'chicken|beef|pork|lamb|steak|turkey|duck|fish|salmon|tuna|cod|shrimp|prawn|crab|lobster|tofu|tempeh|egg|eggs|bacon|sausage|ham|meatball|burger|wings|thighs|breast|ribs|roast|calamari|scallops|mussels|clams|oyster|sardines|anchovies|pepperoni|salami|chorizo|prosciutto|pancetta|spam|hotdog|corned beef|brisket|pulled pork|carnitas|carne asada|barbacoa|gyro|kebab|shawarma|falafel|seitan|lentils|beans|chickpeas|hummus|edamame|nuts|seeds|peanut|almond|cashew|walnut|pecan|pistachio|hazelnut|macadamia|pine nut|sunflower|pumpkin|sesame|chia|flax|hemp|quinoa|oats|barley|bulgur|farro|millet|rice|couscous|polenta|grits|pasta|noodle|spaghetti|macaroni|lasagna|ravioli|tortellini|gnocchi|dumpling|wonton|spring roll|egg roll|samosa|empanada|taco|burrito|quesadilla|enchilada|nachos|fajitas|tostada|tamale|pupusa|arepa|tortilla|pita|naan|roti|chapati|paratha|dosa|idli|bagel|croissant|biscuit|scone|muffin|bread|toast|pancake|waffle|crepe|french toast|cereal|atmeal|porridge|yogurtgranola|o|cheese|milk|cream|butter|ice cream|gelato|sorbet|sherbet|custard|pudding|mousse|cake|pie|tart|cookie|brownie|blondie|cupcake|donut|doughnut|pastry|danish|baklava|tiramisu|cheesecake|fudge|truffle|candy|chocolate|caramel|toffee|marshmallow|meringue|macaron|souffle|parfait|trifle|cobbler|crisp|crumble|buckle|betty|pandowdy|slump|grunt|smoothie|shake|juice|tea|coffee|latte|cappuccino|mocha|cocoa|cider|lemonade|limeade|punch|cocktail|mocktail|beer|wine|sake|soju|spirit|liquor|liqueur|syrup|honey|jam|jelly|preserves|marmalade|chutney|relish|salsa|guacamole|pesto|hummus|tapenade|dip|sauce|dressing|gravy|marinade|rub|spice|herb|salt|pepper|vinegar|oil|broth|stock|soup|stew|chili|curry|chowder|bisque|gumbo|jambalaya|etouffee|bouillabaisse|cioppino|gazpacho|vichyssoise|borscht|miso|ramen|pho|udon|soba|laksa|pad thai|lo mein|chow mein|fried rice|risotto|paella|pilaf|biryani|jollof|stuffing|casserole|gratin|bake|roast|fry|grill|saute|stir-fry|scramble|poach|steam|boil|braise|stew|smoke|cure|pickle|ferment|salad|slaw|vegetable|fruit|berry|melon|citrus|apple|pear|peach|plum|apricot|cherry|grape|banana|plantain|pineapple|mango|papaya|kiwi|fig|date|raisin|cranberry|blueberry|raspberry|blackberry|strawberry|coconut|avocado|tomato|cucumber|pepper|chili|jalapeno|habanero|chipotle|paprika|cayenne|cumin|coriander|turmeric|ginger|garlic|onion|shallot|leek|scallion|chive|celery|carrot|parsnip|beet|radish|turnip|rutabaga|potato|yam|sweet potato|squash|zucchini|pumpkin|eggplant|okra|corn|peas|green bean|asparagus|broccoli|cauliflower|cabbage|kale|spinach|lettuce|arugula|chard|collard|mustard|cress|endive|radicchio|fennel|artichoke|mushroom|truffle|olive|caper|seaweed|nori|wakame|kombu|dulse|kelp|algae|spirulina|wheat|rye|barley|oat|corn|rice|millet|sorghum|teff|amaranth|buckwheat|quinoa|flour|meal|starch|gluten|yeast|baking|powder|soda|sugar|sweetener|honey|syrup|molasses|agave|stevia|monk fruit|erythritol|xylitol|sorbitol|mannitol|isomalt|lactitol|maltitol|recipe|dish|meal|adobo|sinigang|kare-kare|tinola|nilaga|paksiw|pinakbet|chopsuey|sisig|lechon|lumpia|pancit|palabok|menudo|afritada|caldereta|mechado|bistek|picadillo|arroz caldo|goto|lugaw|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana cue|ginataang|laing|pinangat|bicol express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua'
+    // Enhanced food keywords - more comprehensive coverage
+    'chicken|beef|pork|lamb|steak|turkey|duck|fish|salmon|tuna|cod|shrimp|prawn|crab|lobster|tofu|tempeh|egg|eggs|bacon|sausage|ham|meatball|burger|wings|thighs|breast|ribs|roast|calamari|scallops|mussels|clams|oyster|sardines|anchovies|pepperoni|salami|chorizo|prosciutto|pancetta|spam|hotdog|corned beef|brisket|pulled pork|carnitas|carne asada|barbacoa|gyro|kebab|shawarma|falafel|seitan|lentils|beans|chickpeas|hummus|edamame|nuts|seeds|peanut|almond|cashew|walnut|pecan|pistachio|hazelnut|macadamia|pine nut|sunflower|pumpkin|sesame|chia|flax|hemp|quinoa|oats|barley|bulgur|farro|millet|rice|couscous|polenta|grits|pasta|noodle|spaghetti|macaroni|lasagna|ravioli|tortellini|gnocchi|dumpling|wonton|spring roll|egg roll|samosa|empanada|taco|burrito|quesadilla|enchilada|nachos|fajitas|tostada|tamale|pupusa|arepa|tortilla|pita|naan|roti|chapati|paratha|dosa|idli|bagel|croissant|biscuit|scone|muffin|bread|toast|pancake|waffle|crepe|french toast|cereal|atmeal|porridge|yogurt|granola|cheese|milk|cream|butter|ice cream|gelato|sorbet|sherbet|custard|pudding|mousse|cake|pie|tart|cookie|brownie|blondie|cupcake|donut|doughnut|pastry|danish|baklava|tiramisu|cheesecake|fudge|truffle|candy|chocolate|caramel|toffee|marshmallow|meringue|macaron|souffle|parfait|trifle|cobbler|crisp|crumble|buckle|betty|pandowdy|slump|grunt|smoothie|shake|juice|tea|coffee|latte|cappuccino|mocha|cocoa|cider|lemonade|limeade|punch|cocktail|mocktail|beer|wine|sake|soju|spirit|liquor|liqueur|syrup|honey|jam|jelly|preserves|marmalade|chutney|relish|salsa|guacamole|pesto|hummus|tapenade|dip|sauce|dressing|gravy|marinade|rub|spice|herb|salt|pepper|vinegar|oil|broth|stock|soup|stew|chili|curry|chowder|bisque|gumbo|jambalaya|etouffee|bouillabaisse|cioppino|gazpacho|vichyssoise|borscht|miso|ramen|pho|udon|soba|laksa|pad thai|lo mein|chow mein|fried rice|risotto|paella|pilaf|biryani|jollof|stuffing|casserole|gratin|bake|roast|fry|grill|saute|stir-fry|scramble|poach|steam|boil|braise|stew|smoke|cure|pickle|ferment|salad|slaw|vegetable|fruit|berry|melon|citrus|apple|pear|peach|plum|apricot|cherry|grape|banana|plantain|pineapple|mango|papaya|kiwi|fig|date|raisin|cranberry|blueberry|raspberry|blackberry|strawberry|coconut|avocado|tomato|cucumber|pepper|chili|jalapeno|habanero|chipotle|paprika|cayenne|cumin|coriander|turmeric|ginger|garlic|onion|shallot|leek|scallion|chive|celery|carrot|parsnip|beet|radish|turnip|rutabaga|potato|yam|sweet potato|squash|zucchini|pumpkin|eggplant|okra|corn|peas|green bean|asparagus|broccoli|cauliflower|cabbage|kale|spinach|lettuce|arugula|chard|collard|mustard|cress|endive|radicchio|fennel|artichoke|mushroom|truffle|olive|caper|seaweed|nori|wakame|kombu|dulse|kelp|algae|spirulina|wheat|rye|barley|oat|corn|rice|millet|sorghum|teff|amaranth|buckwheat|quinoa|flour|meal|starch|gluten|yeast|baking powder|soda|sugar|sweetener|honey|syrup|molasses|agave|stevia|monk fruit|erythritol|xylitol|sorbitol|mannitol|isomalt|lactitol|maltitol|recipe|dish|meal|cooking|food|kitchen|chef|restaurant|kitchen|cook|bake|prepare|serve|garnish|flavor|ingredient|cuisine|style|method|technique|preparation|adobo|sinigang|kare-kare|tinola|nilaga|paksiw|pinakbet|chopsuey|sisig|lechon|lumpia|pancit|palabok|menudo|afritada|caldereta|mechado|bistek|picadillo|arroz caldo|goto|lugaw|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana cue|ginataang|laing|pinangat|bicol express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua'
     + ')\\b',
     'i'
   );
@@ -583,16 +583,6 @@ function isValidRecipe(text) {
   const hasFoodKeyword = foodKeywords.test(lowerText);
   
   if (!hasFoodKeyword) {
-    // Check for common recipe formats like "Title with Subtitle" or "Style Dish"
-    // Only accept if it looks VERY much like a recipe title (Capitalized Words, 3-6 words long)
-    const isTitleCase = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(cleanText);
-    const wordCount = cleanText.split(' ').length;
-    
-    if (isTitleCase && wordCount >= 2 && wordCount <= 6) {
-       console.log(`⚠️ [VALIDATION] Allowed due to Title Case (No Keyword): "${cleanText}"`);
-       return true;
-    }
-    
     console.log(`❌ [VALIDATION] Rejected (No Food Keyword): "${cleanText}"`);
     return false;
   }
@@ -769,7 +759,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isDeveloperResponse: true,
-          redirectToCooking: false
+          redirectToCooking: false,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }
@@ -784,7 +775,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isIdentityResponse: true,
-          redirectToCooking: false
+          redirectToCooking: false,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }
@@ -799,7 +791,8 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
           timestamp: new Date().toISOString(),
           userId: req.userId,
           isOffTopic: true,
-          redirectToCooking: true
+          redirectToCooking: true,
+          detectedRecipes: [] // Explicitly empty to prevent client-side detection
         }
       });
     }
@@ -812,12 +805,18 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     try {
       const fullResponse = await callGroqAI(message, history);
       
-      // 1. EXTRACT FIRST (Before cleaning)
+      // 1. EXTRACT FIRST (Before cleaning) - WITH VALIDATION
       const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
       if (jsonMatch && jsonMatch[1]) {
         try {
           const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed.recipes) detectedRecipes = parsed.recipes.map(r => r.title || r.name);
+          if (parsed.recipes) {
+            // VALIDATE each recipe title before adding to detectedRecipes
+            const validRecipeTitles = parsed.recipes
+              .map(r => r.title || r.name)
+              .filter(title => title && isValidRecipe(title));
+            detectedRecipes = validRecipeTitles;
+          }
         } catch (e) { console.error('JSON Parse Error', e); }
       }
 
