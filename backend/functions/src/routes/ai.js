@@ -684,6 +684,9 @@ That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinega
     }
   ]
 }
+
+**NON-FOOD QUERIES:**
+If the user asks for something that is NOT a food item (e.g., "Swimming Pool", "Cement", "Chair"), you MUST return an empty recipes array in the JSON: { "recipes": [] }. Do NOT invent recipes for non-food items.
 \`\`\``
   };
   
@@ -806,6 +809,7 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       const fullResponse = await callGroqAI(message, history);
       
       // 1. EXTRACT FIRST (Before cleaning) - WITH VALIDATION
+      let jsonExtractionSuccess = false;
       const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
       if (jsonMatch && jsonMatch[1]) {
         try {
@@ -816,16 +820,21 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
               .map(r => r.title || r.name)
               .filter(title => title && isValidRecipe(title));
             detectedRecipes = validRecipeTitles;
+            jsonExtractionSuccess = true; // Mark that we got valid JSON (even if empty)
           }
-        } catch (e) { console.error('JSON Parse Error', e); }
+        } catch (e) {
+          console.error('JSON Parse Error', e);
+          jsonExtractionSuccess = false;
+        }
       }
 
       // 2. CLEANUP SECOND
       aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
       if (!aiReply) aiReply = "I found some recipes! Check below.";
 
-      // 3. Fallback Detection (if JSON failed)
-      if (detectedRecipes.length === 0) {
+      // 3. Fallback Detection (ONLY if JSON extraction failed completely)
+      // CRITICAL FIX: If we got valid JSON (even if empty), STOP here - don't run dangerous fallback
+      if (!jsonExtractionSuccess) {
         detectedRecipes = extractRecipesFromResponse(fullResponse);
       }
 

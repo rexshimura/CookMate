@@ -404,7 +404,7 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="text-sm font-bold min-w-[3rem] text-center">
-                  {(multiplier * parseFloat(recipeData.servings) || 2).toFixed(1)} Servings
+                  {Math.round(multiplier * parseFloat(recipeData.servings) || 2)} Servings
                 </span>
                 <button
                   onClick={() => setMultiplier(multiplier + 0.25)}

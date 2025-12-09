@@ -31,78 +31,6 @@ const parseMarkdownText = (text) => {
   });
 };
 
-// NEW: Improved client-side recipe detection
-const detectRecipesFromText = (text) => {
-  if (!text || typeof text !== 'string') return [];
-
-  // 1) Extract bolded phrases (common pattern used by AI responses)
-  const boldRegex = /\*\*([^*]{2,120}?)\*\*/g;
-  const candidates = [];
-  let match;
-  while ((match = boldRegex.exec(text)) !== null) {
-    const raw = match[1].trim();
-    if (raw) candidates.push(raw);
-  }
-
-  // 2) fallback: sometimes responses use lines/headers like "1. Italian" or "- Italian"
-  if (candidates.length === 0) {
-    const lineRegex = /^(?:[-\d.]+\s*)?([A-Z][A-Za-z &/+-]{2,80})$/gm;
-    while ((match = lineRegex.exec(text)) !== null) {
-      const raw = match[1].trim();
-      if (raw) candidates.push(raw);
-    }
-  }
-
-  if (candidates.length === 0) return [];
-
-  // 3) validation heuristics: presence of food/cuisine keywords or typical dish words
-  const foodKeywords = [
-    'chicken','beef','pork','pasta','pizza','taco','rice','curry','dessert','cake','pie','salad',
-    'soup','bolognese','spaghetti','pancake','grill','bbq','vegan','vegetarian','seafood','fish',
-    'shrimp','noodle','ramen','sushi','biryani','burger','sandwich','omelette','stew','chili',
-    'risotto','paella','lasagna','italian','mexican','indian','thai','japanese','chinese','korean',
-    'mediterranean','bbq','grilling','desserts','dessert','breakfast','dinner','brunch'
-  ];
-
-  const isLikelyRecipe = (candidate) => {
-    if (!candidate) return false;
-    const c = candidate.toLowerCase();
-
-    // Reject overly long headings
-    if (candidate.length > 80) return false;
-
-    // Accept if contains any strong food/cuisine keyword
-    for (const kw of foodKeywords) {
-      if (c.includes(kw)) return true;
-    }
-
-    // Accept if it's reasonably short and looks like a dish/cuisine (2-4 words, not generic UI text)
-    const words = c.split(/\s+/).filter(Boolean);
-    if (words.length <= 4 && words.length >= 1 && /[a-z]/.test(c)) {
-      // heuristics to avoid generic labels
-      const genericReject = ['choose','options','ingredients','step','instructions','please','choose a','here are'];
-      if (!genericReject.some(g => c.includes(g))) return true;
-    }
-
-    return false;
-  };
-
-  // 4) filter & dedupe while preserving order
-  const seen = new Set();
-  const results = [];
-  for (const raw of candidates) {
-    const normalized = raw.replace(/\s+/g, ' ').trim();
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    if (isLikelyRecipe(normalized)) {
-      seen.add(key);
-      results.push(normalized);
-    }
-  }
-
-  return results;
-};
-
 export default function Home({ favoritesHook, collectionsHook }) {
   const { user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -859,10 +787,11 @@ export default function Home({ favoritesHook, collectionsHook }) {
               </div>
             ) : (
               messages.map((message) => {
-                // Use server-provided detectedRecipes if available; otherwise run client detection
-                const detected = (!message.isUser && Array.isArray(message.detectedRecipes) && message.detectedRecipes.length > 0)
+                // FIX: Trust the backend's detection. Do not use client-side fallback (detectRecipesFromText)
+                // because it causes false positives for names/identities.
+                const detected = (!message.isUser && Array.isArray(message.detectedRecipes))
                   ? message.detectedRecipes
-                  : (!message.isUser ? detectRecipesFromText(message.text) : []);
+                  : [];
 
                 return (
                 <div key={message.id} className={`flex gap-4 ${message.isUser ? 'flex-row-reverse' : ''} animate-slideUp`}>
