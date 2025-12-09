@@ -542,103 +542,63 @@ function extractRecipesFromResponse(response) {
 
 // Improved recipe validation function with better international support and less aggressive filtering
 function isValidRecipe(text) {
-  if (!text || text.length === 0) {
-    return false;
-  }
-  const lower = text.toLowerCase().trim();
+  if (!text || typeof text !== 'string' || text.length < 3) return false;
   
-  // 1. REJECT INSTRUCTIONS: If it starts with a verb, it's not a title.
-  // e.g. "Crack the egg", "Pour the milk", "Heat the pan"
-  const cookingVerbs = /^(crack|pour|mix|stir|heat|add|place|put|whisk|boil|fry|bake|roast|slice|chop|mince|peel|cut|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|microwave|freeze|chill|refrigerate|wash|clean|dry|pat|season|taste|adjust)/i;
+  const cleanText = text.trim();
+  const lowerText = cleanText.toLowerCase();
   
-  if (cookingVerbs.test(text)) {
-    console.log(`Rejecting instruction-like title: "${text}"`);
+  // 1. BLOCKLIST: Immediate rejection for known non-recipe phrases
+  const blockTerms = [
+    'instruction', 'direction', 'ingredient', 'step', 'method', 'tip', 'note',
+    'click', 'view', 'read', 'here', 'link', 'website', 'youtube', 'video',
+    'cook time', 'prep time', 'servings', 'calories', 'total time',
+    'welcome', 'hello', 'hi', 'thank', 'sorry', 'goodbye',
+    'crack', 'pour', 'mix', 'stir', 'heat', 'add', 'place', 'put', 'boil' // Verbs
+  ];
+  
+  if (blockTerms.some(term => lowerText.startsWith(term) || lowerText === term)) {
+    console.log(`❌ [VALIDATION] Rejected blocked term: "${cleanText}"`);
     return false;
   }
 
-  // 2. REJECT LONG SENTENCES: Titles are rarely longer than 10 words
-  if (text.split(' ').length > 10) return false;
+  // 2. COOKING VERB CHECK: If it starts with a verb, it's an instruction, not a title
+  // e.g. "Bake for 20 mins" -> REJECT
+  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust)/i;
   
-  const lowerText = text.toLowerCase().trim();
-  
-  // Basic length check - more lenient
-  if (text.length < 3 || text.length > 80) {
+  if (cookingVerbs.test(cleanText)) {
+    console.log(`❌ [VALIDATION] Rejected instruction starting with verb: "${cleanText}"`);
     return false;
   }
-  
-  // Must start with capital letter or number
-  if (!/^[A-Z0-9]/.test(text.trim())) {
-    return false;
-  }
-  
-  // SPECIFIC EXCLUSIONS for clear non-recipe terms
-  const excludeTerms = [
-    // Only exclude clear section headers and instruction phrases
-    'ingredients:', 'instructions:', 'directions:', 'method:', 'nutrition:', 'safety:',
-    'step ', 'steps ', 'cooking time', 'prep time', 'servings:', 'difficulty:',
-    'temperature', 'degrees', 'minutes', 'hours', 'cup ', 'cups ', 'tablespoon', 'teaspoon',
-    'ounce', 'pound',
-    // Only exclude complete instructional phrases
-    'preheat the oven to', 'heat the oil in', 'cook until tender', 'bake until golden',
-    'fry until crispy', 'serve hot immediately', 'serve warm with', 'season with salt',
-    'brush both sides', 'transfer to plate', 'combine all ingredients'
-  ];
-  
-  // Check for excluded terms (more precise matching)
-  if (excludeTerms.some(term => lowerText === term || lowerText.includes(term))) {
-    return false;
-  }
-  
-  // Expanded food keywords with international dishes
-  const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta|korean|chinese|italian|mexican|indian|thai|french|mediterranean)\b/i;
-  
-  const foodKeywordMatch = foodKeywords.test(lowerText);
-  
-  // If food keywords found, it's likely a valid recipe
-  if (foodKeywordMatch) {
-    return true;
-  }
-  
-  // More comprehensive instruction pattern detection to reject cooking instructions
-  const instructionPatterns = [
-    // Clear cooking instruction starters
-    /^(cook|bake|fry|mix|stir|add|heat|preheat|drain|rinse|pat|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage|place|put|transfer|pour|combine|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|place|put)\b/i,
-    // Instructions with "in a", "on a", "over" etc.
-    /^(in|on|over|under|at|to|for|with)\s+(a|an|the)\s+(skillet|pan|pot|oven|grill|bowl|plate|container)/i,
-    // Instructions with time indicators
-    /\b(minutes?|hours?|seconds?|until|for)\b/i,
-    // Instructions with cooking methods
-    /\b(according to package instructions|until al dente|until tender|until golden|until cooked|until done)\b/i,
-    // Instructions starting with "let", "allow", "keep"
-    /^(let|allow|keep)\s+(it|them|the)\s+(marinate|rest|cool|warm)/i
-  ];
-  
-  // Check if text matches cooking instruction patterns
-  if (instructionPatterns.some(pattern => pattern.test(text))) {
-    return false;
-  }
-  
-  // If no food keywords, check if it looks like a legitimate dish name
-  const looksLikeDishName = (
-    // Proper capitalization pattern (not starting with lowercase)
-    /^[A-Z]/.test(text) &&
-    // Not too many words (likely not a full instruction)
-    text.split(/\s+/).length <= 6 &&
-    // Doesn't start with common instruction words
-    !/^(cook|bake|fry|mix|stir|add|heat|preheat|drain|rinse|pat|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage|place|put|transfer|pour|combine|let|allow|keep|in|on|over|under|at|to|for|with)\b/i.test(text) &&
-    // Doesn't end with clear instruction indicators
-    !/(ly|ing|ed)$/.test(lowerText.split(' ').pop()) &&
-    // No excessive punctuation that suggests it's an instruction
-    (text.match(/[,]/g) || []).length <= 2 &&
-    // Doesn't contain typical instruction phrases
-    !/\b(according to|until|for\s+\d+|minutes?|hours?|in\s+a\s+skillet|in\s+a\s+pan|on\s+medium\s+heat|over\s+medium\s+heat)\b/i.test(lowerText)
+
+  // 3. ALLOWLIST: It MUST contain at least one food-related keyword
+  // This is the "Strict" part. If it doesn't mention food, it's not a recipe card.
+  const foodKeywords = new RegExp(
+    '\\b(' +
+    // Proteins
+    'chicken|beef|pork|lamb|steak|turkey|duck|fish|salmon|tuna|cod|shrimp|prawn|crab|lobster|tofu|tempeh|egg|eggs|bacon|sausage|ham|meatball|burger|wings|thighs|breast|ribs|roast|calamari|scallops|mussels|clams|oyster|sardines|anchovies|pepperoni|salami|chorizo|prosciutto|pancetta|spam|hotdog|corned beef|brisket|pulled pork|carnitas|carne asada|barbacoa|gyro|kebab|shawarma|falafel|seitan|lentils|beans|chickpeas|hummus|edamame|nuts|seeds|peanut|almond|cashew|walnut|pecan|pistachio|hazelnut|macadamia|pine nut|sunflower|pumpkin|sesame|chia|flax|hemp|quinoa|oats|barley|bulgur|farro|millet|rice|couscous|polenta|grits|pasta|noodle|spaghetti|macaroni|lasagna|ravioli|tortellini|gnocchi|dumpling|wonton|spring roll|egg roll|samosa|empanada|taco|burrito|quesadilla|enchilada|nachos|fajitas|tostada|tamale|pupusa|arepa|tortilla|pita|naan|roti|chapati|paratha|dosa|idli|bagel|croissant|biscuit|scone|muffin|bread|toast|pancake|waffle|crepe|french toast|cereal|atmeal|porridge|yogurtgranola|o|cheese|milk|cream|butter|ice cream|gelato|sorbet|sherbet|custard|pudding|mousse|cake|pie|tart|cookie|brownie|blondie|cupcake|donut|doughnut|pastry|danish|baklava|tiramisu|cheesecake|fudge|truffle|candy|chocolate|caramel|toffee|marshmallow|meringue|macaron|souffle|parfait|trifle|cobbler|crisp|crumble|buckle|betty|pandowdy|slump|grunt|smoothie|shake|juice|tea|coffee|latte|cappuccino|mocha|cocoa|cider|lemonade|limeade|punch|cocktail|mocktail|beer|wine|sake|soju|spirit|liquor|liqueur|syrup|honey|jam|jelly|preserves|marmalade|chutney|relish|salsa|guacamole|pesto|hummus|tapenade|dip|sauce|dressing|gravy|marinade|rub|spice|herb|salt|pepper|vinegar|oil|broth|stock|soup|stew|chili|curry|chowder|bisque|gumbo|jambalaya|etouffee|bouillabaisse|cioppino|gazpacho|vichyssoise|borscht|miso|ramen|pho|udon|soba|laksa|pad thai|lo mein|chow mein|fried rice|risotto|paella|pilaf|biryani|jollof|stuffing|casserole|gratin|bake|roast|fry|grill|saute|stir-fry|scramble|poach|steam|boil|braise|stew|smoke|cure|pickle|ferment|salad|slaw|vegetable|fruit|berry|melon|citrus|apple|pear|peach|plum|apricot|cherry|grape|banana|plantain|pineapple|mango|papaya|kiwi|fig|date|raisin|cranberry|blueberry|raspberry|blackberry|strawberry|coconut|avocado|tomato|cucumber|pepper|chili|jalapeno|habanero|chipotle|paprika|cayenne|cumin|coriander|turmeric|ginger|garlic|onion|shallot|leek|scallion|chive|celery|carrot|parsnip|beet|radish|turnip|rutabaga|potato|yam|sweet potato|squash|zucchini|pumpkin|eggplant|okra|corn|peas|green bean|asparagus|broccoli|cauliflower|cabbage|kale|spinach|lettuce|arugula|chard|collard|mustard|cress|endive|radicchio|fennel|artichoke|mushroom|truffle|olive|caper|seaweed|nori|wakame|kombu|dulse|kelp|algae|spirulina|wheat|rye|barley|oat|corn|rice|millet|sorghum|teff|amaranth|buckwheat|quinoa|flour|meal|starch|gluten|yeast|baking|powder|soda|sugar|sweetener|honey|syrup|molasses|agave|stevia|monk fruit|erythritol|xylitol|sorbitol|mannitol|isomalt|lactitol|maltitol|recipe|dish|meal|adobo|sinigang|kare-kare|tinola|nilaga|paksiw|pinakbet|chopsuey|sisig|lechon|lumpia|pancit|palabok|menudo|afritada|caldereta|mechado|bistek|picadillo|arroz caldo|goto|lugaw|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana cue|ginataang|laing|pinangat|bicol express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua'
+    + ')\\b',
+    'i'
   );
+
+  const hasFoodKeyword = foodKeywords.test(lowerText);
   
-  if (looksLikeDishName) {
-    return true;
+  if (!hasFoodKeyword) {
+    // Check for common recipe formats like "Title with Subtitle" or "Style Dish"
+    // Only accept if it looks VERY much like a recipe title (Capitalized Words, 3-6 words long)
+    const isTitleCase = /^[A-Z][a-z]+(\s[A-Z][a-z]+)*$/.test(cleanText);
+    const wordCount = cleanText.split(' ').length;
+    
+    if (isTitleCase && wordCount >= 2 && wordCount <= 6) {
+       console.log(`⚠️ [VALIDATION] Allowed due to Title Case (No Keyword): "${cleanText}"`);
+       return true;
+    }
+    
+    console.log(`❌ [VALIDATION] Rejected (No Food Keyword): "${cleanText}"`);
+    return false;
   }
-  
-  return false;
+
+  console.log(`✅ [VALIDATION] Accepted: "${cleanText}"`);
+  return true;
 }
 
 // Test function to validate "Korean-Style BBQ Beef Tacos"

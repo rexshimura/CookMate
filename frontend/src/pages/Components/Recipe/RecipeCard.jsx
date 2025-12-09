@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
-import { ChefHat, Clock, Users, Heart, Folder, Plus, CheckCircle } from 'lucide-react';
+import { ChefHat, Heart, Folder, Plus, CheckCircle } from 'lucide-react';
 import { generateRecipeId } from '../../../utils/ids.js';
 import { useModal } from '../../../App.jsx';
 
-const RecipeCard = ({ 
-  recipe, 
-  onClick, 
-  isLoading, 
+const RecipeCard = ({
+  recipe,
+  onClick,
+  isLoading,
   isFavorited = false,
   onAddToFavorites,
   onRemoveFromFavorites,
@@ -39,7 +39,7 @@ const RecipeCard = ({
   };
 
   // Check if recipe is saved in ANY collection (for the folder icon glow)
-  const isSavedInCollection = collectionsHook?.collections?.some(col => 
+  const isSavedInCollection = collectionsHook?.collections?.some(col =>
     col.recipes?.some(r => r.id === generateRecipeId(recipe))
   );
 
@@ -124,21 +124,6 @@ const RecipeCard = ({
     return recipe?.description || 'A delicious recipe to try';
   };
 
-  const getCookingTime = () => {
-    if (typeof recipe === 'string') return 'Varies';
-    return recipe?.cookingTime || recipe?.prepTime || '30 mins';
-  };
-
-  const getServings = () => {
-    if (typeof recipe === 'string') return '4';
-    return recipe?.servings || '4';
-  };
-
-  const getDifficulty = () => {
-    if (typeof recipe === 'string') return 'Medium';
-    return recipe?.difficulty || 'Medium';
-  };
-
   return (
     <>
       <div
@@ -170,21 +155,6 @@ const RecipeCard = ({
                 {getRecipeDescription()}
               </p>
             )}
-
-            <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-stone-600 mt-1.5 font-medium flex-wrap">
-              <div className="flex items-center gap-1 whitespace-nowrap">
-                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-500" />
-                <span className="tracking-wide">{getCookingTime()}</span>
-              </div>
-              <div className="flex items-center gap-1 whitespace-nowrap">
-                <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-500" />
-                <span className="tracking-wide">{getServings()} servings</span>
-              </div>
-              <div className="flex items-center gap-1 whitespace-nowrap">
-                <ChefHat className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-500" />
-                <span className="tracking-wide">{getDifficulty()}</span>
-              </div>
-            </div>
           </div>
 
           {/* Action Buttons - Adjusted opacity and spacing for mobile */}
@@ -199,7 +169,7 @@ const RecipeCard = ({
               disabled={favoritesHook?.loading}
               className={`p-2 rounded-full transition-all hover:scale-110 ${
                 ((isFavorite && isFavorite(recipe)) || isFavorited)
-                  ? 'text-pink-600 bg-pink-50 hover:bg-pink-100' 
+                  ? 'text-pink-600 bg-pink-50 hover:bg-pink-100'
                   : 'text-stone-400 hover:text-pink-600 hover:bg-pink-50'
               } ${favoritesHook?.loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               title={((isFavorite && isFavorite(recipe)) || isFavorited) ? 'Remove from favorites' : 'Add to favorites'}
@@ -212,14 +182,14 @@ const RecipeCard = ({
               onClick={(e) => {
                 e.stopPropagation();
                 // Open the new Unified Modal, defaulting to the 'collections' tab
-                showFavoritesCollectionsModal({ 
-                  recipe, 
-                  initialTab: 'collections' 
+                showFavoritesCollectionsModal({
+                  recipe,
+                  initialTab: 'collections'
                 });
               }}
               className={`p-2 rounded-full transition-all hover:scale-110 ${
                 isSavedInCollection
-                  ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' 
+                  ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
                   : 'text-stone-400 hover:text-orange-600 hover:bg-orange-50'
               }`}
               title="Save to Collection"
