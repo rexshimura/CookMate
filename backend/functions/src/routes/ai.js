@@ -1085,9 +1085,12 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     let detectedRecipes = [];
     let jsonExtractionSuccess = false;
     let jsonStringToClean = null;
+    let fullResponse;
 
     try {
-      const fullResponse = await callGroqAI(message, history);
+      console.log('🔄 Calling Groq AI for chat response...');
+      fullResponse = await callGroqAI(message, history);
+      console.log('✅ AI response received successfully');
 
       // STRATEGY 1: Look for Markdown Code Blocks (Standard)
       const markdownMatch = fullResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -1181,17 +1184,18 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
          await Promise.allSettled(detectedRecipes.map(r => storeDetectedRecipe(r, req.userId)));
       }
     } catch (aiError) {
-      console.error('AI service failed, using fallback response:', aiError.message);
-      
+      console.error('❌ AI service failed, using fallback response:', aiError.message);
+      console.log('⚠️ fullResponse status:', fullResponse ? 'defined' : 'undefined');
+
       // Create a helpful fallback response based on the message content
       const ingredientList = extractIngredients(message);
-      
+
       if (ingredientList.length > 0) {
         aiReply = `I'm having trouble connecting to my AI brain right now, but I can still help you cook! 🌟
 
 Based on what you mentioned (${ingredientList.join(', ')}), here are some cooking ideas:
 • Try combining your ingredients in a simple stir-fry
-• Make a hearty soup or stew 
+• Make a hearty soup or stew
 • Create a fresh salad with protein
 • Grill or roast for flavorful results
 
@@ -1202,7 +1206,7 @@ Based on what you mentioned (${ingredientList.join(', ')}), here are some cookin
 
 I'm experiencing technical difficulties at the moment, but I'll be back to full strength soon! In the meantime, feel free to ask me about cooking techniques, food safety, or ingredient substitutions.`;
       } else {
-        aiReply = `I'm having trouble connecting to my brain right now. 🌟 
+        aiReply = `I'm having trouble connecting to my brain right now. 🌟
 
 But I'm still here to help! Try asking me about:
 • What ingredients you have available
@@ -1219,7 +1223,14 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
     if (detectedRecipes.length === 0) {
       // Use the original fullResponse for fallback to ensure we don't miss any recipes
       // that might have been removed during cleanup
-      detectedRecipes = extractRecipesFromResponse(fullResponse);
+      if (fullResponse) {
+        console.log('🔍 Extracting recipes from fullResponse fallback');
+        detectedRecipes = extractRecipesFromResponse(fullResponse);
+      } else {
+        console.log('⚠️ No fullResponse available, skipping recipe extraction');
+        // If we don't have fullResponse (AI call failed), try to extract from the message itself
+        detectedRecipes = extractRecipesFromResponse(message);
+      }
     }
        
       // 5. Send Response (Ensuring detectedRecipes is included!)
