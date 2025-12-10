@@ -422,7 +422,7 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
                   href={recipeData.youtubeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                  className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white shadow-sm flex items-center justify-center"
                   title="Watch on YouTube"
                 >
                   <Youtube className="w-4 h-4" />
