@@ -222,30 +222,189 @@ const verifyAuthToken = async (req, res, next) => {
   }
 };
 
-// Smart ingredient extraction (keeping this useful feature)
+// Enhanced ingredient extraction with comprehensive ingredient database
 function extractIngredients(message) {
-  const ingredientPatterns = [
-    /\b(chicken|beef|pork|lamb|turkey|fish|salmon|shrimp|tuna|tofu|eggs?)\b/gi,
-    /\b(rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa)\b/gi,
-    /\b(potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber)\b/gi,
-    /\b(mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn)\b/gi,
-    /\b(cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream)\b/gi,
-    /\b(oil|olive oil|vegetable oil|canola oil|sesame oil)\b/gi,
-    /\b(salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil)\b/gi,
-    /\b(sugar|honey|maple syrup|brown sugar)\b/gi,
-    /\b(lemon|lime|orange|apple|banana|berries|grapes)\b/gi,
-    /\b(vanilla|almond|coconut|chocolate|cocoa)\b/gi
+  // Comprehensive ingredient database organized by categories
+  const ingredientDatabase = [
+    // Proteins
+    'chicken', 'beef', 'pork', 'lamb', 'turkey', 'duck', 'goose', 'venison', 'bison',
+    'fish', 'salmon', 'tuna', 'cod', 'haddock', 'halibut', 'mackerel', 'sardines', 'anchovies',
+    'shrimp', 'prawns', 'lobster', 'crab', 'scallops', 'mussels', 'clams', 'oysters', 'squid',
+    'tofu', 'tempeh', 'seitan', 'eggs', 'egg whites', 'egg yolks',
+
+    // Grains and starches
+    'rice', 'brown rice', 'white rice', 'jasmine rice', 'basmati rice', 'wild rice', 'arborio rice',
+    'pasta', 'spaghetti', 'fettuccine', 'penne', 'macaroni', 'lasagna', 'noodles', 'ramen',
+    'udon', 'soba', 'bread', 'whole wheat bread', 'sourdough', 'baguette', 'ciabatta',
+    'flour', 'all-purpose flour', 'whole wheat flour', 'bread flour', 'cake flour', 'oats',
+    'quinoa', 'couscous', 'bulgur', 'barley', 'farro', 'millet', 'polenta', 'cornmeal',
+
+    // Vegetables
+    'potato', 'sweet potato', 'yams', 'onion', 'red onion', 'green onion', 'shallots',
+    'garlic', 'ginger', 'leek', 'celery', 'carrot', 'carrots', 'parsnip', 'turnip', 'rutabaga',
+    'tomato', 'cherry tomato', 'grape tomato', 'roma tomato', 'heirloom tomato',
+    'bell pepper', 'red bell pepper', 'green bell pepper', 'yellow bell pepper', 'jalapeno',
+    'habanero', 'serrano', 'cayenne', 'chili pepper', 'lettuce', 'romaine', 'iceberg',
+    'spinach', 'kale', 'arugula', 'swiss chard', 'collard greens', 'cabbage', 'napa cabbage',
+    'bok choy', 'broccoli', 'cauliflower', 'brussels sprouts', 'asparagus', 'artichoke',
+    'zucchini', 'yellow squash', 'butternut squash', 'acorn squash', 'pumpkin', 'cucumber',
+    'eggplant', 'mushroom', 'mushrooms', 'portobello', 'shiitake', 'cremini', 'oyster mushroom', 'chanterelle',
+    'green beans', 'snap peas', 'snow peas', 'sugar snap peas', 'peas', 'corn', 'edamame',
+
+    // Fruits
+    'apple', 'banana', 'orange', 'lemon', 'lime', 'grapefruit', 'tangerine', 'clementine',
+    'pear', 'peach', 'nectarine', 'plum', 'apricot', 'cherry', 'strawberry', 'blueberry',
+    'raspberry', 'blackberry', 'boysenberry', 'cranberry', 'grape', 'pineapple', 'mango',
+    'papaya', 'guava', 'kiwi', 'pomegranate', 'fig', 'date', 'avocado', 'coconut', 'plantain',
+
+    // Dairy and alternatives
+    'milk', 'whole milk', 'skim milk', '2% milk', 'cream', 'heavy cream', 'whipping cream',
+    'half-and-half', 'butter', 'unsalted butter', 'salted butter', 'ghee', 'cheese', 'cheddar',
+    'mozzarella', 'parmesan', 'feta', 'goat cheese', 'blue cheese', 'gouda', 'swiss cheese',
+    'provolone', 'ricotta', 'cottage cheese', 'cream cheese', 'yogurt', 'greek yogurt',
+    'sour cream', 'buttermilk', 'condensed milk', 'evaporated milk', 'coconut milk',
+
+    // Oils and fats
+    'oil', 'olive oil', 'extra virgin olive oil', 'vegetable oil', 'canola oil', 'sunflower oil',
+    'sesame oil', 'peanut oil', 'avocado oil', 'coconut oil', 'grapeseed oil', 'lard', 'shortening',
+
+    // Herbs and spices
+    'salt', 'sea salt', 'kosher salt', 'pepper', 'black pepper', 'white pepper', 'cayenne pepper',
+    'paprika', 'smoked paprika', 'chili powder', 'cumin', 'coriander', 'turmeric', 'curry powder',
+    'garlic powder', 'onion powder', 'ginger powder', 'cinnamon', 'nutmeg', 'cloves', 'allspice',
+    'cardamom', 'vanilla', 'vanilla extract', 'almond extract', 'peppermint extract', 'oregano',
+    'thyme', 'rosemary', 'sage', 'basil', 'parsley', 'cilantro', 'dill', 'mint', 'tarragon',
+    'bay leaf', 'marjoram', 'saffron', 'star anise', 'fennel seeds', 'mustard seeds',
+
+    // Sweeteners
+    'sugar', 'white sugar', 'brown sugar', 'powdered sugar', 'confectioners sugar', 'raw sugar',
+    'honey', 'maple syrup', 'agave nectar', 'corn syrup', 'molasses', 'stevia', 'artificial sweetener',
+
+    // Baking ingredients
+    'baking powder', 'baking soda', 'yeast', 'active dry yeast', 'instant yeast', 'cornstarch',
+    'starch', 'flour', 'cocoa powder', 'unsweetened cocoa', 'chocolate', 'dark chocolate', 'milk chocolate',
+    'white chocolate', 'chocolate chips', 'butterscotch chips', 'peanut butter chips',
+
+    // Nuts and seeds
+    'almonds', 'cashews', 'peanuts', 'walnuts', 'pecans', 'hazelnuts', 'pistachios', 'macadamia nuts',
+    'pine nuts', 'sunflower seeds', 'pumpkin seeds', 'chia seeds', 'flax seeds', 'sesame seeds',
+
+    // Canned and preserved goods
+    'tomato sauce', 'tomato paste', 'tomato puree', 'diced tomatoes', 'crushed tomatoes',
+    'coconut milk', 'evaporated milk', 'condensed milk', 'broth', 'chicken broth', 'beef broth',
+    'vegetable broth', 'stock', 'chicken stock', 'beef stock', 'vegetable stock', 'olives',
+    'pickles', 'capers', 'artichoke hearts', 'roasted red peppers', 'salsa', 'pesto',
+
+    // Condiments and sauces
+    'soy sauce', 'teriyaki sauce', 'hoisin sauce', 'oyster sauce', 'fish sauce', 'worcestershire sauce',
+    'hot sauce', 'sriracha', 'tabasco', 'bbq sauce', 'ketchup', 'mustard', 'dijon mustard',
+    'mayonnaise', 'salad dressing', 'ranch dressing', 'italian dressing', 'balsamic vinegar',
+    'apple cider vinegar', 'white vinegar', 'red wine vinegar', 'rice vinegar',
+
+    // International ingredients
+    'miso paste', 'tofu', 'tempeh', 'nori', 'seaweed', 'wasabi', 'sake', 'mirin', 'rice wine vinegar',
+    'gochujang', 'kimchi', 'sriracha', 'curry paste', 'coconut cream', 'paneer', 'ghee', 'tahini',
+    'hummus', 'falafel', 'pita bread', 'naan', 'tortillas', 'corn tortillas', 'flour tortillas',
+
+    // Beverages
+    'coffee', 'tea', 'green tea', 'black tea', 'herbal tea', 'juice', 'orange juice', 'apple juice',
+    'cranberry juice', 'lemon juice', 'lime juice', 'wine', 'red wine', 'white wine', 'beer',
+    'champagne', 'soda', 'sparkling water', 'club soda', 'tonic water'
   ];
-  
+
+  // Convert to regex pattern for efficient matching
+  const ingredientPattern = new RegExp(`\\b(${ingredientDatabase.join('|')})\\b`, 'gi');
+
+  // Extract all matches
+  const matches = message.match(ingredientPattern);
+
+  // Also handle multi-word ingredients and ingredient phrases
+  const multiWordIngredients = [
+    'bell pepper', 'green onion', 'red onion', 'yellow onion', 'white onion',
+    'garlic powder', 'onion powder', 'chili powder', 'baking powder', 'baking soda',
+    'olive oil', 'vegetable oil', 'canola oil', 'coconut oil', 'extra virgin olive oil',
+    'whole wheat flour', 'all-purpose flour', 'brown sugar', 'powdered sugar',
+    'chocolate chips', 'peanut butter', 'cream cheese', 'greek yogurt',
+    'chicken broth', 'beef broth', 'vegetable broth', 'chicken stock',
+    'beef stock', 'vegetable stock', 'apple cider vinegar', 'rice wine vinegar',
+    'red wine vinegar', 'white wine vinegar', 'balsamic vinegar', 'soy sauce',
+    'hot sauce', 'salad dressing', 'tomato sauce', 'tomato paste', 'tomato puree',
+    'diced tomatoes', 'crushed tomatoes', 'evaporated milk', 'condensed milk',
+    'heavy cream', 'whipping cream', 'half-and-half', 'sour cream', 'buttermilk'
+  ];
+
+  // Check for multi-word ingredients
   const foundIngredients = new Set();
-  ingredientPatterns.forEach(pattern => {
-    const matches = message.match(pattern);
-    if (matches) {
-      matches.forEach(match => foundIngredients.add(match.toLowerCase()));
+
+  // Add single-word matches
+  if (matches) {
+    matches.forEach(match => foundIngredients.add(match.toLowerCase()));
+  }
+
+  // Add multi-word ingredient matches
+  multiWordIngredients.forEach(ingredient => {
+    if (message.toLowerCase().includes(ingredient.toLowerCase())) {
+      foundIngredients.add(ingredient.toLowerCase());
     }
   });
-  
+
+  // Convert to array and return
   return Array.from(foundIngredients);
+}
+
+// Function to detect gratitude and compliments
+function isGratitudeOrCompliment(message) {
+  const lowerMessage = message.toLowerCase();
+
+  // Check for gratitude/compliment keywords
+  const gratitudeKeywords = [
+    'thank you', 'thanks', 'appreciate', 'grateful',
+    'great help', 'awesome', 'amazing', 'wonderful',
+    'fantastic', 'excellent', 'perfect', 'awesome job',
+    'you rock', 'youre great', 'youre awesome', 'youre amazing',
+    'well done', 'great work', 'nice job', 'good job',
+    'thank you so much', 'much appreciated', 'youre the best',
+    'youre incredible', 'youre fantastic', 'youre wonderful'
+  ];
+
+  // Check if message is primarily gratitude/compliment
+  const isGratitude = gratitudeKeywords.some(keyword =>
+    lowerMessage.includes(keyword)
+  );
+
+  // Additional check: if it's gratitude but also contains cooking keywords,
+  // we need to determine which intent is primary
+  if (isGratitude) {
+    // Check if it also contains cooking keywords
+    const cookingKeywords = [
+      'cook', 'recipe', 'food', 'meal', 'dish', 'ingredient', 'kitchen',
+      'bake', 'fry', 'grill', 'roast', 'boil', 'steam', 'saute', 'stir',
+      'chicken', 'beef', 'fish', 'vegetable', 'fruit', 'rice', 'pasta'
+    ];
+
+    const hasCookingKeywords = cookingKeywords.some(keyword =>
+      lowerMessage.includes(keyword)
+    );
+
+    // If it has both gratitude and cooking keywords, check which is more prominent
+    if (hasCookingKeywords) {
+      // Count gratitude vs cooking keywords to determine intent
+      const gratitudeCount = gratitudeKeywords.filter(kw =>
+        lowerMessage.includes(kw)
+      ).length;
+
+      const cookingCount = cookingKeywords.filter(kw =>
+        lowerMessage.includes(kw)
+      ).length;
+
+      // If gratitude keywords outnumber cooking keywords 2:1, it's likely gratitude
+      return gratitudeCount >= cookingCount * 2;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 // Function to detect if user is asking about the app developers
@@ -317,85 +476,104 @@ What would you like to cook or learn about today? 🍳`;
 // Enhanced content detection function with comprehensive off-topic categories
 function isOffTopic(message) {
   const lowerMessage = message.toLowerCase();
-  
+
+  // First, check if the message contains cooking-related keywords
+  // If it does, it's likely a cooking question and should not be flagged as off-topic
+  const cookingKeywords = [
+    'cook', 'recipe', 'food', 'meal', 'dish', 'ingredient', 'kitchen',
+    'bake', 'fry', 'grill', 'roast', 'boil', 'steam', 'saute', 'stir',
+    'chicken', 'beef', 'fish', 'vegetable', 'fruit', 'rice', 'pasta',
+    'soup', 'stew', 'salad', 'sauce', 'spice', 'herb', 'oil', 'butter'
+  ];
+
+  // If the message contains cooking keywords, it's likely cooking-related
+  const isCookingRelated = cookingKeywords.some(keyword =>
+    lowerMessage.includes(keyword)
+  );
+
+  // If it's cooking-related, don't flag as off-topic
+  if (isCookingRelated) {
+    return false;
+  }
+
   const offTopicKeywords = [
     // Politics & Government
     'politics', 'election', 'vote', 'government', 'policy', 'democrat', 'republican',
     'congress', 'senate', 'parliament', 'president', 'prime minister', 'mayor',
     'political', 'campaign', 'ballot', 'legislation', 'law', 'court', 'judge',
-    
+
     // Religion & Faith (but not dietary religious practices)
     'religion', 'religious', 'god', 'jesus', 'allah', 'buddha', 'christian', 'muslim',
     'jewish', 'hindu', 'buddhist', 'church', 'mosque', 'temple', 'prayer',
     'bible', 'quran', 'torah', 'scripture', 'faith', 'spirituality', 'worship',
-    
+
     // Sports & Recreation
     'sports', 'football', 'soccer', 'basketball', 'baseball', 'tennis', 'golf',
     'hockey', 'volleyball', 'cricket', 'rugby', 'olympics', 'nfl', 'nba', 'mlb',
     'fifa', 'uefa', 'championship', 'tournament', 'game', 'match', 'season',
-    
+
     // Gaming & Entertainment (but not food-related gaming)
     'gaming', 'video games', 'xbox', 'playstation', 'nintendo', 'switch', 'pc gaming',
     'minecraft', 'fortnite', 'call of duty', 'league of legends', 'wow', 'pokemon',
     'board games', 'chess', 'poker', 'casino', 'betting', 'movies', 'cinema',
     'tv show', 'netflix', 'disney', 'marvel', 'star wars', 'harry potter',
-    
+
     // Technology & Programming (but not cooking technology)
     'technology', 'programming', 'coding', 'software', 'javascript', 'python', 'java',
     'react', 'angular', 'vue', 'node.js', 'html', 'css', 'git', 'github',
     'artificial intelligence', 'machine learning', 'blockchain', 'cryptocurrency',
     'bitcoin', 'ethereum', 'startup', 'tech', 'internet', 'website', 'app development',
-    
+
     // Business & Finance (but not food business/finance)
     'business', 'finance', 'stocks', 'investing', 'trading', 'stock market', 'wall street',
     'crypto', 'money', 'wealth', 'salary', 'income', 'mortgage', 'loan', 'debt',
     'banking', 'credit', 'retirement', '401k', 'bitcoin', 'forex', 'economics',
     'entrepreneur', 'startup', 'venture capital', 'ipo', 'merger', 'acquisition',
-    
+
     // Education & Academic (but not cooking education)
     'education', 'school', 'university', 'college', 'student', 'teacher', 'professor',
     'homework', 'exam', 'test', 'grade', 'study', 'learning', 'course', 'class',
     'math', 'algebra', 'calculus', 'physics', 'chemistry', 'biology', 'history',
     'geography', 'literature', 'essay', 'research', 'thesis', 'dissertation',
-    
+
     // Health & Fitness (EXCLUDING nutrition - that's cooking related!)
     // Only medical/fitness topics that are NOT food-related
     'exercise', 'workout', 'gym', 'fitness', 'weight loss', 'muscle', 'cardio',
     'yoga', 'pilates', 'running', 'swimming', 'cycling', 'training', 'bodybuilding',
     'medical', 'doctor', 'medicine', 'hospital', 'surgery', 'therapy', 'medication',
     'disease', 'illness', 'symptoms', 'treatment', 'diagnosis',
-    
+
     // Travel & Transportation
     'travel', 'vacation', 'holiday', 'trip', 'flight', 'airline', 'hotel', 'resort',
     'tourism', 'passport', 'visa', 'cruise', 'beach', 'mountain', 'city', 'country',
     'car', 'vehicle', 'driving', 'traffic', 'public transport', 'subway', 'train',
     'airplane', 'airport', 'transportation', 'commute',
-    
+
     // Relationships & Social
     'relationships', 'dating', 'boyfriend', 'girlfriend', 'husband', 'wife', 'marriage',
     'wedding', 'divorce', 'family', 'parents', 'children', 'kids', 'baby',
     'friendship', 'social', 'party', 'event', 'celebration', 'holiday',
-    
+
     // News & Current Events
     'news', 'current events', 'breaking news', 'report', 'journalism', 'media',
     'newspaper', 'magazine', 'reporter', 'correspondent', 'interview', 'headlines',
-    
+
     // Shopping & Consumer Products (non-food)
     'shopping', 'clothes', 'fashion', 'shoes', 'electronics', 'phone', 'computer',
     'house', 'apartment', 'furniture', 'decor', 'makeup', 'cosmetics',
     'perfume', 'jewelry', 'accessories', 'retail', 'mall', 'store',
-    
+
     // Weather & Environment (non-cooking related)
     'weather', 'climate', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
     'tornado', 'flood', 'drought', 'environment', 'pollution', 'carbon footprint',
-    
+
     // Other Non-Cooking Topics
     'cars', 'automotive', 'real estate', 'property', 'rent', 'mortgage', 'insurance',
     'pets', 'animals', 'dogs', 'cats', 'gardening', 'plants', 'flowers', 'lawn',
     'books', 'reading', 'writing', 'art', 'painting', 'music', 'instruments',
     'hobbies', 'crafts', 'diy', 'woodworking', 'knitting', 'sewing'
   ];
-  
+
   return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
@@ -830,10 +1008,65 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       });
     }
     
+    // Check for gratitude and compliments (to prevent false recipe generation)
+    if (isGratitudeOrCompliment(message)) {
+      try {
+        // Use AI to generate a natural, personalized response to gratitude
+        const gratitudePrompt = `The user said: "${message}". This is a compliment or expression of gratitude. Respond warmly and naturally as CookMate, the AI cooking assistant. Keep the response friendly, personal, and cooking-themed. Do NOT generate any recipes or cooking suggestions - this is purely a social response. Make it feel genuine and engaging.`;
+
+        const aiResponse = await callGroqAI(gratitudePrompt);
+
+        // Clean up the AI response to remove any accidental recipe references
+        let cleanedResponse = aiResponse
+          .replace(/```json[\s\S]*?```/i, '') // Remove any JSON blocks
+          .replace(/```/g, '') // Remove code blocks
+          .replace(/\b(recipe|cook|ingredient|dish|meal)\b/gi, 'cooking') // Replace cooking terms
+          .trim();
+
+        // Fallback if AI response is empty or problematic
+        if (!cleanedResponse || cleanedResponse.length < 10 || cleanedResponse.includes('{') || cleanedResponse.includes('}')) {
+          cleanedResponse = "You're very welcome! 😊 I'm happy to help with your cooking adventures! Let me know if you need more assistance.";
+        }
+
+        return res.status(200).json({
+          response: {
+            message: cleanedResponse,
+            timestamp: new Date().toISOString(),
+            userId: req.userId,
+            isGratitudeResponse: true,
+            redirectToCooking: false,
+            detectedRecipes: [] // No recipes for gratitude messages
+          }
+        });
+      } catch (aiError) {
+        console.error('AI gratitude response failed, using fallback:', aiError.message);
+
+        // Fallback response if AI call fails
+        const fallbackResponses = [
+          "You're very welcome! 😊 I'm happy to help with your cooking adventures!",
+          "Thank you for your kind words! 🍳 Let me know if you need more cooking assistance!",
+          "I appreciate your feedback! 👨‍🍳 What would you like to cook next?",
+          "That's so nice to hear! 😊 What can I help you with in the kitchen today?",
+          "Thank you! 🍽️ I'm here whenever you need more recipe ideas or cooking help!"
+        ];
+
+        return res.status(200).json({
+          response: {
+            message: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)],
+            timestamp: new Date().toISOString(),
+            userId: req.userId,
+            isGratitudeResponse: true,
+            redirectToCooking: false,
+            detectedRecipes: [] // No recipes for gratitude messages
+          }
+        });
+      }
+    }
+
     // Check for off-topic content only after checking legitimate cooking questions
     if (isOffTopic(message)) {
       const aiReply = getOffTopicResponse(message);
-      
+
       return res.status(200).json({
         response: {
           message: aiReply,
