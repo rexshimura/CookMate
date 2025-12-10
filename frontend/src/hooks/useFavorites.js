@@ -1,7 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth.jsx';
-import { getFavorites, addToFavorites, removeFromFavorites, checkIsFavorite } from '../utils/api.js';
+import { getFavorites, addToFavorites, removeFromFavorites, checkIsFavorite, searchFavorites } from '../utils/api.js';
 import { generateRecipeId } from '../utils/ids.js';
+
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 /**
  * Unified Collections Architecture - Favorites Hook
@@ -199,15 +212,78 @@ export const useFavorites = () => {
     return loadFavorites();
   }, [loadFavorites]);
 
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (query) => {
+      if (!query || query.trim().length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      try {
+        setIsSearching(true);
+        setSearchError(null);
+
+        // Call the new search endpoint using the proper API function
+        const data = await searchFavorites(query);
+
+        if (data.success && data.results) {
+          setSearchResults(data.results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchError(error.message || 'Failed to search favorites');
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300), // 300ms debounce
+    [user]
+  );
+
+  // Handle search input changes
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    if (query.length >= 2 || query.length === 0) {
+      debouncedSearch(query);
+    }
+  }, [debouncedSearch]);
+
+  // Clear search
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
+  }, []);
+
+  // Display favorites (respects search if active)
+  const displayFavorites = searchQuery.length >= 2 ? searchResults : favorites;
+
   return {
     // Data
     favorites,
     favoriteIds,
-    
+
+    // Search State
+    searchQuery,
+    searchResults,
+    isSearching,
+    searchError,
+    displayFavorites,
+
     // State
     loading,
     error,
-    
+
     // Operations
     toggleFavorite,
     addToFavorites: addToFavoritesHook,
@@ -216,5 +292,9 @@ export const useFavorites = () => {
     clearFavorites,
     refreshFavorites,
     loadFavorites,
+
+    // Search Operations
+    handleSearch,
+    clearSearch,
   };
 };

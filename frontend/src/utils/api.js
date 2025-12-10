@@ -516,6 +516,19 @@ export const healthCheck = async () => {
   }
 };
 
+export const searchFavorites = async (query, limit = 20, offset = 0) => {
+  try {
+    // Input validation
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      throw new Error('Search query must be at least 2 characters');
+    }
+
+    return await apiCall(`/api/collections/favorites/search?query=${encodeURIComponent(query.trim())}&limit=${limit}&offset=${offset}`);
+  } catch (error) {
+    throw new Error(error.message || 'Failed to search favorites');
+  }
+};
+
 export default {
   chatWithAI,
   generateRecipe,
@@ -536,4 +549,5 @@ export default {
   getCollectionRecipes,
   migrateFavorites,
   healthCheck,
+  searchFavorites,
 };

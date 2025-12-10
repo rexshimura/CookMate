@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, X, Plus, Folder, Clock, Trash2, Check, ArrowLeft } from 'lucide-react';
+import { Heart, X, Plus, Folder, Clock, Trash2, Check, ArrowLeft, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '../../App.jsx';
 import { getRecipeDetails } from '../../utils/api.js';
+import FavoritesSearch from './FavoritesSearch';
 
 const FavoritesCollectionsModal = ({ 
   isOpen, 
@@ -336,28 +337,51 @@ const FavoritesCollectionsModal = ({
           {/* FAVORITES TAB */}
           {activeTab === 'favorites' && (
             <div className="space-y-4">
+              {/* Search Bar */}
+              {favoritesHook && (
+                <FavoritesSearch
+                  searchQuery={favoritesHook.searchQuery || ''}
+                  setSearchQuery={favoritesHook.handleSearch}
+                  isSearching={favoritesHook.isSearching || false}
+                  onClear={favoritesHook.clearSearch}
+                  placeholder="Search your favorite recipes..."
+                />
+              )}
+
               {favoritesLoading ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="w-8 h-8 border-2 border-orange-600 border-t-transparent rounded-full animate-spin mb-2"></div>
                   <p className="text-sm text-stone-500">Loading favorites...</p>
                 </div>
-              ) : favorites.length === 0 ? (
+              ) : (favoritesHook?.displayFavorites || favorites).length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Heart className="w-8 h-8 text-stone-300" />
                   </div>
-                  <h3 className="text-lg font-medium text-stone-800 mb-1">No favorites yet</h3>
+                  <h3 className="text-lg font-medium text-stone-800 mb-1">
+                    {favoritesHook?.searchQuery ? 'No recipes found' : 'No favorites yet'}
+                  </h3>
                   <p className="text-sm text-stone-500">
-                    Click the heart icon on any recipe to save it here.
+                    {favoritesHook?.searchQuery
+                      ? `No recipes match "${favoritesHook.searchQuery}". Try a different search term.`
+                      : 'Click the heart icon on any recipe to save it here.'}
                   </p>
+                  {favoritesHook?.searchQuery && (
+                    <button
+                      onClick={favoritesHook.clearSearch}
+                      className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
+                    >
+                      Clear Search
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid gap-3">
-                  {favorites.map((fav) => (
+                  {/* Use displayFavorites which respects search results */}
+                  {(favoritesHook?.displayFavorites || favorites).map((fav) => (
                     <SimpleRecipeCard
                       key={fav.id}
                       recipe={fav}
-                      onRemove={() => toggleFavorite(fav)}
                       onRecipeClick={handleRecipeClick}
                     />
                   ))}

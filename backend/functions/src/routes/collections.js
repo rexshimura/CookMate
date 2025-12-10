@@ -389,7 +389,76 @@ router.get('/favorites', verifyAuthToken, async (req, res) => {
   }
 });
 
-// 8. Get Recipes in Collection (with full recipe details)
+// 8. Search Favorites Collection
+router.get('/favorites/search', verifyAuthToken, async (req, res) => {
+  try {
+    const { query, limit = 20, offset = 0 } = req.query;
+
+    // Validate query parameter
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return res.status(400).json({
+        error: 'Search query must be at least 2 characters'
+      });
+    }
+
+    // Get user's favorites collection
+    const favoritesSnapshot = await db.collection('collections')
+      .where('userId', '==', req.userId)
+      .where('isDefault', '==', true)
+      .limit(1)
+      .get();
+
+    if (favoritesSnapshot.empty) {
+      return res.status(200).json({
+        results: [],
+        total: 0,
+        message: 'No favorites collection found'
+      });
+    }
+
+    const favoritesDoc = favoritesSnapshot.docs[0];
+    const favoritesData = favoritesDoc.data();
+    const allRecipes = favoritesData.recipes || [];
+
+    // Perform search
+    const searchTerm = query.trim().toLowerCase();
+
+    const filteredRecipes = allRecipes.filter(recipe => {
+      const recipeName = recipe.title?.toLowerCase() || recipe.name?.toLowerCase() || '';
+      const recipeDescription = recipe.description?.toLowerCase() || '';
+      const recipeIngredients = recipe.ingredients?.join(' ')?.toLowerCase() || '';
+      const recipeTags = recipe.tags?.join(' ')?.toLowerCase() || '';
+      const recipeCuisine = recipe.cuisine?.toLowerCase() || '';
+
+      return recipeName.includes(searchTerm) ||
+             recipeDescription.includes(searchTerm) ||
+             recipeIngredients.includes(searchTerm) ||
+             recipeTags.includes(searchTerm) ||
+             recipeCuisine.includes(searchTerm);
+    });
+
+    // Apply pagination
+    const paginatedResults = filteredRecipes.slice(offset, offset + limit);
+
+    res.status(200).json({
+      success: true,
+      results: paginatedResults.map(normalizeRecipeData),
+      total: filteredRecipes.length,
+      offset: offset,
+      limit: limit,
+      query: query
+    });
+
+  } catch (error) {
+    console.error('Favorites search error:', error);
+    res.status(500).json({
+      error: 'Failed to search favorites',
+      details: error.message
+    });
+  }
+});
+
+// 10. Get Recipes in Collection (with full recipe details)
 router.get('/:id/recipes', verifyAuthToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -424,7 +493,7 @@ router.get('/:id/recipes', verifyAuthToken, async (req, res) => {
   }
 });
 
-// 9. Migration endpoint for existing users - migrate old favorites to collections
+// 11. Migration endpoint for existing users - migrate old favorites to collections
 router.post('/migrate-favorites', verifyAuthToken, async (req, res) => {
   try {
     console.log('🔄 [MIGRATION] Starting favorites migration for user:', req.userId);

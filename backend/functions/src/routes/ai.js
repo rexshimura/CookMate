@@ -6,9 +6,10 @@ const { db, admin } = require('../config/firebase');
 function safeJSONParse(str) {
   try {
     // Fix common AI JSON issues before parsing
-    const cleaned = str.replace(/(?<!\\)\n/g, "\\n") // Escape newlines
-                       .replace(/,\s*}/g, "}")        // Remove trailing commas
-                       .replace(/,\s*]/g, "]");
+    const cleaned = str.replace(/,\s*}/g, "}")        // Remove trailing commas
+                      .replace(/,\s*]/g, "]")
+                      .replace(/\s+/g, ' ')           // Replace multiple whitespace with single space
+                      .trim();
     return JSON.parse(cleaned);
   } catch (e) {
     console.error("JSON Parse failed:", e.message);
@@ -696,7 +697,7 @@ async function callGroqAI(message, conversationHistory = []) {
     content: `You are CookMate, a comprehensive AI cooking assistant. Your primary goal is to provide a helpful and engaging conversational experience about cooking, while also extracting key recipe information in a structured format.
 
 **Conversational Response:**
-First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking.
+First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking. **IMPORTANT: Keep your conversational response brief and concise - aim for 1-3 sentences maximum.** Focus on the key information the user needs.
 
 **Structured JSON Output:**
 After the conversational text, you MUST include a structured JSON object. This JSON object should be enclosed in \`\`\`json code blocks. The JSON should contain a single key, "recipes," which is an array of recipe objects. For each recipe mentioned or implied in the user's request, create a JSON object with the following fields:
@@ -712,7 +713,7 @@ After the conversational text, you MUST include a structured JSON object. This J
 User: "I'm thinking of making some adobo and maybe some sinigang."
 
 Your Response:
-That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup. Do you have a preference for which one you'd like to make?
+That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup.
 
 \`\`\`json
 {
@@ -849,40 +850,103 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
     let aiReply;
     let detectedRecipes = [];
-    
+    let jsonExtractionSuccess = false;
+    let jsonStringToClean = null;
+
     try {
       const fullResponse = await callGroqAI(message, history);
-      let detectedRecipes = [];
-      let jsonExtractionSuccess = false;
 
-      // 1. ROBUST EXTRACTION: Handle ```json, ```JSON, or just ``` with spaces
-      const jsonMatch = fullResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-      
-      if (jsonMatch && jsonMatch[1]) {
-        const parsed = safeJSONParse(jsonMatch[1]);
+      // STRATEGY 1: Look for Markdown Code Blocks (Standard)
+      const markdownMatch = fullResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+
+      if (markdownMatch && markdownMatch[1]) {
+        const parsed = safeJSONParse(markdownMatch[1]);
         if (parsed && parsed.recipes) {
-          // Filter using your strict validator
-          detectedRecipes = parsed.recipes
-            .map(r => r.title || r.name)
-            .filter(title => title && isValidRecipe(title));
+          detectedRecipes = parsed.recipes;
           jsonExtractionSuccess = true;
+          jsonStringToClean = markdownMatch[0]; // Remove the whole block including backticks
         }
       }
 
-      // 2. ROBUST CLEANUP: Remove ANY code block from the text
-      aiReply = fullResponse.replace(/```(?:json)?\s*[\s\S]*?\s*```/gi, '').trim();
-      if (!aiReply) aiReply = "I found some recipes! Check below.";
+      // STRATEGY 2: Look for Raw JSON (Fallback if AI forgot backticks)
+      // Look for a structure starting with { "recipes": or { recipes:
+      if (!jsonExtractionSuccess) {
+        const rawJsonMatch = fullResponse.match(/(\{\s*"?recipes"?\s*:[\s\S]*\})/i);
+        if (rawJsonMatch && rawJsonMatch[1]) {
+          const parsed = safeJSONParse(rawJsonMatch[1]);
+          if (parsed && parsed.recipes) {
+            detectedRecipes = parsed.recipes;
+            jsonExtractionSuccess = true;
+            jsonStringToClean = rawJsonMatch[1]; // Remove just the JSON object
+          }
+        }
+      }
 
-      // 3. FALLBACK: Only if we found NO JSON at all
+      // 3. VALIDATE & FILTER
+      if (jsonExtractionSuccess && Array.isArray(detectedRecipes)) {
+        detectedRecipes = detectedRecipes
+          .map(r => r.title || r.name)
+          .filter(title => title && isValidRecipe(title));
+      }
+
+      // 4. CLEANUP RESPONSE TEXT
+      // If we found JSON, remove it from the message so the user doesn't see code
+      aiReply = fullResponse;
+      if (jsonStringToClean) {
+        aiReply = fullResponse.replace(jsonStringToClean, '').trim();
+      }
+
+      // Remove any lingering empty tags or "Here is the JSON:" text
+      aiReply = aiReply.replace(/```\s*```/g, '')
+                      .replace(/Here is the JSON:?/i, '')
+                      .trim();
+
+      // Remove detailed recipe content (ingredients, instructions) since they'll be shown in recipe detail page
+      // Remove ingredient sections
+      aiReply = aiReply.replace(/Ingredients?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      // Remove instruction sections
+                      .replace(/Instructions?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Directions?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Steps?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Method\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      // Remove bullet point lists
+                      .replace(/^\s*[•\-*]\s*.*(\n\s*[•\-*]\s*.*)*/gm, '')
+                      // Remove numbered lists
+                      .replace(/^\s*\d+\.\s*.*(\n\s*\d+\.\s*.*)*/gm, '')
+                      // FINAL CLEANUP: Remove any remaining JSON references or code block markers
+                      // Remove entire phrases that reference JSON or recipe data
+                      .replace(/\bjson\b/gi, 'recipe data')
+                      .replace(/Here is the (?:JSON|recipe data):?/gi, '')
+                      .replace(/Here\'s the (?:JSON|recipe data):?/gi, '')
+                      .replace(/The (?:JSON|recipe data) is:?/gi, '')
+                      .replace(/recipe data/gi, '')
+                      .replace(/```/g, '')
+                      .replace(/`/g, '')
+                      .trim();
+
+      if (!aiReply || aiReply.length < 20 || !aiReply.match(/[a-zA-Z0-9]/)) {
+        aiReply = "I found some recipes! Check below.";
+      }
+
+      // OPTIONAL: Summarize lengthy responses to focus on recipe descriptions
+      // This helps when users want brief recipe descriptions rather than detailed instructions
+      if (aiReply.length > 300) {
+        // Try to extract just the recipe descriptions and key points
+        const summaryMatch = aiReply.match(/Here's [^\.!]*\.|How about [^\.!]*\.|Let's [^\.!]*\./i);
+        if (summaryMatch) {
+          aiReply = summaryMatch[0] + " Check below for more details.";
+        }
+      }
+
+      // 5. LEGACY FALLBACK (Only if both JSON strategies failed completely)
       if (!jsonExtractionSuccess && detectedRecipes.length === 0) {
         detectedRecipes = extractRecipesFromResponse(fullResponse);
       }
 
-      // 4. STORE
+      // 6. STORE DATA
       if (detectedRecipes.length > 0) {
          await Promise.allSettled(detectedRecipes.map(r => storeDetectedRecipe(r, req.userId)));
       }
-
     } catch (aiError) {
       console.error('AI service failed, using fallback response:', aiError.message);
       
@@ -920,7 +984,9 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
     
     // Extract recipes from AI response for consistency (if not already detected)
     if (detectedRecipes.length === 0) {
-      detectedRecipes = extractRecipesFromResponse(aiReply);
+      // Use the original fullResponse for fallback to ensure we don't miss any recipes
+      // that might have been removed during cleanup
+      detectedRecipes = extractRecipesFromResponse(fullResponse);
     }
        
       // 5. Send Response (Ensuring detectedRecipes is included!)
