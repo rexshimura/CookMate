@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const { db, admin } = require('../config/firebase');
 
+// Helper function for robust JSON parsing
+function safeJSONParse(str) {
+  try {
+    // Fix common AI JSON issues before parsing
+    const cleaned = str.replace(/,\s*}/g, "}")        // Remove trailing commas
+                      .replace(/,\s*]/g, "]")
+                      .replace(/\s+/g, ' ')           // Replace multiple whitespace with single space
+                      .trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("JSON Parse failed:", e.message);
+    return null;
+  }
+}
+
 // In-memory cache for recipe consistency during development
 const recipeCache = new Map();
 
@@ -207,30 +222,189 @@ const verifyAuthToken = async (req, res, next) => {
   }
 };
 
-// Smart ingredient extraction (keeping this useful feature)
+// Enhanced ingredient extraction with comprehensive ingredient database
 function extractIngredients(message) {
-  const ingredientPatterns = [
-    /\b(chicken|beef|pork|lamb|turkey|fish|salmon|shrimp|tuna|tofu|eggs?)\b/gi,
-    /\b(rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa)\b/gi,
-    /\b(potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber)\b/gi,
-    /\b(mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn)\b/gi,
-    /\b(cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream)\b/gi,
-    /\b(oil|olive oil|vegetable oil|canola oil|sesame oil)\b/gi,
-    /\b(salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil)\b/gi,
-    /\b(sugar|honey|maple syrup|brown sugar)\b/gi,
-    /\b(lemon|lime|orange|apple|banana|berries|grapes)\b/gi,
-    /\b(vanilla|almond|coconut|chocolate|cocoa)\b/gi
+  // Comprehensive ingredient database organized by categories
+  const ingredientDatabase = [
+    // Proteins
+    'chicken', 'beef', 'pork', 'lamb', 'turkey', 'duck', 'goose', 'venison', 'bison',
+    'fish', 'salmon', 'tuna', 'cod', 'haddock', 'halibut', 'mackerel', 'sardines', 'anchovies',
+    'shrimp', 'prawns', 'lobster', 'crab', 'scallops', 'mussels', 'clams', 'oysters', 'squid',
+    'tofu', 'tempeh', 'seitan', 'eggs', 'egg whites', 'egg yolks',
+
+    // Grains and starches
+    'rice', 'brown rice', 'white rice', 'jasmine rice', 'basmati rice', 'wild rice', 'arborio rice',
+    'pasta', 'spaghetti', 'fettuccine', 'penne', 'macaroni', 'lasagna', 'noodles', 'ramen',
+    'udon', 'soba', 'bread', 'whole wheat bread', 'sourdough', 'baguette', 'ciabatta',
+    'flour', 'all-purpose flour', 'whole wheat flour', 'bread flour', 'cake flour', 'oats',
+    'quinoa', 'couscous', 'bulgur', 'barley', 'farro', 'millet', 'polenta', 'cornmeal',
+
+    // Vegetables
+    'potato', 'sweet potato', 'yams', 'onion', 'red onion', 'green onion', 'shallots',
+    'garlic', 'ginger', 'leek', 'celery', 'carrot', 'carrots', 'parsnip', 'turnip', 'rutabaga',
+    'tomato', 'cherry tomato', 'grape tomato', 'roma tomato', 'heirloom tomato',
+    'bell pepper', 'red bell pepper', 'green bell pepper', 'yellow bell pepper', 'jalapeno',
+    'habanero', 'serrano', 'cayenne', 'chili pepper', 'lettuce', 'romaine', 'iceberg',
+    'spinach', 'kale', 'arugula', 'swiss chard', 'collard greens', 'cabbage', 'napa cabbage',
+    'bok choy', 'broccoli', 'cauliflower', 'brussels sprouts', 'asparagus', 'artichoke',
+    'zucchini', 'yellow squash', 'butternut squash', 'acorn squash', 'pumpkin', 'cucumber',
+    'eggplant', 'mushroom', 'mushrooms', 'portobello', 'shiitake', 'cremini', 'oyster mushroom', 'chanterelle',
+    'green beans', 'snap peas', 'snow peas', 'sugar snap peas', 'peas', 'corn', 'edamame',
+
+    // Fruits
+    'apple', 'banana', 'orange', 'lemon', 'lime', 'grapefruit', 'tangerine', 'clementine',
+    'pear', 'peach', 'nectarine', 'plum', 'apricot', 'cherry', 'strawberry', 'blueberry',
+    'raspberry', 'blackberry', 'boysenberry', 'cranberry', 'grape', 'pineapple', 'mango',
+    'papaya', 'guava', 'kiwi', 'pomegranate', 'fig', 'date', 'avocado', 'coconut', 'plantain',
+
+    // Dairy and alternatives
+    'milk', 'whole milk', 'skim milk', '2% milk', 'cream', 'heavy cream', 'whipping cream',
+    'half-and-half', 'butter', 'unsalted butter', 'salted butter', 'ghee', 'cheese', 'cheddar',
+    'mozzarella', 'parmesan', 'feta', 'goat cheese', 'blue cheese', 'gouda', 'swiss cheese',
+    'provolone', 'ricotta', 'cottage cheese', 'cream cheese', 'yogurt', 'greek yogurt',
+    'sour cream', 'buttermilk', 'condensed milk', 'evaporated milk', 'coconut milk',
+
+    // Oils and fats
+    'oil', 'olive oil', 'extra virgin olive oil', 'vegetable oil', 'canola oil', 'sunflower oil',
+    'sesame oil', 'peanut oil', 'avocado oil', 'coconut oil', 'grapeseed oil', 'lard', 'shortening',
+
+    // Herbs and spices
+    'salt', 'sea salt', 'kosher salt', 'pepper', 'black pepper', 'white pepper', 'cayenne pepper',
+    'paprika', 'smoked paprika', 'chili powder', 'cumin', 'coriander', 'turmeric', 'curry powder',
+    'garlic powder', 'onion powder', 'ginger powder', 'cinnamon', 'nutmeg', 'cloves', 'allspice',
+    'cardamom', 'vanilla', 'vanilla extract', 'almond extract', 'peppermint extract', 'oregano',
+    'thyme', 'rosemary', 'sage', 'basil', 'parsley', 'cilantro', 'dill', 'mint', 'tarragon',
+    'bay leaf', 'marjoram', 'saffron', 'star anise', 'fennel seeds', 'mustard seeds',
+
+    // Sweeteners
+    'sugar', 'white sugar', 'brown sugar', 'powdered sugar', 'confectioners sugar', 'raw sugar',
+    'honey', 'maple syrup', 'agave nectar', 'corn syrup', 'molasses', 'stevia', 'artificial sweetener',
+
+    // Baking ingredients
+    'baking powder', 'baking soda', 'yeast', 'active dry yeast', 'instant yeast', 'cornstarch',
+    'starch', 'flour', 'cocoa powder', 'unsweetened cocoa', 'chocolate', 'dark chocolate', 'milk chocolate',
+    'white chocolate', 'chocolate chips', 'butterscotch chips', 'peanut butter chips',
+
+    // Nuts and seeds
+    'almonds', 'cashews', 'peanuts', 'walnuts', 'pecans', 'hazelnuts', 'pistachios', 'macadamia nuts',
+    'pine nuts', 'sunflower seeds', 'pumpkin seeds', 'chia seeds', 'flax seeds', 'sesame seeds',
+
+    // Canned and preserved goods
+    'tomato sauce', 'tomato paste', 'tomato puree', 'diced tomatoes', 'crushed tomatoes',
+    'coconut milk', 'evaporated milk', 'condensed milk', 'broth', 'chicken broth', 'beef broth',
+    'vegetable broth', 'stock', 'chicken stock', 'beef stock', 'vegetable stock', 'olives',
+    'pickles', 'capers', 'artichoke hearts', 'roasted red peppers', 'salsa', 'pesto',
+
+    // Condiments and sauces
+    'soy sauce', 'teriyaki sauce', 'hoisin sauce', 'oyster sauce', 'fish sauce', 'worcestershire sauce',
+    'hot sauce', 'sriracha', 'tabasco', 'bbq sauce', 'ketchup', 'mustard', 'dijon mustard',
+    'mayonnaise', 'salad dressing', 'ranch dressing', 'italian dressing', 'balsamic vinegar',
+    'apple cider vinegar', 'white vinegar', 'red wine vinegar', 'rice vinegar',
+
+    // International ingredients
+    'miso paste', 'tofu', 'tempeh', 'nori', 'seaweed', 'wasabi', 'sake', 'mirin', 'rice wine vinegar',
+    'gochujang', 'kimchi', 'sriracha', 'curry paste', 'coconut cream', 'paneer', 'ghee', 'tahini',
+    'hummus', 'falafel', 'pita bread', 'naan', 'tortillas', 'corn tortillas', 'flour tortillas',
+
+    // Beverages
+    'coffee', 'tea', 'green tea', 'black tea', 'herbal tea', 'juice', 'orange juice', 'apple juice',
+    'cranberry juice', 'lemon juice', 'lime juice', 'wine', 'red wine', 'white wine', 'beer',
+    'champagne', 'soda', 'sparkling water', 'club soda', 'tonic water'
   ];
-  
+
+  // Convert to regex pattern for efficient matching
+  const ingredientPattern = new RegExp(`\\b(${ingredientDatabase.join('|')})\\b`, 'gi');
+
+  // Extract all matches
+  const matches = message.match(ingredientPattern);
+
+  // Also handle multi-word ingredients and ingredient phrases
+  const multiWordIngredients = [
+    'bell pepper', 'green onion', 'red onion', 'yellow onion', 'white onion',
+    'garlic powder', 'onion powder', 'chili powder', 'baking powder', 'baking soda',
+    'olive oil', 'vegetable oil', 'canola oil', 'coconut oil', 'extra virgin olive oil',
+    'whole wheat flour', 'all-purpose flour', 'brown sugar', 'powdered sugar',
+    'chocolate chips', 'peanut butter', 'cream cheese', 'greek yogurt',
+    'chicken broth', 'beef broth', 'vegetable broth', 'chicken stock',
+    'beef stock', 'vegetable stock', 'apple cider vinegar', 'rice wine vinegar',
+    'red wine vinegar', 'white wine vinegar', 'balsamic vinegar', 'soy sauce',
+    'hot sauce', 'salad dressing', 'tomato sauce', 'tomato paste', 'tomato puree',
+    'diced tomatoes', 'crushed tomatoes', 'evaporated milk', 'condensed milk',
+    'heavy cream', 'whipping cream', 'half-and-half', 'sour cream', 'buttermilk'
+  ];
+
+  // Check for multi-word ingredients
   const foundIngredients = new Set();
-  ingredientPatterns.forEach(pattern => {
-    const matches = message.match(pattern);
-    if (matches) {
-      matches.forEach(match => foundIngredients.add(match.toLowerCase()));
+
+  // Add single-word matches
+  if (matches) {
+    matches.forEach(match => foundIngredients.add(match.toLowerCase()));
+  }
+
+  // Add multi-word ingredient matches
+  multiWordIngredients.forEach(ingredient => {
+    if (message.toLowerCase().includes(ingredient.toLowerCase())) {
+      foundIngredients.add(ingredient.toLowerCase());
     }
   });
-  
+
+  // Convert to array and return
   return Array.from(foundIngredients);
+}
+
+// Function to detect gratitude and compliments
+function isGratitudeOrCompliment(message) {
+  const lowerMessage = message.toLowerCase();
+
+  // Check for gratitude/compliment keywords
+  const gratitudeKeywords = [
+    'thank you', 'thanks', 'appreciate', 'grateful',
+    'great help', 'awesome', 'amazing', 'wonderful',
+    'fantastic', 'excellent', 'perfect', 'awesome job',
+    'you rock', 'youre great', 'youre awesome', 'youre amazing',
+    'well done', 'great work', 'nice job', 'good job',
+    'thank you so much', 'much appreciated', 'youre the best',
+    'youre incredible', 'youre fantastic', 'youre wonderful'
+  ];
+
+  // Check if message is primarily gratitude/compliment
+  const isGratitude = gratitudeKeywords.some(keyword =>
+    lowerMessage.includes(keyword)
+  );
+
+  // Additional check: if it's gratitude but also contains cooking keywords,
+  // we need to determine which intent is primary
+  if (isGratitude) {
+    // Check if it also contains cooking keywords
+    const cookingKeywords = [
+      'cook', 'recipe', 'food', 'meal', 'dish', 'ingredient', 'kitchen',
+      'bake', 'fry', 'grill', 'roast', 'boil', 'steam', 'saute', 'stir',
+      'chicken', 'beef', 'fish', 'vegetable', 'fruit', 'rice', 'pasta'
+    ];
+
+    const hasCookingKeywords = cookingKeywords.some(keyword =>
+      lowerMessage.includes(keyword)
+    );
+
+    // If it has both gratitude and cooking keywords, check which is more prominent
+    if (hasCookingKeywords) {
+      // Count gratitude vs cooking keywords to determine intent
+      const gratitudeCount = gratitudeKeywords.filter(kw =>
+        lowerMessage.includes(kw)
+      ).length;
+
+      const cookingCount = cookingKeywords.filter(kw =>
+        lowerMessage.includes(kw)
+      ).length;
+
+      // If gratitude keywords outnumber cooking keywords 2:1, it's likely gratitude
+      return gratitudeCount >= cookingCount * 2;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 // Function to detect if user is asking about the app developers
@@ -267,7 +441,7 @@ function isIdentityQuestion(message) {
 // Function to get developer information response
 function getDeveloperResponse() {
   return `CookMate was created by:
-  
+   
 👨‍💻 **John Mark P. Magdasal**
 👨‍💻 **John Paul Mahilom**
 
@@ -302,85 +476,104 @@ What would you like to cook or learn about today? 🍳`;
 // Enhanced content detection function with comprehensive off-topic categories
 function isOffTopic(message) {
   const lowerMessage = message.toLowerCase();
-  
+
+  // First, check if the message contains cooking-related keywords
+  // If it does, it's likely a cooking question and should not be flagged as off-topic
+  const cookingKeywords = [
+    'cook', 'recipe', 'food', 'meal', 'dish', 'ingredient', 'kitchen',
+    'bake', 'fry', 'grill', 'roast', 'boil', 'steam', 'saute', 'stir',
+    'chicken', 'beef', 'fish', 'vegetable', 'fruit', 'rice', 'pasta',
+    'soup', 'stew', 'salad', 'sauce', 'spice', 'herb', 'oil', 'butter'
+  ];
+
+  // If the message contains cooking keywords, it's likely cooking-related
+  const isCookingRelated = cookingKeywords.some(keyword =>
+    lowerMessage.includes(keyword)
+  );
+
+  // If it's cooking-related, don't flag as off-topic
+  if (isCookingRelated) {
+    return false;
+  }
+
   const offTopicKeywords = [
     // Politics & Government
     'politics', 'election', 'vote', 'government', 'policy', 'democrat', 'republican',
     'congress', 'senate', 'parliament', 'president', 'prime minister', 'mayor',
     'political', 'campaign', 'ballot', 'legislation', 'law', 'court', 'judge',
-    
+
     // Religion & Faith (but not dietary religious practices)
     'religion', 'religious', 'god', 'jesus', 'allah', 'buddha', 'christian', 'muslim',
     'jewish', 'hindu', 'buddhist', 'church', 'mosque', 'temple', 'prayer',
     'bible', 'quran', 'torah', 'scripture', 'faith', 'spirituality', 'worship',
-    
+
     // Sports & Recreation
     'sports', 'football', 'soccer', 'basketball', 'baseball', 'tennis', 'golf',
     'hockey', 'volleyball', 'cricket', 'rugby', 'olympics', 'nfl', 'nba', 'mlb',
     'fifa', 'uefa', 'championship', 'tournament', 'game', 'match', 'season',
-    
+
     // Gaming & Entertainment (but not food-related gaming)
     'gaming', 'video games', 'xbox', 'playstation', 'nintendo', 'switch', 'pc gaming',
     'minecraft', 'fortnite', 'call of duty', 'league of legends', 'wow', 'pokemon',
     'board games', 'chess', 'poker', 'casino', 'betting', 'movies', 'cinema',
     'tv show', 'netflix', 'disney', 'marvel', 'star wars', 'harry potter',
-    
+
     // Technology & Programming (but not cooking technology)
     'technology', 'programming', 'coding', 'software', 'javascript', 'python', 'java',
     'react', 'angular', 'vue', 'node.js', 'html', 'css', 'git', 'github',
     'artificial intelligence', 'machine learning', 'blockchain', 'cryptocurrency',
     'bitcoin', 'ethereum', 'startup', 'tech', 'internet', 'website', 'app development',
-    
+
     // Business & Finance (but not food business/finance)
     'business', 'finance', 'stocks', 'investing', 'trading', 'stock market', 'wall street',
     'crypto', 'money', 'wealth', 'salary', 'income', 'mortgage', 'loan', 'debt',
     'banking', 'credit', 'retirement', '401k', 'bitcoin', 'forex', 'economics',
     'entrepreneur', 'startup', 'venture capital', 'ipo', 'merger', 'acquisition',
-    
+
     // Education & Academic (but not cooking education)
     'education', 'school', 'university', 'college', 'student', 'teacher', 'professor',
     'homework', 'exam', 'test', 'grade', 'study', 'learning', 'course', 'class',
     'math', 'algebra', 'calculus', 'physics', 'chemistry', 'biology', 'history',
     'geography', 'literature', 'essay', 'research', 'thesis', 'dissertation',
-    
+
     // Health & Fitness (EXCLUDING nutrition - that's cooking related!)
     // Only medical/fitness topics that are NOT food-related
     'exercise', 'workout', 'gym', 'fitness', 'weight loss', 'muscle', 'cardio',
     'yoga', 'pilates', 'running', 'swimming', 'cycling', 'training', 'bodybuilding',
     'medical', 'doctor', 'medicine', 'hospital', 'surgery', 'therapy', 'medication',
     'disease', 'illness', 'symptoms', 'treatment', 'diagnosis',
-    
+
     // Travel & Transportation
     'travel', 'vacation', 'holiday', 'trip', 'flight', 'airline', 'hotel', 'resort',
     'tourism', 'passport', 'visa', 'cruise', 'beach', 'mountain', 'city', 'country',
     'car', 'vehicle', 'driving', 'traffic', 'public transport', 'subway', 'train',
     'airplane', 'airport', 'transportation', 'commute',
-    
+
     // Relationships & Social
     'relationships', 'dating', 'boyfriend', 'girlfriend', 'husband', 'wife', 'marriage',
     'wedding', 'divorce', 'family', 'parents', 'children', 'kids', 'baby',
     'friendship', 'social', 'party', 'event', 'celebration', 'holiday',
-    
+
     // News & Current Events
     'news', 'current events', 'breaking news', 'report', 'journalism', 'media',
     'newspaper', 'magazine', 'reporter', 'correspondent', 'interview', 'headlines',
-    
+
     // Shopping & Consumer Products (non-food)
     'shopping', 'clothes', 'fashion', 'shoes', 'electronics', 'phone', 'computer',
     'house', 'apartment', 'furniture', 'decor', 'makeup', 'cosmetics',
     'perfume', 'jewelry', 'accessories', 'retail', 'mall', 'store',
-    
+
     // Weather & Environment (non-cooking related)
     'weather', 'climate', 'temperature', 'rain', 'snow', 'storm', 'hurricane',
     'tornado', 'flood', 'drought', 'environment', 'pollution', 'carbon footprint',
-    
+
     // Other Non-Cooking Topics
     'cars', 'automotive', 'real estate', 'property', 'rent', 'mortgage', 'insurance',
     'pets', 'animals', 'dogs', 'cats', 'gardening', 'plants', 'flowers', 'lawn',
     'books', 'reading', 'writing', 'art', 'painting', 'music', 'instruments',
     'hobbies', 'crafts', 'diy', 'woodworking', 'knitting', 'sewing'
   ];
-  
+
   return offTopicKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
@@ -389,7 +582,7 @@ function extractRecipesFromResponse(response) {
   const recipes = [];
   const uniqueRecipes = new Set(); // Prevent duplicates
   
-
+ 
   
   // Helper function to clean and validate recipe names
   const cleanRecipeName = (name) => {
@@ -506,139 +699,120 @@ function extractRecipesFromResponse(response) {
   // IMPROVED FALLBACK: More intelligent line analysis
   if (recipes.length === 0) {
     const lines = response.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Skip empty lines and obvious non-recipe content
-      if (!trimmed || 
-          trimmed.length < 5 || 
-          trimmed.length > 80 ||
+      if (!trimmed ||
+          trimmed.length < 3 ||
+          trimmed.length > 100 ||
           /^(ingredients?|instructions?|directions?|steps?|method|tips?|nutrition|safety|serves?|prep|cook|time|difficulty|brush|season|serve|preheat|transfer|pour|combine|whisk|beat|chop|dice|slice|cut|mince|drain|rinse|pat dry|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|both sides|all sides|to taste|as needed|optional|until|when|while|then|next|serve with|garnish with|top with|sprinkle with|dripping|tender|cooked through|juicy|flaky|golden brown|on both sides|on all sides|until cooked|until tender|until golden|cup|cups|tablespoon|teaspoon|pound|ounce|minutes|hours|degrees)/i.test(trimmed)) {
         continue;
       }
-      
-      // Must be proper sentence case
-      if (!/^[A-Z][a-z]/.test(trimmed) || /^[A-Z\s\d]+$/.test(trimmed)) {
+
+      // Must be proper sentence case or title case
+      if (!/^[A-Z]/.test(trimmed) || /^[A-Z\s\d]+$/.test(trimmed)) {
         continue;
       }
-      
+
       // Skip lines that are clearly instructions (start with verbs)
       if (/^(cook|bake|fry|mix|stir|add|heat|preheat|drain|rinse|pat|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage|place|put|transfer|pour|combine)/i.test(trimmed)) {
         continue;
       }
-      
-      // Check for strong recipe indicators
-      const strongRecipeIndicators = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta)\b/i;
-      
+
+      // Check for strong recipe indicators - simplified pattern for better performance
+      const strongRecipeIndicators = /\b(chicken|beef|pork|fish|salmon|shrimp|tofu|egg|eggs|rice|pasta|noodles|bread|flour|potato|tomato|onion|garlic|pepper|carrot|cheese|milk|cream|butter|oil|salt|pepper|sugar|lemon|lime|vanilla|chocolate|cocoa|soup|stew|salad|sandwich|pizza|cake|cookie|pie|sauce|dressing|marinade|spice|herb|seasoning|recipe|dish|meal|cooking|food|cuisine|flavor|style|method|technique|preparation|adobo|sinigang|kare-kare|tinola|nilaga|paksiw|pinakbet|chopsuey|sisig|lechon|lumpia|pancit|palabok|menudo|afritada|caldereta|mechado|bistek|picadillo|arroz|caldo|goto|lugaw|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana|cue|ginataang|laing|pinangat|bicol|express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua)\b/i;
+
       if (strongRecipeIndicators.test(trimmed)) {
         addRecipe(trimmed, 'intelligent_fallback');
       }
     }
   }
-  
+
+  // ADDITIONAL FALLBACK: Look for common recipe name patterns
+  if (recipes.length === 0) {
+    // Pattern for "Recipe: Name" or "Dish: Name"
+    const colonPattern = /\b(recipe|dish|meal|food|try|make|here'?s):\s*([A-Z][A-Za-z\s-]{3,80})/gi;
+    let match;
+    while ((match = colonPattern.exec(response)) !== null) {
+      const recipeName = match[2].trim();
+      if (recipeName.length > 3 && recipeName.length < 80) {
+        addRecipe(recipeName, 'colon_pattern');
+      }
+    }
+
+    // Pattern for quotes around recipe names
+    const quotePattern = /["']([A-Z][A-Za-z\s-]{5,80})["']/g;
+    while ((match = quotePattern.exec(response)) !== null) {
+      const recipeName = match[1].trim();
+      if (recipeName.length > 3 && recipeName.length < 80) {
+        addRecipe(recipeName, 'quote_pattern');
+      }
+    }
+  }
+
   return recipes;
 }
 
 // Improved recipe validation function with better international support and less aggressive filtering
 function isValidRecipe(text) {
-  if (!text || text.length === 0) {
-    return false;
-  }
-  const lower = text.toLowerCase().trim();
-  
-  // 1. REJECT INSTRUCTIONS: If it starts with a verb, it's not a title.
-  // e.g. "Crack the egg", "Pour the milk", "Heat the pan"
-  const cookingVerbs = /^(crack|pour|mix|stir|heat|add|place|put|whisk|boil|fry|bake|roast|slice|chop|mince|peel|cut|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|microwave|freeze|chill|refrigerate|wash|clean|dry|pat|season|taste|adjust)/i;
-  
-  if (cookingVerbs.test(text)) {
-    console.log(`Rejecting instruction-like title: "${text}"`);
+  if (!text || typeof text !== 'string' || text.length < 3) return false;
+
+  const cleanText = text.trim();
+  const lowerText = cleanText.toLowerCase();
+
+  // 1. BLOCKLIST: Immediate rejection for known non-recipe phrases
+  // Reduced blocklist to only clear non-recipe terms
+  const blockTerms = [
+    'click', 'view', 'read', 'here', 'link', 'website', 'youtube', 'video',
+    'welcome', 'hello', 'hi', 'thank', 'sorry', 'goodbye'
+  ];
+
+  if (blockTerms.some(term => lowerText.startsWith(term) || lowerText === term)) {
+    console.log(`❌ [VALIDATION] Rejected blocked term: "${cleanText}"`);
     return false;
   }
 
-  // 2. REJECT LONG SENTENCES: Titles are rarely longer than 10 words
-  if (text.split(' ').length > 10) return false;
-  
-  const lowerText = text.toLowerCase().trim();
-  
-  // Basic length check - more lenient
-  if (text.length < 3 || text.length > 80) {
-    return false;
+  // 2. COOKING VERB CHECK: If it starts with a verb, it's an instruction, not a title
+  // e.g. "Bake for 20 mins" -> REJECT
+  // But be more lenient - only reject if it's clearly an instruction
+  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust)/i;
+
+  if (cookingVerbs.test(cleanText)) {
+    // Only reject if it looks like an instruction (has additional words after the verb)
+    const wordsAfterVerb = cleanText.replace(cookingVerbs, '').trim();
+    if (wordsAfterVerb && !wordsAfterVerb.startsWith('(') && !wordsAfterVerb.startsWith('-')) {
+      console.log(`❌ [VALIDATION] Rejected instruction starting with verb: "${cleanText}"`);
+      return false;
+    }
   }
-  
-  // Must start with capital letter or number
-  if (!/^[A-Z0-9]/.test(text.trim())) {
-    return false;
-  }
-  
-  // SPECIFIC EXCLUSIONS for clear non-recipe terms
-  const excludeTerms = [
-    // Only exclude clear section headers and instruction phrases
-    'ingredients:', 'instructions:', 'directions:', 'method:', 'nutrition:', 'safety:',
-    'step ', 'steps ', 'cooking time', 'prep time', 'servings:', 'difficulty:',
-    'temperature', 'degrees', 'minutes', 'hours', 'cup ', 'cups ', 'tablespoon', 'teaspoon',
-    'ounce', 'pound',
-    // Only exclude complete instructional phrases
-    'preheat the oven to', 'heat the oil in', 'cook until tender', 'bake until golden',
-    'fry until crispy', 'serve hot immediately', 'serve warm with', 'season with salt',
-    'brush both sides', 'transfer to plate', 'combine all ingredients'
-  ];
-  
-  // Check for excluded terms (more precise matching)
-  if (excludeTerms.some(term => lowerText === term || lowerText.includes(term))) {
-    return false;
-  }
-  
-  // Expanded food keywords with international dishes
-  const foodKeywords = /\b(chicken|beef|pork|fish|salmon|shrimp|tuna|cod|haddock|lamb|turkey|tofu|egg|eggs|rice|pasta|noodles|spaghetti|macaroni|bread|flour|oats|quinoa|potato|tomato|onion|garlic|pepper|bell pepper|carrot|celery|lettuce|spinach|kale|cucumber|mushroom|zucchini|eggplant|broccoli|cauliflower|green beans|peas|corn|cheese|mozzarella|parmesan|cheddar|milk|cream|butter|yogurt|sour cream|oil|olive oil|vegetable oil|canola oil|sesame oil|salt|pepper|garlic powder|onion powder|paprika|cumin|oregano|thyme|basil|rosemary|sugar|honey|maple syrup|brown sugar|lemon|lime|orange|apple|banana|berries|grapes|avocado|vanilla|almond|coconut|chocolate|cocoa|soup|stew|salad|sandwich|pizza|bread|cake|cookie|pancake|waffle|curry|taco|tacos|burrito|omelette|lasagna|risotto|muffin|brownie|pie|sauce|dressing|marinade|rub|spice|herb|seasoning|condiment|bbq|grilled|roasted|braised|stir-fry|fried|baked|sauteed|steamed|poached|smoked|marinated|glazed|caramelized|crispy|tender|juicy|spicy|sweet|sour|bitter|salty|umami|fresh|organic|local|seasonal|homemade|traditional|authentic|fusion|comfort|quick|easy|simple|complex|elegant|rustic|gourmet|restaurant-style|street-food|appetizer|entree|main|dessert|snack|breakfast|lunch|dinner|supper|brunch|side|starter|course|meal|dish|cuisine|flavor|style|method|technique|preparation|cooking|recipe|ingredient|champorado|adobo|sinigang|kare-kare|bistek|lechon|paksiw|crispy|kinilaw|ceviche|tartare|sushi|ramen|udon|tempura|teriyaki|yakitori|miso|poke|bento|kimchi|bibimbap|bulgogi|japchae|tteokbokki|pancit|lumpia|siopao|pad-thai|green-curry|massaman|khao-soi|som-tam|larb|nam-tok|pho|banh-mi|bun-cha|com-tam|goi-cuon|spring-roll|fresh-roll|satay|nasi-goreng|samosa|naan|tikka|masala|dal|biryani|pulao|rogan|butter-chicken|tandoori|moussaka|souvlaki|gyro|tzatziki|hummus|tabbouleh|falafel|paella|tapas|gazpacho|tortilla|frittata|pesto|bruschetta|minestrone|beef-wellington|fish-and-chips|shepherds-pie|bangers-and-mash|toad-in-the-hole|croque-monsieur|crepes|souffle|ratatouille|coq-au-vin|boeuf-bourguignon|pierogi|borscht|goulash|schnitzel|stroganoff|cabbage-rolls|tacos|enchiladas|quesadillas|pozole|mole|guacamole|salsa|carnitas|jambalaya|gumbo|crawfish|etouffee|red-beans-and-rice|po-boys|muffuletta|korean|chinese|italian|mexican|indian|thai|french|mediterranean)\b/i;
-  
-  const foodKeywordMatch = foodKeywords.test(lowerText);
-  
-  // If food keywords found, it's likely a valid recipe
-  if (foodKeywordMatch) {
-    return true;
-  }
-  
-  // More comprehensive instruction pattern detection to reject cooking instructions
-  const instructionPatterns = [
-    // Clear cooking instruction starters
-    /^(cook|bake|fry|mix|stir|add|heat|preheat|drain|rinse|pat|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage|place|put|transfer|pour|combine|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|place|put)\b/i,
-    // Instructions with "in a", "on a", "over" etc.
-    /^(in|on|over|under|at|to|for|with)\s+(a|an|the)\s+(skillet|pan|pot|oven|grill|bowl|plate|container)/i,
-    // Instructions with time indicators
-    /\b(minutes?|hours?|seconds?|until|for)\b/i,
-    // Instructions with cooking methods
-    /\b(according to package instructions|until al dente|until tender|until golden|until cooked|until done)\b/i,
-    // Instructions starting with "let", "allow", "keep"
-    /^(let|allow|keep)\s+(it|them|the)\s+(marinate|rest|cool|warm)/i
-  ];
-  
-  // Check if text matches cooking instruction patterns
-  if (instructionPatterns.some(pattern => pattern.test(text))) {
-    return false;
-  }
-  
-  // If no food keywords, check if it looks like a legitimate dish name
-  const looksLikeDishName = (
-    // Proper capitalization pattern (not starting with lowercase)
-    /^[A-Z]/.test(text) &&
-    // Not too many words (likely not a full instruction)
-    text.split(/\s+/).length <= 6 &&
-    // Doesn't start with common instruction words
-    !/^(cook|bake|fry|mix|stir|add|heat|preheat|drain|rinse|pat|trim|peel|core|seed|marinate|chill|freeze|cover|uncover|brush|season|serve|whisk|beat|chop|dice|slice|cut|mince|crush|mash|blend|simmer|boil|saute|grill|roast|caramelize|baste|glaze|toss|massage|place|put|transfer|pour|combine|let|allow|keep|in|on|over|under|at|to|for|with)\b/i.test(text) &&
-    // Doesn't end with clear instruction indicators
-    !/(ly|ing|ed)$/.test(lowerText.split(' ').pop()) &&
-    // No excessive punctuation that suggests it's an instruction
-    (text.match(/[,]/g) || []).length <= 2 &&
-    // Doesn't contain typical instruction phrases
-    !/\b(according to|until|for\s+\d+|minutes?|hours?|in\s+a\s+skillet|in\s+a\s+pan|on\s+medium\s+heat|over\s+medium\s+heat)\b/i.test(lowerText)
+
+  // 3. ALLOWLIST: It MUST contain at least one food-related keyword
+  // This is the "Strict" part. If it doesn't mention food, it's not a recipe card.
+  // Simplified food keywords pattern for better performance
+  const foodKeywords = new RegExp(
+    '\\b(' +
+    // Core food categories
+    'chicken|beef|pork|fish|salmon|shrimp|tofu|egg|eggs|rice|pasta|noodles|bread|flour|potato|tomato|onion|garlic|pepper|carrot|cheese|milk|cream|butter|oil|salt|pepper|sugar|lemon|lime|vanilla|chocolate|cocoa|soup|stew|salad|sandwich|pizza|cake|cookie|pie|sauce|dressing|marinade|spice|herb|seasoning|recipe|dish|meal|cooking|food|cuisine|flavor|style|method|technique|preparation|adobo|sinigang|kare-kare|tinola|nilaga|paksiw|pinakbet|chopsuey|sisig|lechon|lumpia|pancit|palabok|menudo|afritada|caldereta|mechado|bistek|picadillo|arroz|caldo|goto|lugaw|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana|cue|ginataang|laing|pinangat|bicol|express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua|champorado|bibingka|puto|kutsinta|sapin-sapin|halo-halo|turon|banana|cue|ginataang|laing|pinangat|bicol|express|kinilaw|kilawin|bulalo|batchoy|mami|lomi|sotanghon|misua'
+    + ')\\b',
+    'i'
   );
-  
-  if (looksLikeDishName) {
-    return true;
+
+  const hasFoodKeyword = foodKeywords.test(lowerText);
+
+  if (!hasFoodKeyword) {
+    // Be more lenient - if it looks like a proper title (capitalized, reasonable length), accept it
+    if (/^[A-Z][a-z]/.test(cleanText) && cleanText.length > 5 && cleanText.length < 80 && cleanText.split(' ').length <= 8) {
+      console.log(`✅ [VALIDATION] Accepted (lenient): "${cleanText}"`);
+      return true;
+    }
+    console.log(`❌ [VALIDATION] Rejected (No Food Keyword): "${cleanText}"`);
+    return false;
   }
-  
-  return false;
+
+  console.log(`✅ [VALIDATION] Accepted: "${cleanText}"`);
+  return true;
 }
 
 // Test function to validate "Korean-Style BBQ Beef Tacos"
@@ -701,7 +875,7 @@ async function callGroqAI(message, conversationHistory = []) {
     content: `You are CookMate, a comprehensive AI cooking assistant. Your primary goal is to provide a helpful and engaging conversational experience about cooking, while also extracting key recipe information in a structured format.
 
 **Conversational Response:**
-First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking.
+First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking. **IMPORTANT: Keep your conversational response brief and concise - aim for 1-3 sentences maximum.** Focus on the key information the user needs.
 
 **Structured JSON Output:**
 After the conversational text, you MUST include a structured JSON object. This JSON object should be enclosed in \`\`\`json code blocks. The JSON should contain a single key, "recipes," which is an array of recipe objects. For each recipe mentioned or implied in the user's request, create a JSON object with the following fields:
@@ -717,7 +891,7 @@ After the conversational text, you MUST include a structured JSON object. This J
 User: "I'm thinking of making some adobo and maybe some sinigang."
 
 Your Response:
-That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup. Do you have a preference for which one you'd like to make?
+That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup.
 
 \`\`\`json
 {
@@ -734,6 +908,9 @@ That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinega
     }
   ]
 }
+
+**NON-FOOD QUERIES:**
+If the user asks for something that is NOT a food item (e.g., "Swimming Pool", "Cement", "Chair"), you MUST return an empty recipes array in the JSON: { "recipes": [] }. Do NOT invent recipes for non-food items.
 \`\`\``
   };
   
@@ -831,10 +1008,65 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
       });
     }
     
+    // Check for gratitude and compliments (to prevent false recipe generation)
+    if (isGratitudeOrCompliment(message)) {
+      try {
+        // Use AI to generate a natural, personalized response to gratitude
+        const gratitudePrompt = `The user said: "${message}". This is a compliment or expression of gratitude. Respond warmly and naturally as CookMate, the AI cooking assistant. Keep the response friendly, personal, and cooking-themed. Do NOT generate any recipes or cooking suggestions - this is purely a social response. Make it feel genuine and engaging.`;
+
+        const aiResponse = await callGroqAI(gratitudePrompt);
+
+        // Clean up the AI response to remove any accidental recipe references
+        let cleanedResponse = aiResponse
+          .replace(/```json[\s\S]*?```/i, '') // Remove any JSON blocks
+          .replace(/```/g, '') // Remove code blocks
+          .replace(/\b(recipe|cook|ingredient|dish|meal)\b/gi, 'cooking') // Replace cooking terms
+          .trim();
+
+        // Fallback if AI response is empty or problematic
+        if (!cleanedResponse || cleanedResponse.length < 10 || cleanedResponse.includes('{') || cleanedResponse.includes('}')) {
+          cleanedResponse = "You're very welcome! 😊 I'm happy to help with your cooking adventures! Let me know if you need more assistance.";
+        }
+
+        return res.status(200).json({
+          response: {
+            message: cleanedResponse,
+            timestamp: new Date().toISOString(),
+            userId: req.userId,
+            isGratitudeResponse: true,
+            redirectToCooking: false,
+            detectedRecipes: [] // No recipes for gratitude messages
+          }
+        });
+      } catch (aiError) {
+        console.error('AI gratitude response failed, using fallback:', aiError.message);
+
+        // Fallback response if AI call fails
+        const fallbackResponses = [
+          "You're very welcome! 😊 I'm happy to help with your cooking adventures!",
+          "Thank you for your kind words! 🍳 Let me know if you need more cooking assistance!",
+          "I appreciate your feedback! 👨‍🍳 What would you like to cook next?",
+          "That's so nice to hear! 😊 What can I help you with in the kitchen today?",
+          "Thank you! 🍽️ I'm here whenever you need more recipe ideas or cooking help!"
+        ];
+
+        return res.status(200).json({
+          response: {
+            message: fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)],
+            timestamp: new Date().toISOString(),
+            userId: req.userId,
+            isGratitudeResponse: true,
+            redirectToCooking: false,
+            detectedRecipes: [] // No recipes for gratitude messages
+          }
+        });
+      }
+    }
+
     // Check for off-topic content only after checking legitimate cooking questions
     if (isOffTopic(message)) {
       const aiReply = getOffTopicResponse(message);
-      
+
       return res.status(200).json({
         response: {
           message: aiReply,
@@ -851,33 +1083,103 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
     let aiReply;
     let detectedRecipes = [];
-    
+    let jsonExtractionSuccess = false;
+    let jsonStringToClean = null;
+
     try {
       const fullResponse = await callGroqAI(message, history);
-      
-      // 1. EXTRACT FIRST (Before cleaning)
-      const jsonMatch = fullResponse.match(/```json([\s\S]*?)```/);
-      if (jsonMatch && jsonMatch[1]) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed.recipes) detectedRecipes = parsed.recipes.map(r => r.title || r.name);
-        } catch (e) { console.error('JSON Parse Error', e); }
+
+      // STRATEGY 1: Look for Markdown Code Blocks (Standard)
+      const markdownMatch = fullResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+
+      if (markdownMatch && markdownMatch[1]) {
+        const parsed = safeJSONParse(markdownMatch[1]);
+        if (parsed && parsed.recipes) {
+          detectedRecipes = parsed.recipes;
+          jsonExtractionSuccess = true;
+          jsonStringToClean = markdownMatch[0]; // Remove the whole block including backticks
+        }
       }
 
-      // 2. CLEANUP SECOND
-      aiReply = fullResponse.replace(/```json[\s\S]*?```/g, '').trim();
-      if (!aiReply) aiReply = "I found some recipes! Check below.";
+      // STRATEGY 2: Look for Raw JSON (Fallback if AI forgot backticks)
+      // Look for a structure starting with { "recipes": or { recipes:
+      if (!jsonExtractionSuccess) {
+        const rawJsonMatch = fullResponse.match(/(\{\s*"?recipes"?\s*:[\s\S]*\})/i);
+        if (rawJsonMatch && rawJsonMatch[1]) {
+          const parsed = safeJSONParse(rawJsonMatch[1]);
+          if (parsed && parsed.recipes) {
+            detectedRecipes = parsed.recipes;
+            jsonExtractionSuccess = true;
+            jsonStringToClean = rawJsonMatch[1]; // Remove just the JSON object
+          }
+        }
+      }
 
-      // 3. Fallback Detection (if JSON failed)
-      if (detectedRecipes.length === 0) {
+      // 3. VALIDATE & FILTER
+      if (jsonExtractionSuccess && Array.isArray(detectedRecipes)) {
+        detectedRecipes = detectedRecipes
+          .map(r => r.title || r.name)
+          .filter(title => title && isValidRecipe(title));
+      }
+
+      // 4. CLEANUP RESPONSE TEXT
+      // If we found JSON, remove it from the message so the user doesn't see code
+      aiReply = fullResponse;
+      if (jsonStringToClean) {
+        aiReply = fullResponse.replace(jsonStringToClean, '').trim();
+      }
+
+      // Remove any lingering empty tags or "Here is the JSON:" text
+      aiReply = aiReply.replace(/```\s*```/g, '')
+                      .replace(/Here is the JSON:?/i, '')
+                      .trim();
+
+      // Remove detailed recipe content (ingredients, instructions) since they'll be shown in recipe detail page
+      // Remove ingredient sections
+      aiReply = aiReply.replace(/Ingredients?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      // Remove instruction sections
+                      .replace(/Instructions?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Directions?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Steps?\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      .replace(/Method\s*:?[\s\S]*?(?=\n\s*[A-Z][a-z]|\n\s*This|\n\s*[A-Z][a-z].*recipe|$)/gi, '')
+                      // Remove bullet point lists
+                      .replace(/^\s*[•\-*]\s*.*(\n\s*[•\-*]\s*.*)*/gm, '')
+                      // Remove numbered lists
+                      .replace(/^\s*\d+\.\s*.*(\n\s*\d+\.\s*.*)*/gm, '')
+                      // FINAL CLEANUP: Remove any remaining JSON references or code block markers
+                      // Remove entire phrases that reference JSON or recipe data
+                      .replace(/\bjson\b/gi, 'recipe data')
+                      .replace(/Here is the (?:JSON|recipe data):?/gi, '')
+                      .replace(/Here\'s the (?:JSON|recipe data):?/gi, '')
+                      .replace(/The (?:JSON|recipe data) is:?/gi, '')
+                      .replace(/recipe data/gi, '')
+                      .replace(/```/g, '')
+                      .replace(/`/g, '')
+                      .trim();
+
+      if (!aiReply || aiReply.length < 20 || !aiReply.match(/[a-zA-Z0-9]/)) {
+        aiReply = "I found some recipes! Check below.";
+      }
+
+      // OPTIONAL: Summarize lengthy responses to focus on recipe descriptions
+      // This helps when users want brief recipe descriptions rather than detailed instructions
+      if (aiReply.length > 300) {
+        // Try to extract just the recipe descriptions and key points
+        const summaryMatch = aiReply.match(/Here's [^\.!]*\.|How about [^\.!]*\.|Let's [^\.!]*\./i);
+        if (summaryMatch) {
+          aiReply = summaryMatch[0] + " Check below for more details.";
+        }
+      }
+
+      // 5. LEGACY FALLBACK (Only if both JSON strategies failed completely)
+      if (!jsonExtractionSuccess && detectedRecipes.length === 0) {
         detectedRecipes = extractRecipesFromResponse(fullResponse);
       }
 
-      // 4. Store Data
+      // 6. STORE DATA
       if (detectedRecipes.length > 0) {
          await Promise.allSettled(detectedRecipes.map(r => storeDetectedRecipe(r, req.userId)));
       }
-
     } catch (aiError) {
       console.error('AI service failed, using fallback response:', aiError.message);
       
@@ -915,9 +1217,11 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
     
     // Extract recipes from AI response for consistency (if not already detected)
     if (detectedRecipes.length === 0) {
-      detectedRecipes = extractRecipesFromResponse(aiReply);
+      // Use the original fullResponse for fallback to ensure we don't miss any recipes
+      // that might have been removed during cleanup
+      detectedRecipes = extractRecipesFromResponse(fullResponse);
     }
-      
+       
       // 5. Send Response (Ensuring detectedRecipes is included!)
       res.status(200).json({
         response: {
