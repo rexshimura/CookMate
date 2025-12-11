@@ -22,6 +22,8 @@ import Collections from "./pages/Collections.jsx";
 import RecipeDetailsPage from "./pages/RecipeDetailsPage.jsx";
 import SigninPage from "./pages/Auth/Sign-In.jsx";
 import SignupPage from "./pages/Auth/Sign-Up.jsx";
+import AccountPreferences from "./pages/Personalization/AccountPreferences";
+import AccountProfile from "./pages/Personalization/AccountProfile";
 import './App.css';
 
 // Create Modal Context
@@ -361,6 +363,8 @@ function App() {
                     <SignupPage />
                   </ProtectedRoute>
                 } />
+                <Route path="/preferences" element={<AccountPreferences />} />
+                <Route path="/profile" element={<AccountProfile />} />
               </Routes>
             </div>
           </ModalManager>
