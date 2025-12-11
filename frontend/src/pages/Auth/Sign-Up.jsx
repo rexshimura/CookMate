@@ -24,7 +24,7 @@ export default function SignupPage() {
       const result = await signUp(email, password, name);
       
       if (result.success) {
-        navigate("/home");
+        navigate("/preferences");
       } else {
         setError(result.error || "Failed to create account. Please try again.");
       }
