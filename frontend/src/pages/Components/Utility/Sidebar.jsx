@@ -45,6 +45,12 @@ const Sidebar = ({
     if (isMobile && onClose) onClose();
   };
 
+  // ADDED: Handler for profile click
+  const handleProfileClick = () => {
+    navigate('/profile');
+    if (isMobile && onClose) onClose();
+  };
+
   const formatLastMessage = (lastMessage) => {
     if (!lastMessage) return 'New chat session';
     return lastMessage.length > 40 ? lastMessage.substring(0, 40) + '...' : lastMessage;
@@ -56,10 +62,10 @@ const Sidebar = ({
       bg-gradient-to-b from-white via-stone-50 to-stone-100 
       border-r border-stone-200/60 backdrop-blur-xl shadow-2xl
       ${isMobile 
-          ? 'w-80 transition-transform duration-400 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform' // Mobile uses transform
+          ? 'w-80 transition-transform duration-400 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform' 
           : `transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${isCollapsed 
-            ? 'w-20' // Desktop collapsed width
-            : 'w-80 lg:w-96' // Desktop expanded width
+            ? 'w-20' 
+            : 'w-80 lg:w-96' 
           }`
       } 
     `}>
@@ -220,9 +226,6 @@ const Sidebar = ({
                           e.stopPropagation();
                           onDeleteSession(session.id, e);
                         }}
-                        /* MODIFIED HERE:
-                          Added conditional opacity based on isMobile prop
-                        */
                         className={`
                           p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all
                           ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
@@ -261,18 +264,25 @@ const Sidebar = ({
         `}>
           {user ? (
             <>
-              <div className={`
-                w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
-                bg-gradient-to-br from-stone-700 to-stone-900 text-white shadow-md
-                flex-shrink-0
+              {/* Clickable Profile Avatar */}
+              <div
+                onClick={handleProfileClick}
+                className={`
+                  w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
+                  bg-gradient-to-br from-stone-700 to-stone-900 text-white shadow-md
+                  flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-stone-200 transition-all
               `}>
                 {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'A'}
               </div>
 
               {(!isCollapsed || isMobile) && (
                 <>
-                  <div className="flex-1 overflow-hidden">
-                    <p className="text-sm font-semibold text-stone-700 truncate">
+                  {/* Clickable Name/Email */}
+                  <div
+                    onClick={handleProfileClick}
+                    className="flex-1 overflow-hidden cursor-pointer group"
+                  >
+                    <p className="text-sm font-semibold text-stone-700 truncate group-hover:text-stone-900 transition-colors">
                       {user.displayName || 'User'}
                     </p>
                     <p className="text-xs text-stone-500 truncate">{user.email}</p>
