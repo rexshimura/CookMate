@@ -63,11 +63,15 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       allergies,
       isVegan,
       isDiabetic,
-      isOnDiet,
+      isDiet, // Changed from isOnDiet to match frontend
+      isMuslim,
+      isLactoseFree,
+      isHighCalorie,
       prefersSalty,
       prefersSpicy,
-      dislikedIngredients,
-      isMuslim
+      prefersSweet,
+      prefersSour,
+      dislikedIngredients
     } = req.body;
 
     // List of countries with well-known cuisines and recipes for validation
@@ -144,8 +148,20 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       updates.isDiabetic = isDiabetic;
     }
 
-    if (typeof isOnDiet === 'boolean') {
-      updates.isOnDiet = isOnDiet;
+    if (typeof isDiet === 'boolean') {
+      updates.isDiet = isDiet;
+    }
+
+    if (typeof isMuslim === 'boolean') {
+      updates.isMuslim = isMuslim;
+    }
+
+    if (typeof isLactoseFree === 'boolean') {
+      updates.isLactoseFree = isLactoseFree;
+    }
+
+    if (typeof isHighCalorie === 'boolean') {
+      updates.isHighCalorie = isHighCalorie;
     }
 
     if (typeof prefersSalty === 'boolean') {
@@ -156,8 +172,12 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       updates.prefersSpicy = prefersSpicy;
     }
 
-    if (typeof isMuslim === 'boolean') {
-      updates.isMuslim = isMuslim;
+    if (typeof prefersSweet === 'boolean') {
+      updates.prefersSweet = prefersSweet;
+    }
+
+    if (typeof prefersSour === 'boolean') {
+      updates.prefersSour = prefersSour;
     }
 
     if (Array.isArray(dislikedIngredients)) {
@@ -196,10 +216,14 @@ router.get('/personalization', verifyAuthToken, async (req, res) => {
       allergies: userData.allergies || [],
       isVegan: userData.isVegan || false,
       isDiabetic: userData.isDiabetic || false,
-      isOnDiet: userData.isOnDiet || false,
+      isDiet: userData.isDiet || false, // Changed from isOnDiet to match frontend
       isMuslim: userData.isMuslim || false,
+      isLactoseFree: userData.isLactoseFree || false,
+      isHighCalorie: userData.isHighCalorie || false,
       prefersSalty: userData.prefersSalty || false,
       prefersSpicy: userData.prefersSpicy || false,
+      prefersSweet: userData.prefersSweet || false,
+      prefersSour: userData.prefersSour || false,
       dislikedIngredients: userData.dislikedIngredients || []
     };
 

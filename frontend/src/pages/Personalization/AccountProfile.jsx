@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase';
-import { getUserProfile, updateUserProfile } from '../../utils/api';
+import { getUserProfile, updateUserProfile, updateUserPersonalization } from '../../utils/api';
 import {
   ArrowLeft, Settings, Mail, Calendar,
   Globe, User, Activity, Edit2, Scale, Moon,
   WheatOff, Ban, Flame, Utensils, Check, X,
-  ChevronRight, Loader2
+  ChevronRight, Loader2, Plus, Save, Edit3
 } from 'lucide-react';
 
 export default function AccountProfile() {
@@ -18,6 +18,27 @@ export default function AccountProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Modal state for editing preferences
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+  const [preferencesForm, setPreferencesForm] = useState({
+    nationality: '',
+    age: null,
+    gender: '',
+    allergies: [],
+    dislikedIngredients: [],
+    isVegan: false,
+    isDiabetic: false,
+    isDiet: false,
+    isMuslim: false,
+    isLactoseFree: false,
+    isHighCalorie: false,
+    prefersSalty: false,
+    prefersSpicy: false,
+    prefersSweet: false,
+    prefersSour: false
+  });
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -57,10 +78,14 @@ export default function AccountProfile() {
           allergies: userProfile.allergies,
           isVegan: userProfile.isVegan,
           isDiabetic: userProfile.isDiabetic,
-          isOnDiet: userProfile.isOnDiet,
+          isDiet: userProfile.isDiet, // Changed from isOnDiet to match backend
           isMuslim: userProfile.isMuslim,
+          isLactoseFree: userProfile.isLactoseFree,
+          isHighCalorie: userProfile.isHighCalorie,
           prefersSalty: userProfile.prefersSalty,
           prefersSpicy: userProfile.prefersSpicy,
+          prefersSweet: userProfile.prefersSweet,
+          prefersSour: userProfile.prefersSour,
           dislikedIngredients: userProfile.dislikedIngredients
         };
         setPreferences({
@@ -77,12 +102,16 @@ export default function AccountProfile() {
           diets: [
             ...(personalization.isVegan ? [{ label: 'Vegan', icon: Scale, color: 'text-green-600', bg: 'bg-green-50' }] : []),
             ...(personalization.isDiabetic ? [{ label: 'Diabetic', icon: Scale, color: 'text-blue-600', bg: 'bg-blue-50' }] : []),
-            ...(personalization.isOnDiet ? [{ label: 'Weight Loss', icon: Scale, color: 'text-purple-600', bg: 'bg-purple-50' }] : []),
-            ...(personalization.isMuslim ? [{ label: 'Halal', icon: Moon, color: 'text-indigo-600', bg: 'bg-indigo-50' }] : [])
+            ...(personalization.isDiet ? [{ label: 'Weight Loss', icon: Scale, color: 'text-purple-600', bg: 'bg-purple-50' }] : []),
+            ...(personalization.isMuslim ? [{ label: 'Halal', icon: Moon, color: 'text-indigo-600', bg: 'bg-indigo-50' }] : []),
+            ...(personalization.isLactoseFree ? [{ label: 'Lactose Free', icon: Scale, color: 'text-amber-600', bg: 'bg-amber-50' }] : []),
+            ...(personalization.isHighCalorie ? [{ label: 'Weight Gain', icon: Scale, color: 'text-red-600', bg: 'bg-red-50' }] : [])
           ],
           tastes: [
             ...(personalization.prefersSpicy ? [{ label: 'Spicy', icon: Flame, theme: 'red' }] : []),
-            ...(personalization.prefersSalty ? [{ label: 'Savory', icon: Utensils, theme: 'yellow' }] : [])
+            ...(personalization.prefersSalty ? [{ label: 'Savory', icon: Utensils, theme: 'yellow' }] : []),
+            ...(personalization.prefersSweet ? [{ label: 'Sweet', icon: Utensils, theme: 'pink' }] : []),
+            ...(personalization.prefersSour ? [{ label: 'Sour', icon: Utensils, theme: 'lime' }] : [])
           ]
         });
       } catch (err) {
@@ -125,6 +154,96 @@ export default function AccountProfile() {
     return 'Senior';
   };
 
+  // Preferences modal handlers
+  const openPreferencesModal = () => {
+    // Initialize form with current preferences
+    setPreferencesForm({
+      nationality: preferences?.nationalities?.[0]?.name || '',
+      age: preferences?.age || null,
+      gender: preferences?.gender || '',
+      allergies: preferences?.allergies || [],
+      dislikedIngredients: preferences?.dislikes || [],
+      isVegan: preferences?.diets?.some(d => d.label === 'Vegan') || false,
+      isDiabetic: preferences?.diets?.some(d => d.label === 'Diabetic') || false,
+      isDiet: preferences?.diets?.some(d => d.label === 'Weight Loss') || false,
+      isMuslim: preferences?.diets?.some(d => d.label === 'Halal') || false,
+      isLactoseFree: preferences?.diets?.some(d => d.label === 'Lactose Free') || false,
+      isHighCalorie: preferences?.diets?.some(d => d.label === 'Weight Gain') || false,
+      prefersSalty: preferences?.tastes?.some(t => t.label === 'Savory') || false,
+      prefersSpicy: preferences?.tastes?.some(t => t.label === 'Spicy') || false,
+      prefersSweet: preferences?.tastes?.some(t => t.label === 'Sweet') || false,
+      prefersSour: preferences?.tastes?.some(t => t.label === 'Sour') || false
+    });
+    setShowPreferencesModal(true);
+  };
+
+  const handlePreferencesChange = (field, value) => {
+    setPreferencesForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddAllergy = (allergy) => {
+    if (allergy && !preferencesForm.allergies.includes(allergy)) {
+      setPreferencesForm(prev => ({ ...prev, allergies: [...prev.allergies, allergy] }));
+    }
+  };
+
+  const handleRemoveAllergy = (allergy) => {
+    setPreferencesForm(prev => ({ ...prev, allergies: prev.allergies.filter(a => a !== allergy) }));
+  };
+
+  const handleAddDislike = (dislike) => {
+    if (dislike && !preferencesForm.dislikedIngredients.includes(dislike)) {
+      setPreferencesForm(prev => ({ ...prev, dislikedIngredients: [...prev.dislikedIngredients, dislike] }));
+    }
+  };
+
+  const handleRemoveDislike = (dislike) => {
+    setPreferencesForm(prev => ({ ...prev, dislikedIngredients: prev.dislikedIngredients.filter(d => d !== dislike) }));
+  };
+
+  const savePreferences = async () => {
+    try {
+      setPreferencesSaving(true);
+      await updateUserPersonalization(preferencesForm);
+      
+      // Update local state to reflect changes
+      setPreferences(prev => ({
+        ...prev,
+        nationalities: preferencesForm.nationality ? [{
+          code: 'XX',
+          name: preferencesForm.nationality,
+          flag: getCountryFlag(preferencesForm.nationality)
+        }] : [],
+        age: preferencesForm.age,
+        ageLabel: preferencesForm.age ? getAgeLabel(preferencesForm.age) : "",
+        gender: preferencesForm.gender,
+        allergies: preferencesForm.allergies,
+        dislikes: preferencesForm.dislikedIngredients,
+        diets: [
+          ...(preferencesForm.isVegan ? [{ label: 'Vegan', icon: Scale, color: 'text-green-600', bg: 'bg-green-50' }] : []),
+          ...(preferencesForm.isDiabetic ? [{ label: 'Diabetic', icon: Scale, color: 'text-blue-600', bg: 'bg-blue-50' }] : []),
+          ...(preferencesForm.isDiet ? [{ label: 'Weight Loss', icon: Scale, color: 'text-purple-600', bg: 'bg-purple-50' }] : []),
+          ...(preferencesForm.isMuslim ? [{ label: 'Halal', icon: Moon, color: 'text-indigo-600', bg: 'bg-indigo-50' }] : []),
+          ...(preferencesForm.isLactoseFree ? [{ label: 'Lactose Free', icon: Scale, color: 'text-amber-600', bg: 'bg-amber-50' }] : []),
+          ...(preferencesForm.isHighCalorie ? [{ label: 'Weight Gain', icon: Scale, color: 'text-red-600', bg: 'bg-red-50' }] : [])
+        ],
+        tastes: [
+          ...(preferencesForm.prefersSpicy ? [{ label: 'Spicy', icon: Flame, theme: 'red' }] : []),
+          ...(preferencesForm.prefersSalty ? [{ label: 'Savory', icon: Utensils, theme: 'yellow' }] : []),
+          ...(preferencesForm.prefersSweet ? [{ label: 'Sweet', icon: Utensils, theme: 'pink' }] : []),
+          ...(preferencesForm.prefersSour ? [{ label: 'Sour', icon: Utensils, theme: 'lime' }] : [])
+        ]
+      }));
+      
+      setShowPreferencesModal(false);
+    } catch (err) {
+      console.error('Failed to save preferences:', err);
+      setError(err.message || 'Failed to save preferences');
+    } finally {
+      setPreferencesSaving(false);
+    }
+  };
+
   const handleSaveName = async () => {
     try {
       setSaving(true);
@@ -153,12 +272,6 @@ export default function AccountProfile() {
             </button>
             <h1 className="text-xl font-bold text-stone-800">My Profile</h1>
           </div>
-          <button
-            onClick={() => navigate('/preferences')}
-            className="p-2 hover:bg-stone-50 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
         </div>
       </div>
 
@@ -314,7 +427,7 @@ export default function AccountProfile() {
                     Food Preferences
                   </h3>
                   <button
-                    onClick={() => navigate('/preferences')}
+                    onClick={openPreferencesModal}
                     className="flex items-center gap-1 text-sm font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition-all"
                   >
                     Update Preferences
@@ -405,6 +518,243 @@ export default function AccountProfile() {
           </div>
         )}
       </div>
+
+      {/* Preferences Modal */}
+      {showPreferencesModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-100">
+            <div className="p-6 border-b border-stone-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                    <Edit3 className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-stone-800 text-lg">Edit Preferences</h3>
+                    <p className="text-stone-500 text-sm">Update your dietary and taste preferences</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPreferencesModal(false)}
+                  className="p-2 hover:bg-stone-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-stone-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Nationality */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Nationality</label>
+                <input
+                  type="text"
+                  value={preferencesForm.nationality}
+                  onChange={(e) => handlePreferencesChange('nationality', e.target.value)}
+                  placeholder="e.g., Philippines, Japan, United States"
+                  className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Age */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Age</label>
+                <input
+                  type="number"
+                  value={preferencesForm.age || ''}
+                  onChange={(e) => handlePreferencesChange('age', e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="e.g., 25"
+                  min="1"
+                  max="120"
+                  className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Gender</label>
+                <select
+                  value={preferencesForm.gender}
+                  onChange={(e) => handlePreferencesChange('gender', e.target.value)}
+                  className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="others">Other</option>
+                  <option value="pnts">Prefer not to say</option>
+                </select>
+              </div>
+
+              {/* Allergies */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Allergies</label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g., Peanuts, Shellfish..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddAllergy(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                    />
+                    <button
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling;
+                        handleAddAllergy(input.value);
+                        input.value = '';
+                      }}
+                      className="px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {preferencesForm.allergies.map((allergy, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-red-50 text-red-700 rounded-full border border-red-200">
+                        <span className="text-sm font-semibold">{allergy}</span>
+                        <button
+                          onClick={() => handleRemoveAllergy(allergy)}
+                          className="hover:bg-red-200 rounded-full p-1 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {preferencesForm.allergies.length === 0 && (
+                      <span className="text-stone-400 text-sm italic">No allergies added</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Disliked Ingredients */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-2">Disliked Ingredients</label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g., Cilantro, Raisins..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddDislike(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="flex-1 px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                    />
+                    <button
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling;
+                        handleAddDislike(input.value);
+                        input.value = '';
+                      }}
+                      className="px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {preferencesForm.dislikedIngredients.map((dislike, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-stone-50 text-stone-700 rounded-full border border-stone-200">
+                        <span className="text-sm font-semibold">{dislike}</span>
+                        <button
+                          onClick={() => handleRemoveDislike(dislike)}
+                          className="hover:bg-stone-200 rounded-full p-1 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {preferencesForm.dislikedIngredients.length === 0 && (
+                      <span className="text-stone-400 text-sm italic">No disliked ingredients added</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dietary Preferences */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-3">Dietary Preferences</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: 'isVegan', label: 'Vegan' },
+                    { key: 'isDiabetic', label: 'Diabetic' },
+                    { key: 'isDiet', label: 'Weight Loss' },
+                    { key: 'isMuslim', label: 'Halal' },
+                    { key: 'isLactoseFree', label: 'Lactose Free' },
+                    { key: 'isHighCalorie', label: 'Weight Gain' }
+                  ].map((diet) => (
+                    <label key={diet.key} className="flex items-center gap-3 p-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={preferencesForm[diet.key]}
+                        onChange={(e) => handlePreferencesChange(diet.key, e.target.checked)}
+                        className="w-4 h-4 text-orange-500 bg-white border-stone-300 rounded focus:ring-orange-500 cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-stone-700">{diet.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Taste Preferences */}
+              <div>
+                <label className="block text-sm font-bold text-stone-600 mb-3">Taste Preferences</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'prefersSpicy', label: 'Spicy', theme: 'red' },
+                    { key: 'prefersSalty', label: 'Savory', theme: 'yellow' },
+                    { key: 'prefersSweet', label: 'Sweet', theme: 'pink' },
+                    { key: 'prefersSour', label: 'Sour', theme: 'lime' }
+                  ].map((taste) => (
+                    <label key={taste.key} className="flex items-center gap-3 p-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={preferencesForm[taste.key]}
+                        onChange={(e) => handlePreferencesChange(taste.key, e.target.checked)}
+                        className="w-4 h-4 text-orange-500 bg-white border-stone-300 rounded focus:ring-orange-500 cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-stone-700">{taste.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-stone-100 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowPreferencesModal(false)}
+                className="px-6 py-3 text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={savePreferences}
+                disabled={preferencesSaving}
+                className="flex items-center gap-3 px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {preferencesSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Save Preferences</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

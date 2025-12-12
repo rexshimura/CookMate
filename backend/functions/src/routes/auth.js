@@ -19,7 +19,28 @@ router.post('/register', async (req, res) => {
       email: userRecord.email,
       displayName: displayName || '',
       createdAt: new Date().toISOString(),
-      dietaryPreferences: '' // Initialize dietary preferences
+      dietaryPreferences: '', // Initialize dietary preferences
+      
+      // Personalization fields
+      nationality: req.body.nationality || '',
+      age: req.body.age || null,
+      gender: req.body.gender || '',
+      allergies: Array.isArray(req.body.allergies) ? req.body.allergies : [],
+      dislikedIngredients: Array.isArray(req.body.dislikedIngredients) ? req.body.dislikedIngredients : [],
+      
+      // Dietary preferences (boolean fields)
+      isVegan: Boolean(req.body.isVegan),
+      isDiet: Boolean(req.body.isDiet), // Changed from isOnDiet to match frontend
+      isMuslim: Boolean(req.body.isMuslim),
+      isDiabetic: Boolean(req.body.isDiabetic),
+      isLactoseFree: Boolean(req.body.isLactoseFree),
+      isHighCalorie: Boolean(req.body.isHighCalorie),
+      
+      // Taste preferences (boolean fields)
+      prefersSalty: Boolean(req.body.prefersSalty),
+      prefersSpicy: Boolean(req.body.prefersSpicy),
+      prefersSweet: Boolean(req.body.prefersSweet),
+      prefersSour: Boolean(req.body.prefersSour)
     });
 
     // 3. Create Default "My Favorites" Collection
