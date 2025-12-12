@@ -464,10 +464,16 @@ export default function AccountProfile() {
                            const themeColors = {
                               yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' },
                               red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-                              orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }
+                              orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
+                              pink: { bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-200' },
+                              lime: { bg: 'bg-lime-50', text: 'text-lime-600', border: 'border-lime-200' }
                            }[taste.theme];
+                           
+                           // Fallback to default colors if themeColors is undefined
+                           const colors = themeColors || { bg: 'bg-stone-50', text: 'text-stone-600', border: 'border-stone-200' };
+                           
                            return (
-                             <div key={idx} className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${themeColors.bg} ${themeColors.border} ${themeColors.text}`}>
+                             <div key={idx} className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${colors.bg} ${colors.border} ${colors.text}`}>
                                 <taste.icon className="w-4 h-4" />
                                 <span className="font-bold text-sm">{taste.label}</span>
                              </div>
