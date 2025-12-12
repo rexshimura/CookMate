@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { updateUserPersonalization } from '../../utils/api';
 import {
   ChefHat, Globe, User, Heart, Utensils, Flame,
   ArrowRight, ArrowLeft, X, Check, Search,
@@ -12,25 +13,178 @@ import {
 // --- Data Constants ---
 
 const COUNTRIES = [
-  { code: 'US', name: 'United States', flag: '🇺🇸' },
-  { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
-  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
-  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
-  { code: 'IN', name: 'India', flag: '🇮🇳' },
+  // Asia
+  { code: 'CN', name: 'China', flag: '🇨🇳' },
   { code: 'JP', name: 'Japan', flag: '🇯🇵' },
   { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
-  { code: 'CN', name: 'China', flag: '🇨🇳' },
-  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
-  { code: 'FR', name: 'France', flag: '🇫🇷' },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
-  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
-  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
-  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'VN', name: 'Vietnam', flag: '🇻🇳' },
+  { code: 'TH', name: 'Thailand', flag: '🇹🇭' },
+  { code: 'IN', name: 'India', flag: '🇮🇳' },
   { code: 'ID', name: 'Indonesia', flag: '🇮🇩' },
   { code: 'MY', name: 'Malaysia', flag: '🇲🇾' },
+  { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
+  { code: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: 'PK', name: 'Pakistan', flag: '🇵🇰' },
+  { code: 'IR', name: 'Iran', flag: '🇮🇷' },
+  { code: 'TR', name: 'Turkey', flag: '🇹🇷' },
   { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦' },
   { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪' },
+  { code: 'IL', name: 'Israel', flag: '🇮🇱' },
+  { code: 'LB', name: 'Lebanon', flag: '🇱🇧' },
+  { code: 'SY', name: 'Syria', flag: '🇸🇾' },
+  { code: 'IQ', name: 'Iraq', flag: '🇮🇶' },
+  { code: 'AF', name: 'Afghanistan', flag: '🇦🇫' },
+  { code: 'BD', name: 'Bangladesh', flag: '🇧🇩' },
+  { code: 'LK', name: 'Sri Lanka', flag: '🇱🇰' },
+  { code: 'NP', name: 'Nepal', flag: '🇳🇵' },
+  { code: 'MM', name: 'Myanmar', flag: '🇲🇲' },
+  { code: 'KH', name: 'Cambodia', flag: '🇰🇭' },
+  { code: 'LA', name: 'Laos', flag: '🇱🇦' },
+  { code: 'KZ', name: 'Kazakhstan', flag: '🇰🇿' },
+  { code: 'UZ', name: 'Uzbekistan', flag: '🇺🇿' },
+  { code: 'GE', name: 'Georgia', flag: '🇬🇪' },
+  { code: 'AM', name: 'Armenia', flag: '🇦🇲' },
+  
+  // Europe
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'PT', name: 'Portugal', flag: '🇵🇹' },
+  { code: 'GR', name: 'Greece', flag: '🇬🇷' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+  { code: 'BE', name: 'Belgium', flag: '🇧🇪' },
+  { code: 'CH', name: 'Switzerland', flag: '🇨🇭' },
+  { code: 'AT', name: 'Austria', flag: '🇦🇹' },
+  { code: 'PL', name: 'Poland', flag: '🇵🇱' },
+  { code: 'CZ', name: 'Czech Republic', flag: '🇨🇿' },
+  { code: 'HU', name: 'Hungary', flag: '🇭🇺' },
+  { code: 'SK', name: 'Slovakia', flag: '🇸🇰' },
+  { code: 'SI', name: 'Slovenia', flag: '🇸🇮' },
+  { code: 'HR', name: 'Croatia', flag: '🇭🇷' },
+  { code: 'RS', name: 'Serbia', flag: '🇷🇸' },
+  { code: 'RO', name: 'Romania', flag: '🇷🇴' },
+  { code: 'BG', name: 'Bulgaria', flag: '🇧🇬' },
+  { code: 'RU', name: 'Russia', flag: '🇷🇺' },
+  { code: 'UA', name: 'Ukraine', flag: '🇺🇦' },
+  { code: 'BY', name: 'Belarus', flag: '🇧🇾' },
+  { code: 'MD', name: 'Moldova', flag: '🇲🇩' },
+  { code: 'DK', name: 'Denmark', flag: '🇩🇰' },
+  { code: 'SE', name: 'Sweden', flag: '🇸🇪' },
+  { code: 'NO', name: 'Norway', flag: '🇳🇴' },
+  { code: 'FI', name: 'Finland', flag: '🇫🇮' },
+  { code: 'IS', name: 'Iceland', flag: '🇮🇸' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'IE', name: 'Ireland', flag: '🇮🇪' },
+  { code: 'LU', name: 'Luxembourg', flag: '🇱🇺' },
+  { code: 'MC', name: 'Monaco', flag: '🇲🇨' },
+  { code: 'VA', name: 'Vatican City', flag: '🇻🇦' },
+  { code: 'SM', name: 'San Marino', flag: '🇸🇲' },
+  
+  // Americas
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'AR', name: 'Argentina', flag: '🇦🇷' },
+  { code: 'CO', name: 'Colombia', flag: '🇨🇴' },
+  { code: 'PE', name: 'Peru', flag: '🇵🇪' },
+  { code: 'CL', name: 'Chile', flag: '🇨🇱' },
+  { code: 'VE', name: 'Venezuela', flag: '🇻🇪' },
+  { code: 'EC', name: 'Ecuador', flag: '🇪🇨' },
+  { code: 'GT', name: 'Guatemala', flag: '🇬🇹' },
+  { code: 'CU', name: 'Cuba', flag: '🇨🇺' },
+  { code: 'JM', name: 'Jamaica', flag: '🇯🇲' },
+  { code: 'DO', name: 'Dominican Republic', flag: '🇩🇴' },
+  { code: 'HN', name: 'Honduras', flag: '🇭🇳' },
+  { code: 'NI', name: 'Nicaragua', flag: '🇳🇮' },
+  { code: 'PA', name: 'Panama', flag: '🇵🇦' },
+  { code: 'BO', name: 'Bolivia', flag: '🇧🇴' },
+  { code: 'UY', name: 'Uruguay', flag: '🇺🇾' },
+  { code: 'PY', name: 'Paraguay', flag: '🇵🇾' },
+  { code: 'BZ', name: 'Belize', flag: '🇧🇿' },
+  { code: 'SV', name: 'El Salvador', flag: '🇸🇻' },
+  { code: 'CR', name: 'Costa Rica', flag: '🇨🇷' },
+  
+  // Africa
+  { code: 'EG', name: 'Egypt', flag: '🇪🇬' },
+  { code: 'MA', name: 'Morocco', flag: '🇲🇦' },
+  { code: 'DZ', name: 'Algeria', flag: '🇩🇿' },
+  { code: 'TN', name: 'Tunisia', flag: '🇹🇳' },
+  { code: 'NG', name: 'Nigeria', flag: '🇳🇬' },
+  { code: 'KE', name: 'Kenya', flag: '🇰🇪' },
+  { code: 'ET', name: 'Ethiopia', flag: '🇪🇹' },
+  { code: 'GH', name: 'Ghana', flag: '🇬🇭' },
+  { code: 'TZ', name: 'Tanzania', flag: '🇹🇿' },
+  { code: 'UG', name: 'Uganda', flag: '🇺🇬' },
+  { code: 'SD', name: 'Sudan', flag: '🇸🇩' },
+  { code: 'LY', name: 'Libya', flag: '🇱🇾' },
+  { code: 'SN', name: 'Senegal', flag: '🇸🇳' },
+  { code: 'CI', name: 'Ivory Coast', flag: '🇨🇮' },
+  { code: 'CM', name: 'Cameroon', flag: '🇨🇲' },
+  { code: 'BF', name: 'Burkina Faso', flag: '🇧🇫' },
+  { code: 'ZW', name: 'Zimbabwe', flag: '🇿🇼' },
+  { code: 'ZM', name: 'Zambia', flag: '🇿🇲' },
+  { code: 'AO', name: 'Angola', flag: '🇦🇴' },
+  { code: 'CD', name: 'DR Congo', flag: '🇨🇩' },
+  { code: 'CG', name: 'Congo', flag: '🇨🇬' },
+  { code: 'GA', name: 'Gabon', flag: '🇬🇦' },
+  { code: 'GQ', name: 'Equatorial Guinea', flag: '🇬🇶' },
+  { code: 'CV', name: 'Cabo Verde', flag: '🇨🇻' },
+  { code: 'ST', name: 'Sao Tome and Principe', flag: '🇸🇹' },
+  { code: 'GW', name: 'Guinea-Bissau', flag: '🇬🇼' },
+  { code: 'GN', name: 'Guinea', flag: '🇬🇳' },
+  { code: 'SL', name: 'Sierra Leone', flag: '🇸🇱' },
+  { code: 'LR', name: 'Liberia', flag: '🇱🇷' },
+  { code: 'BJ', name: 'Benin', flag: '🇧🇯' },
+  { code: 'TG', name: 'Togo', flag: '🇹🇬' },
+  { code: 'NE', name: 'Niger', flag: '🇳🇪' },
+  { code: 'TD', name: 'Chad', flag: '🇹🇩' },
+  { code: 'CF', name: 'Central African Republic', flag: '🇨🇫' },
+  { code: 'DJ', name: 'Djibouti', flag: '🇩🇯' },
+  { code: 'ER', name: 'Eritrea', flag: '🇪🇷' },
+  { code: 'SO', name: 'Somalia', flag: '🇸🇴' },
+  { code: 'SC', name: 'Seychelles', flag: '🇸🇨' },
+  { code: 'KM', name: 'Comoros', flag: '🇰🇲' },
+  { code: 'MG', name: 'Madagascar', flag: '🇲🇬' },
+  { code: 'MW', name: 'Malawi', flag: '🇲🇼' },
+  { code: 'MZ', name: 'Mozambique', flag: '🇲🇿' },
+  { code: 'NA', name: 'Namibia', flag: '🇳🇦' },
+  { code: 'BW', name: 'Botswana', flag: '🇧🇼' },
+  { code: 'SZ', name: 'Eswatini', flag: '🇸🇿' },
+  { code: 'LS', name: 'Lesotho', flag: '🇱🇸' },
+  { code: 'BI', name: 'Burundi', flag: '🇧🇮' },
+  { code: 'RW', name: 'Rwanda', flag: '🇷🇼' },
+  { code: 'MU', name: 'Mauritius', flag: '🇲🇺' },
+  { code: 'MR', name: 'Mauritania', flag: '🇲🇷' },
+  
+  // Oceania
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿' },
+  { code: 'FJ', name: 'Fiji', flag: '🇫🇯' },
+  { code: 'PG', name: 'Papua New Guinea', flag: '🇵🇬' },
+  { code: 'SB', name: 'Solomon Islands', flag: '🇸🇧' },
+  { code: 'VU', name: 'Vanuatu', flag: '🇻🇺' },
+  { code: 'NC', name: 'New Caledonia', flag: '🇳🇨' },
+  { code: 'WS', name: 'Samoa', flag: '🇼🇸' },
+  { code: 'TO', name: 'Tonga', flag: '🇹🇴' },
+  { code: 'TV', name: 'Tuvalu', flag: '🇹🇻' },
+  { code: 'NR', name: 'Nauru', flag: '🇳🇷' },
+  { code: 'KI', name: 'Kiribati', flag: '🇰🇮' },
+  { code: 'MH', name: 'Marshall Islands', flag: '🇲🇭' },
+  { code: 'FM', name: 'Micronesia', flag: '🇫🇲' },
+  { code: 'PW', name: 'Palau', flag: '🇵🇼' },
+  
+  // Caribbean
+  { code: 'HT', name: 'Haiti', flag: '🇭🇹' },
+  { code: 'BB', name: 'Barbados', flag: '🇧🇧' },
+  { code: 'GD', name: 'Grenada', flag: '🇬🇩' },
+  { code: 'VC', name: 'Saint Vincent and the Grenadines', flag: '🇻🇨' },
+  { code: 'LC', name: 'Saint Lucia', flag: '🇱🇨' },
+  { code: 'KN', name: 'Saint Kitts and Nevis', flag: '🇰🇳' },
+  { code: 'DM', name: 'Dominica', flag: '🇩🇲' },
+  { code: 'AG', name: 'Antigua and Barbuda', flag: '🇦🇬' },
+  { code: 'BS', name: 'Bahamas', flag: '🇧🇸' },
 ];
 
 const AGE_CATEGORIES = [
@@ -259,9 +413,40 @@ export default function AccountPreferences() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!handleValidation(7)) return;
-    setIsLoading(true);
-    // Future API Hookup
-    setTimeout(() => { setIsLoading(false); navigate('/home'); }, 1500);
+    
+    try {
+      setIsLoading(true);
+      
+      // Prepare the data to send to the backend
+      const personalizationData = {
+        nationality: formData.nationalities.length > 0 ? formData.nationalities[0].name : '',
+        age: formData.age,
+        gender: formData.gender,
+        allergies: formData.allergies,
+        dislikedIngredients: formData.dislikedIngredients,
+        isVegan: formData.isVegan,
+        isDiet: formData.isDiet,
+        isMuslim: formData.isMuslim,
+        isDiabetic: formData.isDiabetic,
+        isLactoseFree: formData.isLactoseFree,
+        isHighCalorie: formData.isHighCalorie,
+        prefersSalty: formData.preferSalty,
+        prefersSpicy: formData.preferSpicy,
+        prefersSweet: formData.preferSweet,
+        prefersSour: formData.preferSour
+      };
+      
+      // Save to backend
+      await updateUserPersonalization(personalizationData);
+      
+      // Navigate to home
+      navigate('/home');
+    } catch (error) {
+      console.error('Failed to save preferences:', error);
+      alert('Failed to save preferences. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // --- Render Steps ---

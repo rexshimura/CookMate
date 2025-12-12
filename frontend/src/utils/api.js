@@ -295,6 +295,23 @@ export const updateUserProfile = async (updates) => {
   }
 };
 
+// User Personalization API
+export const updateUserPersonalization = async (updates) => {
+  try {
+    // Input validation
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('Updates must be an object');
+    }
+
+    return await apiCall('/api/users/personalization', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  } catch (error) {
+    throw new Error(error.message || 'Failed to update user personalization');
+  }
+};
+
 // Favorites API (using collections underneath)
 export const getFavorites = async () => {
   try {
@@ -536,6 +553,7 @@ export default {
   getRecipeDetails,
   getUserProfile,
   updateUserProfile,
+  updateUserPersonalization,
   getFavorites,
   addToFavorites,
   removeFromFavorites,

@@ -1,47 +1,141 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../../firebase';
+import { getUserProfile, updateUserProfile } from '../../utils/api';
 import {
   ArrowLeft, Settings, Mail, Calendar,
   Globe, User, Activity, Edit2, Scale, Moon,
   WheatOff, Ban, Flame, Utensils, Check, X,
-  ChevronRight
+  ChevronRight, Loader2
 } from 'lucide-react';
 
 export default function AccountProfile() {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
-  const [displayName, setDisplayName] = useState("Rex Shimura");
+  const [displayName, setDisplayName] = useState("");
+  const [user, setUser] = useState(null);
+  const [preferences, setPreferences] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Static Data
-  const user = {
-    email: "rex@example.com",
-    joinedDate: "December 2023",
-    avatar: "RS",
+  // Fetch user data on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Check if user is authenticated before making API call
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setError('Please sign in to view your profile');
+          return;
+        }
+        
+        const userData = await getUserProfile();
+        const userProfile = userData.user;
+        
+        // Set display name (prefer displayName, fallback to email)
+        setDisplayName(userProfile.displayName || userProfile.email || "");
+        
+        // Set user data
+        setUser({
+          email: userProfile.email || "",
+          joinedDate: userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long'
+          }) : "",
+          avatar: userProfile.displayName ? userProfile.displayName.split(' ').map(n => n[0]).join('').toUpperCase() : userProfile.email ? userProfile.email[0].toUpperCase() : "U"
+        });
+        
+        // Set preferences from personalization data (stored directly in user document)
+        const personalization = {
+          nationality: userProfile.nationality,
+          age: userProfile.age,
+          gender: userProfile.gender,
+          allergies: userProfile.allergies,
+          isVegan: userProfile.isVegan,
+          isDiabetic: userProfile.isDiabetic,
+          isOnDiet: userProfile.isOnDiet,
+          isMuslim: userProfile.isMuslim,
+          prefersSalty: userProfile.prefersSalty,
+          prefersSpicy: userProfile.prefersSpicy,
+          dislikedIngredients: userProfile.dislikedIngredients
+        };
+        setPreferences({
+          nationalities: personalization.nationality ? [{
+            code: 'XX', // We don't have country codes, using placeholder
+            name: personalization.nationality,
+            flag: getCountryFlag(personalization.nationality)
+          }] : [],
+          age: personalization.age || null,
+          ageLabel: personalization.age ? getAgeLabel(personalization.age) : "",
+          gender: personalization.gender || "",
+          allergies: personalization.allergies || [],
+          dislikes: personalization.dislikedIngredients || [],
+          diets: [
+            ...(personalization.isVegan ? [{ label: 'Vegan', icon: Scale, color: 'text-green-600', bg: 'bg-green-50' }] : []),
+            ...(personalization.isDiabetic ? [{ label: 'Diabetic', icon: Scale, color: 'text-blue-600', bg: 'bg-blue-50' }] : []),
+            ...(personalization.isOnDiet ? [{ label: 'Weight Loss', icon: Scale, color: 'text-purple-600', bg: 'bg-purple-50' }] : []),
+            ...(personalization.isMuslim ? [{ label: 'Halal', icon: Moon, color: 'text-indigo-600', bg: 'bg-indigo-50' }] : [])
+          ],
+          tastes: [
+            ...(personalization.prefersSpicy ? [{ label: 'Spicy', icon: Flame, theme: 'red' }] : []),
+            ...(personalization.prefersSalty ? [{ label: 'Savory', icon: Utensils, theme: 'yellow' }] : [])
+          ]
+        });
+      } catch (err) {
+        console.error('❌ [AccountProfile] Failed to fetch user profile:', err);
+        setError(err.message || 'Failed to load profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [auth.currentUser]);
+
+  // Helper functions
+  const getCountryFlag = (countryName) => {
+    // Simple country flag mapping
+    const flagMap = {
+      'Philippines': '🇵🇭',
+      'Japan': '🇯🇵',
+      'United States': '🇺🇸',
+      'Canada': '🇨🇦',
+      'United Kingdom': '🇬🇧',
+      'Australia': '🇦🇺',
+      'Germany': '🇩🇪',
+      'France': '🇫🇷',
+      'Italy': '🇮🇹',
+      'Spain': '🇪🇸',
+      'China': '🇨🇳',
+      'India': '🇮🇳',
+      'Brazil': '🇧🇷',
+      'Mexico': '🇲🇽'
+    };
+    return flagMap[countryName] || '🌍';
   };
 
-  const preferences = {
-    nationalities: [
-      { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
-      { code: 'JP', name: 'Japan', flag: '🇯🇵' }
-    ],
-    age: 25,
-    ageLabel: "Young Adult",
-    gender: "Male",
-    allergies: ["Peanuts", "Shellfish"],
-    dislikes: ["Cilantro", "Raisins"],
-    diets: [
-      { label: 'Weight Loss', icon: Scale, color: 'text-purple-600', bg: 'bg-purple-50' },
-      { label: 'Halal', icon: Moon, color: 'text-indigo-600', bg: 'bg-indigo-50' }
-    ],
-    tastes: [
-      { label: 'Spicy', icon: Flame, theme: 'red' },
-      { label: 'Savory', icon: Utensils, theme: 'yellow' }
-    ]
+  const getAgeLabel = (age) => {
+    if (age < 18) return 'Minor';
+    if (age < 30) return 'Young Adult';
+    if (age < 50) return 'Adult';
+    return 'Senior';
   };
 
-  const handleSaveName = () => {
-    setIsEditing(false);
-    // Logic to save name would go here
+  const handleSaveName = async () => {
+    try {
+      setSaving(true);
+      await updateUserProfile({ displayName });
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      setError(err.message || 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -59,209 +153,257 @@ export default function AccountProfile() {
             </button>
             <h1 className="text-xl font-bold text-stone-800">My Profile</h1>
           </div>
-          <button className="p-2 hover:bg-stone-50 rounded-full text-stone-400 hover:text-stone-600 transition-colors">
+          <button
+            onClick={() => navigate('/preferences')}
+            className="p-2 hover:bg-stone-50 rounded-full text-stone-400 hover:text-stone-600 transition-colors"
+          >
             <Settings className="w-5 h-5" />
           </button>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-
-        {/* Header Profile Card */}
-        <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-28 bg-gradient-to-r from-orange-100 to-orange-50"></div>
-
-          <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 pt-12 md:pt-6">
-            <div className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-orange-400 to-red-500 rounded-full border-4 border-white shadow-md flex items-center justify-center text-3xl font-bold text-white shrink-0">
-              {user.avatar}
-            </div>
-
-            <div className="text-center md:text-left flex-1 space-y-2 mb-1 w-full md:w-auto">
-              {isEditing ? (
-                <div className="flex items-center justify-center md:justify-start gap-2">
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="text-2xl md:text-3xl font-bold text-stone-800 bg-transparent border-b-2 border-orange-200 focus:border-orange-500 outline-none px-1 w-full md:w-auto text-center md:text-left"
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <h2 className="text-2xl md:text-3xl font-bold text-stone-800">{displayName}</h2>
-              )}
-
-              <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-stone-500 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <Mail className="w-4 h-4" />
-                  <span>{user.email}</span>
-                </div>
-                <div className="hidden md:block w-1 h-1 bg-stone-300 rounded-full"></div>
-                <div className="flex items-center gap-1.5 text-stone-400">
-                  <Calendar className="w-4 h-4" />
-                  <span>Joined {user.joinedDate}</span>
-                </div>
-              </div>
-            </div>
-
-            {isEditing ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="p-2 text-stone-400 hover:bg-stone-100 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleSaveName}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors shadow-sm"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-stone-200 text-stone-700 rounded-xl text-sm font-bold hover:bg-stone-50 transition-colors shadow-sm"
-              >
-                <Edit2 className="w-4 h-4" />
-                <span>Edit Profile</span>
-              </button>
-            )}
+        
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+            <div className="text-red-600 text-sm font-semibold">Error loading profile</div>
+            <div className="text-red-500 text-xs mt-1">{error}</div>
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          {/* Left Column: Personal Details */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm h-full">
-               <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-6 flex items-center gap-2">
-                 <User className="w-4 h-4" /> Personal Details
-               </h3>
-               <ul className="space-y-6">
-                 <li className="flex flex-col gap-2">
-                   <span className="text-stone-500 text-sm flex items-center gap-2 font-medium">Nationality</span>
-                   <div className="flex flex-wrap gap-2">
-                     {preferences.nationalities.map(n => (
-                       <div key={n.code} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl border border-stone-100">
-                         <span className="text-xl">{n.flag}</span>
-                         <span className="text-sm font-semibold text-stone-700">{n.name}</span>
-                       </div>
-                     ))}
-                   </div>
-                 </li>
-
-                 <div className="h-px bg-stone-100 w-full"></div>
-
-                 <li className="flex items-center justify-between">
-                   <span className="text-stone-500 text-sm font-medium">Gender</span>
-                   <span className="font-bold text-stone-800 bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">
-                     {preferences.gender}
-                   </span>
-                 </li>
-
-                 <li className="flex items-center justify-between">
-                   <span className="text-stone-500 text-sm font-medium">Age Group</span>
-                   <div className="text-right">
-                     <div className="font-bold text-stone-800">{preferences.age}</div>
-                     <div className="text-xs text-stone-400 font-medium">{preferences.ageLabel}</div>
-                   </div>
-                 </li>
-               </ul>
+        {/* Loading State */}
+        {loading ? (
+          <div className="bg-white rounded-3xl p-8 border border-stone-100 shadow-sm flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-stone-600" />
+              <span className="text-stone-600 font-medium">Loading profile...</span>
             </div>
           </div>
+        ) : (
+          <>
+            {/* Header Profile Card */}
+            <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-28 bg-gradient-to-r from-orange-100 to-orange-50"></div>
 
-          {/* Right Column: Food Preferences */}
-          <div className="md:col-span-2 space-y-6">
-            <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="font-bold text-stone-800 text-lg flex items-center gap-2">
-                  <Utensils className="w-5 h-5 text-orange-500" />
-                  Food Preferences
-                </h3>
-                <button
-                  onClick={() => navigate('/preferences')}
-                  className="flex items-center gap-1 text-sm font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition-all"
-                >
-                  Update Preferences
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+              <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 pt-12 md:pt-6">
+                <div className="w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-orange-400 to-red-500 rounded-full border-4 border-white shadow-md flex items-center justify-center text-3xl font-bold text-white shrink-0">
+                  {user?.avatar || "U"}
+                </div>
+
+                <div className="text-center md:text-left flex-1 space-y-2 mb-1 w-full md:w-auto">
+                  {isEditing ? (
+                    <div className="flex items-center justify-center md:justify-start gap-2">
+                      <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        className="text-2xl md:text-3xl font-bold text-stone-800 bg-transparent border-b-2 border-orange-200 focus:border-orange-500 outline-none px-1 w-full md:w-auto text-center md:text-left"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="text-2xl md:text-3xl font-bold text-stone-800">{displayName || "User"}</h2>
+                  )}
+
+                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-stone-500 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Mail className="w-4 h-4" />
+                      <span>{user?.email || "No email"}</span>
+                    </div>
+                    <div className="hidden md:block w-1 h-1 bg-stone-300 rounded-full"></div>
+                    <div className="flex items-center gap-1.5 text-stone-400">
+                      <Calendar className="w-4 h-4" />
+                      <span>Joined {user?.joinedDate || "Unknown"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="p-2 text-stone-400 hover:bg-stone-100 rounded-xl transition-colors"
+                      disabled={saving}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleSaveName}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-stone-200 text-stone-700 rounded-xl text-sm font-bold hover:bg-stone-50 transition-colors shadow-sm"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    <span>Edit Profile</span>
+                  </button>
+                )}
               </div>
+            </div>
+          </>
+        )}
 
-              <div className="space-y-6">
-                {/* Dietary Goals */}
-                <div>
-                  <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Dietary Goals</h4>
-                  <div className="flex flex-wrap gap-3">
-                    {preferences.diets.map((diet, idx) => (
-                      <div key={idx} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border border-stone-100 ${diet.bg} ${diet.color}`}>
-                        <div className="bg-white p-1.5 rounded-full shadow-sm">
-                          <diet.icon className="w-4 h-4" />
-                        </div>
-                        <span className="font-semibold text-sm">{diet.label}</span>
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Left Column: Personal Details */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm h-full">
+                 <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                   <User className="w-4 h-4" /> Personal Details
+                 </h3>
+                 <ul className="space-y-6">
+                   <li className="flex flex-col gap-2">
+                     <span className="text-stone-500 text-sm flex items-center gap-2 font-medium">Nationality</span>
+                     <div className="flex flex-wrap gap-2">
+                       {preferences?.nationalities?.length > 0 ? (
+                         preferences.nationalities.map(n => (
+                           <div key={n.code} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl border border-stone-100">
+                             <span className="text-xl">{n.flag}</span>
+                             <span className="text-sm font-semibold text-stone-700">{n.name}</span>
+                           </div>
+                         ))
+                       ) : (
+                         <span className="text-xs text-stone-400 italic">Not specified</span>
+                       )}
+                     </div>
+                   </li>
+
+                   <div className="h-px bg-stone-100 w-full"></div>
+
+                   <li className="flex items-center justify-between">
+                     <span className="text-stone-500 text-sm font-medium">Gender</span>
+                     <span className="font-bold text-stone-800 bg-stone-50 px-3 py-1 rounded-lg border border-stone-100">
+                       {preferences?.gender || "Not specified"}
+                     </span>
+                   </li>
+
+                   <li className="flex items-center justify-between">
+                     <span className="text-stone-500 text-sm font-medium">Age Group</span>
+                     <div className="text-right">
+                       <div className="font-bold text-stone-800">{preferences?.age || "-"}</div>
+                       <div className="text-xs text-stone-400 font-medium">{preferences?.ageLabel || "Not specified"}</div>
+                     </div>
+                   </li>
+                 </ul>
+              </div>
+            </div>
+
+            {/* Right Column: Food Preferences */}
+            <div className="md:col-span-2 space-y-6">
+              <div className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-bold text-stone-800 text-lg flex items-center gap-2">
+                    <Utensils className="w-5 h-5 text-orange-500" />
+                    Food Preferences
+                  </h3>
+                  <button
+                    onClick={() => navigate('/preferences')}
+                    className="flex items-center gap-1 text-sm font-bold text-orange-600 hover:text-orange-700 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    Update Preferences
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Dietary Goals */}
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Dietary Goals</h4>
+                    <div className="flex flex-wrap gap-3">
+                      {preferences?.diets?.length > 0 ? (
+                        preferences.diets.map((diet, idx) => (
+                          <div key={idx} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border border-stone-100 ${diet.bg} ${diet.color}`}>
+                            <div className="bg-white p-1.5 rounded-full shadow-sm">
+                              <diet.icon className="w-4 h-4" />
+                            </div>
+                            <span className="font-semibold text-sm">{diet.label}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-stone-400 italic">No dietary goals set</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Taste Profile */}
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Taste Profile</h4>
+                    <div className="flex flex-wrap gap-3">
+                      {preferences?.tastes?.length > 0 ? (
+                        preferences.tastes.map((taste, idx) => {
+                           const themeColors = {
+                              yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' },
+                              red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+                              orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' }
+                           }[taste.theme];
+                           return (
+                             <div key={idx} className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${themeColors.bg} ${themeColors.border} ${themeColors.text}`}>
+                                <taste.icon className="w-4 h-4" />
+                                <span className="font-bold text-sm">{taste.label}</span>
+                             </div>
+                           );
+                        })
+                      ) : (
+                        <span className="text-xs text-stone-400 italic">No taste preferences set</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    {/* Allergies */}
+                    <div className="bg-red-50/50 rounded-2xl p-4 border border-red-100">
+                      <div className="flex items-center gap-2 mb-3 text-red-600">
+                        <WheatOff className="w-4 h-4" />
+                        <span className="font-bold text-sm">Allergies</span>
                       </div>
-                    ))}
+                      <div className="flex flex-wrap gap-2">
+                        {preferences?.allergies?.length > 0 ? preferences.allergies.map(tag => (
+                          <span key={tag} className="px-2.5 py-1 bg-white text-red-700 text-xs font-bold rounded-lg border border-red-100 shadow-sm">
+                            {tag}
+                          </span>
+                        )) : <span className="text-xs text-red-400 italic">None</span>}
+                      </div>
+                    </div>
+
+                    {/* Dislikes */}
+                    <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200">
+                      <div className="flex items-center gap-2 mb-3 text-stone-600">
+                        <Ban className="w-4 h-4" />
+                        <span className="font-bold text-sm">Dislikes</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {preferences?.dislikes?.length > 0 ? preferences.dislikes.map(tag => (
+                          <span key={tag} className="px-2.5 py-1 bg-white text-stone-600 text-xs font-bold rounded-lg border border-stone-200 shadow-sm">
+                            {tag}
+                          </span>
+                        )) : <span className="text-xs text-stone-400 italic">None</span>}
+                      </div>
+                    </div>
                   </div>
+
                 </div>
-
-                {/* Taste Profile */}
-                <div>
-                  <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-3">Taste Profile</h4>
-                  <div className="flex flex-wrap gap-3">
-                    {preferences.tastes.map((taste, idx) => {
-                       const themeColors = {
-                          yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-200' },
-                          red: { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-                       }[taste.theme];
-                       return (
-                         <div key={idx} className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${themeColors.bg} ${themeColors.border} ${themeColors.text}`}>
-                            <taste.icon className="w-4 h-4" />
-                            <span className="font-bold text-sm">{taste.label}</span>
-                         </div>
-                       );
-                    })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  {/* Allergies */}
-                  <div className="bg-red-50/50 rounded-2xl p-4 border border-red-100">
-                    <div className="flex items-center gap-2 mb-3 text-red-600">
-                      <WheatOff className="w-4 h-4" />
-                      <span className="font-bold text-sm">Allergies</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {preferences.allergies.length > 0 ? preferences.allergies.map(tag => (
-                        <span key={tag} className="px-2.5 py-1 bg-white text-red-700 text-xs font-bold rounded-lg border border-red-100 shadow-sm">
-                          {tag}
-                        </span>
-                      )) : <span className="text-xs text-red-400 italic">None</span>}
-                    </div>
-                  </div>
-
-                  {/* Dislikes */}
-                  <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200">
-                    <div className="flex items-center gap-2 mb-3 text-stone-600">
-                      <Ban className="w-4 h-4" />
-                      <span className="font-bold text-sm">Dislikes</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {preferences.dislikes.length > 0 ? preferences.dislikes.map(tag => (
-                        <span key={tag} className="px-2.5 py-1 bg-white text-stone-600 text-xs font-bold rounded-lg border border-stone-200 shadow-sm">
-                          {tag}
-                        </span>
-                      )) : <span className="text-xs text-stone-400 italic">None</span>}
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </div>
-          </div>
 
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
