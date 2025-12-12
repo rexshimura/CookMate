@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { getUserProfile, updateUserProfile, updateUserPersonalization } from '../../utils/api';
+import { useAuth } from '../../hooks/useAuth';
 import {
   ArrowLeft, Settings, Mail, Calendar,
   Globe, User, Activity, Edit2, Scale, Moon,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function AccountProfile() {
+  const { updateUserProfile: updateAuthUserProfile } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -86,7 +88,7 @@ export default function AccountProfile() {
           prefersSpicy: userProfile.prefersSpicy,
           prefersSweet: userProfile.prefersSweet,
           prefersSour: userProfile.prefersSour,
-          dislikedIngredients: userProfile.dislikedIngredients
+          dislikedIngredients: userProfile.dislikedIngredients || userProfile.dislikes
         };
         setPreferences({
           nationalities: personalization.nationality ? [{
@@ -204,7 +206,11 @@ export default function AccountProfile() {
   const savePreferences = async () => {
     try {
       setPreferencesSaving(true);
-      await updateUserPersonalization(preferencesForm);
+      console.log('Submitting preferences form:', preferencesForm);
+      await updateUserPersonalization({
+        ...preferencesForm,
+        dislikedIngredients: preferencesForm.dislikedIngredients
+      });
       
       // Update local state to reflect changes
       setPreferences(prev => ({
@@ -247,7 +253,16 @@ export default function AccountProfile() {
   const handleSaveName = async () => {
     try {
       setSaving(true);
-      await updateUserProfile({ displayName });
+      
+      // Use the useAuth hook's updateUserProfile function which updates both Firestore and Firebase Auth
+      await updateAuthUserProfile({ displayName });
+      
+      // Update local state to reflect the change immediately
+      setDisplayName(displayName);
+      
+      // Update the user state to trigger sidebar update
+      setUser(prev => ({ ...prev, displayName }));
+      
       setIsEditing(false);
     } catch (err) {
       console.error('Failed to update profile:', err);

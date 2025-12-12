@@ -57,6 +57,9 @@ router.put('/profile', verifyAuthToken, async (req, res) => {
 router.put('/personalization', verifyAuthToken, async (req, res) => {
   try {
     console.log('Received personalization update:', req.body);
+    console.log('dislikesInput value:', dislikesInput);
+    console.log('dislikesInput type:', typeof dislikesInput);
+    console.log('dislikesInput isArray:', Array.isArray(dislikesInput));
     
     const {
       nationality,
@@ -72,9 +75,11 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       prefersSalty,
       prefersSpicy,
       prefersSweet,
-      prefersSour,
-      dislikedIngredients
+      prefersSour
     } = req.body;
+
+    // Handle variable mismatch: Extract the value using both possible keys
+    let dislikesInput = req.body.dislikedIngredients || req.body.dislikes;
 
     // Validation
     const updates = {};
@@ -118,20 +123,25 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
     updates.prefersSweet = req.body.prefersSweet === true || req.body.prefersSweet === 'true';
     updates.prefersSour = req.body.prefersSour === true || req.body.prefersSour === 'true';
 
-    // Robust parsing for dislikedIngredients array
-    if (dislikedIngredients !== undefined) {
-      if (Array.isArray(dislikedIngredients)) {
-        updates.dislikedIngredients = dislikedIngredients.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
-      } else if (typeof dislikedIngredients === 'string') {
+    // Robust parsing for dislikedIngredients array - ensure update logic runs
+    if (dislikesInput !== undefined) {
+      if (Array.isArray(dislikesInput)) {
+        updates.dislikedIngredients = dislikesInput.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+      } else if (typeof dislikesInput === 'string') {
         // Handle comma-separated string
-        updates.dislikedIngredients = dislikedIngredients.split(',').map(item => item.trim()).filter(item => item.length > 0);
+        updates.dislikedIngredients = dislikesInput.split(',').map(item => item.trim()).filter(item => item.length > 0);
       } else {
         updates.dislikedIngredients = [];
       }
     }
 
     // Update the user document
+    console.log('Updating user document with:', updates);
     await db.collection('users').doc(req.userId).update(updates);
+    
+    // Verify the update by reading the document
+    const updatedDoc = await db.collection('users').doc(req.userId).get();
+    console.log('Updated document dislikedIngredients:', updatedDoc.data().dislikedIngredients);
 
     res.status(200).json({
       message: 'Personalization survey updated successfully',

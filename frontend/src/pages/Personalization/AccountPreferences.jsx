@@ -418,6 +418,24 @@ export default function AccountPreferences() {
       setIsLoading(true);
       
       // Prepare the data to send to the backend
+      console.log('Submitting personalization data:', {
+        nationality: formData.nationalities.length > 0 ? formData.nationalities[0].name : '',
+        age: formData.age,
+        gender: formData.gender,
+        allergies: formData.allergies,
+        dislikedIngredients: formData.dislikedIngredients,
+        isVegan: formData.isVegan,
+        isDiet: formData.isDiet,
+        isMuslim: formData.isMuslim,
+        isDiabetic: formData.isDiabetic,
+        isLactoseFree: formData.isLactoseFree,
+        isHighCalorie: formData.isHighCalorie,
+        prefersSalty: formData.preferSalty,
+        prefersSpicy: formData.preferSpicy,
+        prefersSweet: formData.preferSweet,
+        prefersSour: formData.preferSour
+      });
+      
       const personalizationData = {
         nationality: formData.nationalities.length > 0 ? formData.nationalities[0].name : '',
         age: formData.age,

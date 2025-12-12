@@ -270,10 +270,20 @@ const Sidebar = ({
                 className={`
                   w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold
                   bg-gradient-to-br from-stone-700 to-stone-900 text-white shadow-md
-                  flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-stone-200 transition-all
-              `}>
+                  flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-stone-200 transition-all group
+              `}
+                title={user.displayName || user.email || 'User'}
+              >
                 {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'A'}
               </div>
+
+              {/* Show name in collapsed state too */}
+              {isCollapsed && !isMobile && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 bg-stone-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none shadow-xl">
+                  <div className="font-semibold">{user.displayName || 'User'}</div>
+                  <div className="text-xs text-stone-300">{user.email}</div>
+                </div>
+              )}
 
               {(!isCollapsed || isMobile) && (
                 <>

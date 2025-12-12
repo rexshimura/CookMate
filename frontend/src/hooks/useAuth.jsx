@@ -59,7 +59,23 @@ export const AuthProvider = ({ children }) => {
               createdAt: new Date().toISOString(),
               favorites: [],
               dietaryPreferences: '',
-              plan: 'free'
+              plan: 'free',
+              // Initialize personalization fields to avoid conflicts
+              nationality: '',
+              age: null,
+              gender: '',
+              allergies: [],
+              dislikedIngredients: [],
+              isVegan: false,
+              isDiabetic: false,
+              isDiet: false,
+              isMuslim: false,
+              isLactoseFree: false,
+              isHighCalorie: false,
+              prefersSalty: false,
+              prefersSpicy: false,
+              prefersSweet: false,
+              prefersSour: false
             };
             
             await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
@@ -289,6 +305,13 @@ export const AuthProvider = ({ children }) => {
         
         // Update local state
         setUserProfile(prev => ({ ...prev, ...updates }));
+        
+        // Also update the Firebase Auth user object if displayName is being updated
+        if (updates.displayName && updates.displayName !== user.displayName) {
+          await updateProfile(user, { displayName: updates.displayName });
+          // Update the user state directly to trigger re-renders
+          setUser(prev => ({ ...prev, displayName: updates.displayName }));
+        }
         
         return { success: true };
       }

@@ -2,6 +2,13 @@ const express = require('express');
 const router = express.Router();
 const { admin, db } = require('../config/firebase'); // Import db
 
+// Helper for parsing arrays (allergies, dislikes)
+const parseArrayInput = (input) => {
+  if (Array.isArray(input)) return input;
+  if (typeof input === 'string') return input.split(',').map(i => i.trim()).filter(i => i);
+  return [];
+};
+
 router.post('/register', async (req, res) => {
   try {
     const { email, password, displayName } = req.body;
@@ -15,6 +22,7 @@ router.post('/register', async (req, res) => {
 
     // 2. Create User Document in Firestore
     // We use .doc(uid).set() to specify the ID exactly matching the Auth UID
+    console.log('Creating user document with dislikedIngredients:', parseArrayInput(req.body.dislikedIngredients || req.body.dislikes));
     await db.collection('users').doc(userRecord.uid).set({
       email: userRecord.email,
       displayName: displayName || '',
@@ -25,10 +33,8 @@ router.post('/register', async (req, res) => {
       nationality: req.body.nationality || '',
       age: req.body.age || null,
       gender: req.body.gender || '',
-      allergies: Array.isArray(req.body.allergies) ? req.body.allergies :
-                 typeof req.body.allergies === 'string' ? [req.body.allergies] : [],
-      dislikedIngredients: Array.isArray(req.body.dislikedIngredients) ? req.body.dislikedIngredients :
-                           typeof req.body.dislikedIngredients === 'string' ? [req.body.dislikedIngredients] : [],
+      allergies: parseArrayInput(req.body.allergies),
+      dislikedIngredients: parseArrayInput(req.body.dislikedIngredients || req.body.dislikes),
       
       // Dietary preferences (boolean fields)
       isVegan: req.body.isVegan === true || req.body.isVegan === 'true',
@@ -60,6 +66,10 @@ router.post('/register', async (req, res) => {
     };
 
     await db.collection('collections').add(defaultFavoritesCollection);
+    
+    // Verify the user document was created correctly
+    const createdUserDoc = await db.collection('users').doc(userRecord.uid).get();
+    console.log('Created user document dislikedIngredients:', createdUserDoc.data().dislikedIngredients);
 
     res.status(201).json({ message: 'User registered successfully', uid: userRecord.uid });
   } catch (error) {
