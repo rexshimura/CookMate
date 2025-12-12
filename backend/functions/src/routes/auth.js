@@ -25,22 +25,24 @@ router.post('/register', async (req, res) => {
       nationality: req.body.nationality || '',
       age: req.body.age || null,
       gender: req.body.gender || '',
-      allergies: Array.isArray(req.body.allergies) ? req.body.allergies : [],
-      dislikedIngredients: Array.isArray(req.body.dislikedIngredients) ? req.body.dislikedIngredients : [],
+      allergies: Array.isArray(req.body.allergies) ? req.body.allergies :
+                 typeof req.body.allergies === 'string' ? [req.body.allergies] : [],
+      dislikedIngredients: Array.isArray(req.body.dislikedIngredients) ? req.body.dislikedIngredients :
+                           typeof req.body.dislikedIngredients === 'string' ? [req.body.dislikedIngredients] : [],
       
       // Dietary preferences (boolean fields)
-      isVegan: Boolean(req.body.isVegan),
-      isDiet: Boolean(req.body.isDiet), // Changed from isOnDiet to match frontend
-      isMuslim: Boolean(req.body.isMuslim),
-      isDiabetic: Boolean(req.body.isDiabetic),
-      isLactoseFree: Boolean(req.body.isLactoseFree),
-      isHighCalorie: Boolean(req.body.isHighCalorie),
+      isVegan: req.body.isVegan === true || req.body.isVegan === 'true',
+      isDiet: req.body.isDiet === true || req.body.isOnDiet === true || req.body.isDiet === 'true' || req.body.isOnDiet === 'true',
+      isMuslim: req.body.isMuslim === true || req.body.isMuslim === 'true',
+      isDiabetic: req.body.isDiabetic === true || req.body.isDiabetic === 'true',
+      isLactoseFree: req.body.isLactoseFree === true || req.body.isLactoseFree === 'true',
+      isHighCalorie: req.body.isHighCalorie === true || req.body.isHighCalorie === 'true',
       
       // Taste preferences (boolean fields)
-      prefersSalty: Boolean(req.body.prefersSalty),
-      prefersSpicy: Boolean(req.body.prefersSpicy),
-      prefersSweet: Boolean(req.body.prefersSweet),
-      prefersSour: Boolean(req.body.prefersSour)
+      prefersSalty: req.body.prefersSalty === true || req.body.prefersSalty === 'true',
+      prefersSpicy: req.body.prefersSpicy === true || req.body.prefersSpicy === 'true',
+      prefersSweet: req.body.prefersSweet === true || req.body.prefersSweet === 'true',
+      prefersSour: req.body.prefersSour === true || req.body.prefersSour === 'true'
     });
 
     // 3. Create Default "My Favorites" Collection

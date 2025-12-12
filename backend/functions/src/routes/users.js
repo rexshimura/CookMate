@@ -56,6 +56,8 @@ router.put('/profile', verifyAuthToken, async (req, res) => {
 // 3. Update User Personalization Survey
 router.put('/personalization', verifyAuthToken, async (req, res) => {
   try {
+    console.log('Received personalization update:', req.body);
+    
     const {
       nationality,
       age,
@@ -74,55 +76,11 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       dislikedIngredients
     } = req.body;
 
-    // List of countries with well-known cuisines and recipes for validation
-    const validCountries = [
-      // Asia
-      'China', 'Japan', 'South Korea', 'Vietnam', 'Thailand', 'India', 'Indonesia', 'Malaysia', 'Philippines', 'Singapore',
-      'Pakistan', 'Iran', 'Turkey', 'Saudi Arabia', 'United Arab Emirates', 'Israel', 'Lebanon', 'Syria', 'Iraq', 'Afghanistan',
-      'Bangladesh', 'Sri Lanka', 'Nepal', 'Myanmar', 'Cambodia', 'Laos', 'Kazakhstan', 'Uzbekistan', 'Georgia', 'Armenia',
-      
-      // Europe
-      'Italy', 'France', 'Spain', 'Portugal', 'Greece', 'Germany', 'Netherlands', 'Belgium', 'Switzerland', 'Austria',
-      'Poland', 'Czech Republic', 'Hungary', 'Slovakia', 'Slovenia', 'Croatia', 'Serbia', 'Romania', 'Bulgaria', 'Russia',
-      'Ukraine', 'Belarus', 'Moldova', 'Denmark', 'Sweden', 'Norway', 'Finland', 'Iceland', 'United Kingdom', 'Ireland',
-      'Luxembourg', 'Monaco', 'Vatican City', 'San Marino',
-      
-      // Americas
-      'United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Colombia', 'Peru', 'Chile', 'Venezuela', 'Ecuador',
-      'Guatemala', 'Cuba', 'Jamaica', 'Dominican Republic', 'Honduras', 'Nicaragua', 'Panama', 'Bolivia', 'Uruguay', 'Paraguay',
-      'Belize', 'El Salvador', 'Costa Rica',
-      
-      // Africa
-      'Egypt', 'Morocco', 'Algeria', 'Tunisia', 'Nigeria', 'Kenya', 'Ethiopia', 'Ghana', 'Tanzania', 'Uganda', 'Sudan',
-      'Libya', 'Senegal', 'Ivory Coast', 'Cameroon', 'Burkina Faso', 'Zimbabwe', 'Zambia', 'Angola', 'DR Congo', 'Congo',
-      'Gabon', 'Equatorial Guinea', 'Cabo Verde', 'Sao Tome and Principe', 'Guinea-Bissau', 'Guinea', 'Sierra Leone', 'Liberia',
-      'Benin', 'Togo', 'Niger', 'Chad', 'Central African Republic', 'Djibouti', 'Eritrea', 'Somalia', 'Seychelles', 'Comoros',
-      'Madagascar', 'Malawi', 'Mozambique', 'Namibia', 'Botswana', 'Eswatini', 'Lesotho', 'Burundi', 'Rwanda', 'Mauritius',
-      'Mauritania',
-      
-      // Oceania
-      'Australia', 'New Zealand', 'Fiji', 'Papua New Guinea', 'Solomon Islands', 'Vanuatu', 'New Caledonia', 'Samoa', 'Tonga',
-      'Tuvalu', 'Nauru', 'Kiribati', 'Marshall Islands', 'Micronesia', 'Palau',
-      
-      // Caribbean
-      'Haiti', 'Barbados', 'Grenada', 'Saint Vincent and the Grenadines', 'Saint Lucia', 'Saint Kitts and Nevis', 'Dominica',
-      'Antigua and Barbuda', 'Bahamas'
-    ];
-
     // Validation
     const updates = {};
 
     if (nationality && typeof nationality === 'string' && nationality.trim().length > 0) {
-      const normalizedNationality = nationality.trim();
-      // Check if it's a valid country (case-insensitive)
-      const isValidCountry = validCountries.some(country =>
-        country.toLowerCase() === normalizedNationality.toLowerCase()
-      );
-      if (isValidCountry) {
-        updates.nationality = normalizedNationality;
-      } else {
-        return res.status(400).json({ error: `Invalid nationality. Please enter a valid country name. Valid countries include: ${validCountries.slice(0, 10).join(', ')}...` });
-      }
+      updates.nationality = nationality.trim();
     }
 
     if (age !== undefined) {
@@ -136,52 +94,40 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
       updates.gender = gender.trim();
     }
 
-    if (Array.isArray(allergies)) {
-      updates.allergies = allergies.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+    // Robust parsing for allergies array
+    if (allergies !== undefined) {
+      if (Array.isArray(allergies)) {
+        updates.allergies = allergies.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+      } else if (typeof allergies === 'string') {
+        // Handle comma-separated string
+        updates.allergies = allergies.split(',').map(item => item.trim()).filter(item => item.length > 0);
+      } else {
+        updates.allergies = [];
+      }
     }
 
-    if (typeof isVegan === 'boolean') {
-      updates.isVegan = isVegan;
-    }
+    // Robust parsing for booleans
+    updates.isVegan = req.body.isVegan === true || req.body.isVegan === 'true';
+    updates.isDiabetic = req.body.isDiabetic === true || req.body.isDiabetic === 'true';
+    updates.isDiet = req.body.isDiet === true || req.body.isDiet === 'true';
+    updates.isMuslim = req.body.isMuslim === true || req.body.isMuslim === 'true';
+    updates.isLactoseFree = req.body.isLactoseFree === true || req.body.isLactoseFree === 'true';
+    updates.isHighCalorie = req.body.isHighCalorie === true || req.body.isHighCalorie === 'true';
+    updates.prefersSalty = req.body.prefersSalty === true || req.body.prefersSalty === 'true';
+    updates.prefersSpicy = req.body.prefersSpicy === true || req.body.prefersSpicy === 'true';
+    updates.prefersSweet = req.body.prefersSweet === true || req.body.prefersSweet === 'true';
+    updates.prefersSour = req.body.prefersSour === true || req.body.prefersSour === 'true';
 
-    if (typeof isDiabetic === 'boolean') {
-      updates.isDiabetic = isDiabetic;
-    }
-
-    if (typeof isDiet === 'boolean') {
-      updates.isDiet = isDiet;
-    }
-
-    if (typeof isMuslim === 'boolean') {
-      updates.isMuslim = isMuslim;
-    }
-
-    if (typeof isLactoseFree === 'boolean') {
-      updates.isLactoseFree = isLactoseFree;
-    }
-
-    if (typeof isHighCalorie === 'boolean') {
-      updates.isHighCalorie = isHighCalorie;
-    }
-
-    if (typeof prefersSalty === 'boolean') {
-      updates.prefersSalty = prefersSalty;
-    }
-
-    if (typeof prefersSpicy === 'boolean') {
-      updates.prefersSpicy = prefersSpicy;
-    }
-
-    if (typeof prefersSweet === 'boolean') {
-      updates.prefersSweet = prefersSweet;
-    }
-
-    if (typeof prefersSour === 'boolean') {
-      updates.prefersSour = prefersSour;
-    }
-
-    if (Array.isArray(dislikedIngredients)) {
-      updates.dislikedIngredients = dislikedIngredients.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+    // Robust parsing for dislikedIngredients array
+    if (dislikedIngredients !== undefined) {
+      if (Array.isArray(dislikedIngredients)) {
+        updates.dislikedIngredients = dislikedIngredients.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+      } else if (typeof dislikedIngredients === 'string') {
+        // Handle comma-separated string
+        updates.dislikedIngredients = dislikedIngredients.split(',').map(item => item.trim()).filter(item => item.length > 0);
+      } else {
+        updates.dislikedIngredients = [];
+      }
     }
 
     // Update the user document
