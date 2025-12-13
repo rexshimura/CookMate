@@ -1,31 +1,38 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  ArrowLeft, 
-  Clock, 
-  Users, 
-  DollarSign, 
-  ChefHat, 
-  Play, 
+import {
+  ArrowLeft,
+  Clock,
+  Users,
+  DollarSign,
+  ChefHat,
+  Play,
   Pause,
   Volume2,
-  Share2, 
-  Minus, 
-  Plus, 
+  Minus,
+  Plus,
   Smartphone,
-  CheckCircle, 
-  Heart, 
-  Timer, 
-  Scale, 
-  AlertCircle, 
+  CheckCircle,
+  Heart,
+  Timer,
+  Scale,
+  AlertCircle,
   Award,
-  Youtube 
+  Youtube
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { generateRecipeId } from '../utils/ids.js';
-import { 
+import {
   getRecipeDetails
 } from '../utils/api.js';
+import {
+  generateRecipeProgressId,
+  saveRecipeProgress,
+  loadRecipeProgress,
+  clearRecipeProgress,
+  hasSavedProgress,
+  autoSaveProgress
+} from '../utils/recipeProgress.js';
 
 const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
   const { name: recipeName } = useParams();
@@ -42,6 +49,12 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
   const [error, setError] = useState(null);
   const [checkedIngredients, setCheckedIngredients] = useState({});
   const [completedSteps, setCompletedSteps] = useState({});
+  
+  // Recipe progress tracking
+  const [recipeProgressId, setRecipeProgressId] = useState('');
+  const [hasLoadedProgress, setHasLoadedProgress] = useState(false);
+  const [autoSaveCancel, setAutoSaveCancel] = useState(null);
+  const [lastSavedProgress, setLastSavedProgress] = useState(null);
   
   // Smart Cooking features
   const [multiplier, setMultiplier] = useState(1);
@@ -145,8 +158,11 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (autoSaveCancel) {
+        autoSaveCancel();
+      }
     };
-  }, [wakeLock, speechSynthesis]);
+  }, [wakeLock, speechSynthesis, autoSaveCancel]);
 
   // Timer functionality
   const startTimer = useCallback((minutes) => {
@@ -223,48 +239,117 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Progress management functions
+  const handleLoadProgress = useCallback(() => {
+    if (!recipeProgressId) return;
+
+    const savedProgress = loadRecipeProgress(recipeProgressId);
+    if (savedProgress) {
+      console.log('✅ [RECIPE-DETAIL-PAGE] Loading saved progress:', savedProgress);
+      
+      setCheckedIngredients(savedProgress.checkedIngredients || {});
+      setCompletedSteps(savedProgress.completedSteps || {});
+      setMultiplier(savedProgress.multiplier || 1);
+      setLastSavedProgress(savedProgress);
+      setHasLoadedProgress(true);
+    } else {
+      console.log('📝 [RECIPE-DETAIL-PAGE] No saved progress found');
+      setHasLoadedProgress(false);
+    }
+  }, [recipeProgressId]);
+
+  const handleSaveProgress = useCallback(() => {
+    if (!recipeProgressId) return;
+
+    const progressData = {
+      checkedIngredients,
+      completedSteps,
+      multiplier
+    };
+
+    saveRecipeProgress(recipeProgressId, progressData);
+    setLastSavedProgress({
+      ...progressData,
+      lastUpdated: new Date().toISOString()
+    });
+  }, [recipeProgressId, checkedIngredients, completedSteps, multiplier]);
+
+  const handleClearProgress = useCallback(() => {
+    if (!recipeProgressId) return;
+
+    clearRecipeProgress(recipeProgressId);
+    setCheckedIngredients({});
+    setCompletedSteps({});
+    setMultiplier(1);
+    setHasLoadedProgress(false);
+    setLastSavedProgress(null);
+    
+    console.log('🗑️ [RECIPE-DETAIL-PAGE] Progress cleared');
+  }, [recipeProgressId]);
+
+  // Auto-save progress when data changes
+  useEffect(() => {
+    if (!recipeProgressId || !hasLoadedProgress) return;
+
+    // Cancel any existing auto-save
+    if (autoSaveCancel) {
+      autoSaveCancel();
+    }
+
+    // Set up new auto-save
+    const cancelAutoSave = autoSaveProgress(recipeProgressId, {
+      checkedIngredients,
+      completedSteps,
+      multiplier
+    }, 1000); // Auto-save after 1 second of inactivity
+
+    setAutoSaveCancel(() => cancelAutoSave);
+
+    return () => {
+      if (cancelAutoSave) {
+        cancelAutoSave();
+      }
+    };
+  }, [recipeProgressId, checkedIngredients, completedSteps, multiplier, hasLoadedProgress, autoSaveCancel]);
+
+  // Load progress when recipe changes
+  useEffect(() => {
+    if (recipeName) {
+      const progressId = generateRecipeProgressId(recipeName);
+      setRecipeProgressId(progressId);
+      
+      // Check if there's saved progress
+      if (hasSavedProgress(progressId)) {
+        console.log('📋 [RECIPE-DETAIL-PAGE] Found saved progress for:', recipeName);
+      }
+    }
+  }, [recipeName]);
+
   // Scale ingredients based on multiplier
   const scaleIngredient = (ingredient) => {
     if (!ingredient || typeof ingredient !== 'string' || multiplier === 1) {
       return ingredient;
     }
     
-    // Simple scaling logic - look for numbers and multiply them
+    // Enhanced scaling logic - look for numbers and multiply them
     return ingredient.replace(/(\d+(?:\.\d+)?)/g, (match) => {
       const num = parseFloat(match);
       if (!isNaN(num)) {
-        const scaled = (num * multiplier).toFixed(num % 1 === 0 ? 0 : 1);
-        return scaled;
+        const scaled = num * multiplier;
+        
+        // Don't round very small amounts to zero - keep at least 2 decimal places for amounts < 1
+        if (scaled > 0 && scaled < 1) {
+          const result = scaled.toFixed(2).replace(/\.?0+$/, '');
+          return result === '' ? '0' : result;
+        }
+        
+        // For amounts >= 1, determine precision based on the scaled value
+        const decimals = scaled % 1 === 0 ? 0 : 1;
+        return scaled.toFixed(decimals).replace(/\.?0+$/, '');
       }
       return match;
     });
   };
-
-  // Share functionality
-  const handleShare = useCallback(async () => {
-    if (navigator.share && recipeData) {
-      try {
-        await navigator.share({
-          title: recipeData.title,
-          text: `Check out this delicious ${recipeData.title} recipe!`,
-          url: window.location.href
-        });
-      } catch (err) {
-        console.log('Share cancelled or failed:', err);
-        // Fallback to clipboard
-        navigator.clipboard.writeText(window.location.href);
-      }
-    } else if (navigator.clipboard) {
-      // Fallback for browsers without Web Share API
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        // You could show a toast notification here
-        console.log('Link copied to clipboard');
-      } catch (err) {
-        console.error('Failed to copy link:', err);
-      }
-    }
-  }, [recipeData]);
 
   // Request notification permission
   useEffect(() => {
@@ -284,6 +369,9 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
       const result = await getRecipeDetails(recipeName);
 
       if (result.success && result.recipe) {
+        const rawServings = parseFloat(result.recipe.servings);
+        const safeServings = (rawServings && rawServings > 0) ? rawServings.toString() : '4';
+
         const sanitizedRecipe = {
           ...result.recipe,
           title: typeof result.recipe.title === 'string' ? result.recipe.title : recipeName,
@@ -291,7 +379,7 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
           ingredients: Array.isArray(result.recipe.ingredients) ? result.recipe.ingredients.filter(ing => typeof ing === 'string') : [],
           instructions: Array.isArray(result.recipe.instructions) ? result.recipe.instructions.filter(inst => typeof inst === 'string') : [],
           cookingTime: typeof result.recipe.cookingTime === 'string' ? result.recipe.cookingTime : 'Varies',
-          servings: typeof result.recipe.servings === 'string' ? result.recipe.servings : '4',
+          servings: safeServings,
           difficulty: typeof result.recipe.difficulty === 'string' ? result.recipe.difficulty : 'Medium',
           estimatedCost: typeof result.recipe.estimatedCost === 'string' ? result.recipe.estimatedCost : 'Moderate',
           nutritionInfo: typeof result.recipe.nutritionInfo === 'object' && result.recipe.nutritionInfo ? result.recipe.nutritionInfo : {},
@@ -339,10 +427,24 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
     setCheckedIngredients({});
     setCompletedSteps({});
     setCurrentSpeakingStep(null);
+    setHasLoadedProgress(false);
+    setLastSavedProgress(null);
     stopTimer();
 
     handleFetchDetails();
   }, [recipeName]);
+
+  // Load progress after recipe data is loaded
+  useEffect(() => {
+    if (recipeData && recipeProgressId && !hasLoadedProgress) {
+      // Small delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        handleLoadProgress();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [recipeData, recipeProgressId, hasLoadedProgress, handleLoadProgress]);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -404,7 +506,7 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
                   <Minus className="w-4 h-4" />
                 </button>
                 <span className="text-sm font-bold min-w-[3rem] text-center">
-                  {Math.round(multiplier * parseFloat(recipeData.servings) || 2)} Servings
+                  {Math.round(multiplier * parseFloat(recipeData.servings))} Servings
                 </span>
                 <button
                   onClick={() => setMultiplier(multiplier + 0.25)}
@@ -427,13 +529,6 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
                 >
                   <Youtube className="w-4 h-4" />
                 </a>
-                <button
-                  onClick={handleShare}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  title="Share Recipe"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
                 <button
                   onClick={() => toggleFavorite && toggleFavorite(recipeData)}
                   disabled={favoritesHook?.loading}
@@ -482,6 +577,18 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
           </div>
         ) : recipeData ? (
           <div className="p-4 space-y-6">
+            {/* Progress indicator */}
+            {hasLoadedProgress && lastSavedProgress && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Progress restored from previous session
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Recipe Meta Info */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-3 text-center border border-orange-200/60">
@@ -514,12 +621,21 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                     Ingredients
                   </h3>
-                  <button
-                    onClick={() => setCheckedIngredients({})}
-                    className="text-xs text-stone-500 hover:text-stone-700 font-medium transition-colors"
-                  >
-                    Reset
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleClearProgress}
+                      className="text-xs text-stone-500 hover:text-red-600 font-medium transition-colors"
+                      title="Clear all progress"
+                    >
+                      Clear Progress
+                    </button>
+                    <button
+                      onClick={() => setCheckedIngredients({})}
+                      className="text-xs text-stone-500 hover:text-stone-700 font-medium transition-colors"
+                    >
+                      Reset
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   {Array.isArray(recipeData.ingredients) ? (

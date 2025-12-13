@@ -20,6 +20,17 @@ function safeJSONParse(str) {
 // In-memory cache for recipe consistency during development
 const recipeCache = new Map();
 
+function normalizeServings(servings) {
+  if (servings === null || servings === undefined) {
+    return '4';
+  }
+  const parsed = parseFloat(servings);
+  if (!isNaN(parsed) && parsed > 0) {
+    return parsed % 1 === 0 ? parsed.toString() : parsed.toFixed(1).replace(/\.0$/, '');
+  }
+  return '4';
+}
+
 // Helper function to generate consistent recipe ID
 function generateConsistentRecipeId(recipeName) {
   if (!recipeName) return '';
@@ -36,6 +47,10 @@ function generateConsistentRecipeId(recipeName) {
 // Helper function to save recipe to Firestore
 async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
   try {
+    const safeServings = normalizeServings(recipeData.servings);
+    const safeCookingTime = (typeof recipeData.cookingTime === 'string' && recipeData.cookingTime.trim())
+      ? recipeData.cookingTime
+      : '30 mins';
     // Generate a clean recipe ID from title
     const recipeId = generateConsistentRecipeId(recipeData.title);
 
@@ -45,8 +60,8 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
       description: recipeData.description || '',
       ingredients: recipeData.ingredients || [],
       instructions: recipeData.instructions || [],
-      cookingTime: recipeData.cookingTime || 'Varies',
-      servings: recipeData.servings || '4',
+      cookingTime: safeCookingTime,
+      servings: safeServings,
       difficulty: recipeData.difficulty || 'Medium',
       estimatedCost: recipeData.estimatedCost || 'Moderate',
       nutritionInfo: recipeData.nutritionInfo || {},
@@ -75,6 +90,10 @@ async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
   try {
     // SAFEGUARD: Handle both Object and String inputs
     const recipeTitle = typeof recipeInput === 'string' ? recipeInput : recipeInput?.title;
+    const safeServings = normalizeServings(recipeInput?.servings);
+    const safeCookingTime = (typeof recipeInput?.cookingTime === 'string' && recipeInput.cookingTime.trim())
+      ? recipeInput.cookingTime
+      : '30 mins';
     
     if (!recipeTitle) {
       console.warn('⚠️ Skipping storage: Missing title');
@@ -99,8 +118,8 @@ async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
         description: `A delicious ${recipeTitle} recipe to try`,
         ingredients: ["Click on the recipe card to get detailed ingredients"],
         instructions: ["Click on the recipe card to get detailed instructions"],
-        cookingTime: "Varies",
-        servings: recipeInput?.servings || "4",
+        cookingTime: safeCookingTime,
+        servings: safeServings,
         difficulty: recipeInput?.difficulty || "Medium",
         estimatedCost: "Moderate",
         nutritionInfo: {
@@ -777,7 +796,7 @@ function isValidRecipe(text) {
   // 2. COOKING VERB CHECK: If it starts with a verb, it's an instruction, not a title
   // e.g. "Bake for 20 mins" -> REJECT
   // But be more lenient - only reject if it's clearly an instruction
-  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust)/i;
+  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust|mix|add|pour|place|combine|stir|heat|warm|cool|refrigerate|knead|fold)/i;
 
   if (cookingVerbs.test(cleanText)) {
     // Only reject if it looks like an instruction (has additional words after the verb)

@@ -53,6 +53,143 @@ router.put('/profile', verifyAuthToken, async (req, res) => {
   }
 });
 
+// 3. Update User Personalization Survey
+router.put('/personalization', verifyAuthToken, async (req, res) => {
+  try {
+    console.log('Received personalization update:', req.body);
+    
+    const {
+      nationality,
+      age,
+      gender,
+      allergies,
+      isVegan,
+      isDiabetic,
+      isDiet, // Changed from isOnDiet to match frontend
+      isMuslim,
+      isLactoseFree,
+      isHighCalorie,
+      prefersSalty,
+      prefersSpicy,
+      prefersSweet,
+      prefersSour
+    } = req.body;
+
+    // Handle variable mismatch: Extract the value using both possible keys
+    let dislikesInput = req.body.dislikedIngredients || req.body.dislikes;
+
+    // Validation
+    const updates = {};
+
+    // Handle nationality - store as array for consistency with frontend
+    if (nationality && typeof nationality === 'string' && nationality.trim().length > 0) {
+      // Store as array to support multiple nationalities in the future
+      // For backward compatibility, also keep the single nationality field
+      updates.nationality = nationality.trim();
+      updates.nationalities = [nationality.trim()];
+    }
+
+    if (age !== undefined) {
+      const ageNum = typeof age === 'string' ? parseInt(age, 10) : age;
+      if (typeof ageNum === 'number' && ageNum > 0 && ageNum < 150) {
+        updates.age = ageNum;
+      }
+    }
+
+    if (gender && typeof gender === 'string' && gender.trim().length > 0) {
+      updates.gender = gender.trim();
+    }
+
+    // Robust parsing for allergies array
+    if (allergies !== undefined) {
+      if (Array.isArray(allergies)) {
+        updates.allergies = allergies.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+      } else if (typeof allergies === 'string') {
+        // Handle comma-separated string
+        updates.allergies = allergies.split(',').map(item => item.trim()).filter(item => item.length > 0);
+      } else {
+        updates.allergies = [];
+      }
+    }
+
+    // Robust parsing for booleans
+    updates.isVegan = req.body.isVegan === true || req.body.isVegan === 'true';
+    updates.isDiabetic = req.body.isDiabetic === true || req.body.isDiabetic === 'true';
+    updates.isDiet = req.body.isDiet === true || req.body.isDiet === 'true';
+    updates.isMuslim = req.body.isMuslim === true || req.body.isMuslim === 'true';
+    updates.isLactoseFree = req.body.isLactoseFree === true || req.body.isLactoseFree === 'true';
+    updates.isHighCalorie = req.body.isHighCalorie === true || req.body.isHighCalorie === 'true';
+    updates.prefersSalty = req.body.prefersSalty === true || req.body.prefersSalty === 'true';
+    updates.prefersSpicy = req.body.prefersSpicy === true || req.body.prefersSpicy === 'true';
+    updates.prefersSweet = req.body.prefersSweet === true || req.body.prefersSweet === 'true';
+    updates.prefersSour = req.body.prefersSour === true || req.body.prefersSour === 'true';
+
+    // Robust parsing for dislikedIngredients array - ensure update logic runs
+    if (dislikesInput !== undefined) {
+      if (Array.isArray(dislikesInput)) {
+        updates.dislikedIngredients = dislikesInput.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => item.trim());
+      } else if (typeof dislikesInput === 'string') {
+        // Handle comma-separated string
+        updates.dislikedIngredients = dislikesInput.split(',').map(item => item.trim()).filter(item => item.length > 0);
+      } else {
+        updates.dislikedIngredients = [];
+      }
+    }
+
+    // Update the user document
+    console.log('Updating user document with:', updates);
+    await db.collection('users').doc(req.userId).update(updates);
+    
+    // Verify the update by reading the document
+    const updatedDoc = await db.collection('users').doc(req.userId).get();
+    console.log('Updated document dislikedIngredients:', updatedDoc.data().dislikedIngredients);
+
+    res.status(200).json({
+      message: 'Personalization survey updated successfully',
+      updatedFields: Object.keys(updates)
+    });
+  } catch (error) {
+    console.error('Personalization update error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 4. Get User Personalization Data
+router.get('/personalization', verifyAuthToken, async (req, res) => {
+  try {
+    const userDoc = await db.collection('users').doc(req.userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userData = userDoc.data();
+    
+    // Return only personalization fields
+    const personalizationData = {
+      nationality: userData.nationality || userData.nationalities?.[0] || '',
+      age: userData.age || null,
+      gender: userData.gender || '',
+      allergies: userData.allergies || [],
+      isVegan: userData.isVegan || false,
+      isDiabetic: userData.isDiabetic || false,
+      isDiet: userData.isDiet || false, // Changed from isOnDiet to match frontend
+      isMuslim: userData.isMuslim || false,
+      isLactoseFree: userData.isLactoseFree || false,
+      isHighCalorie: userData.isHighCalorie || false,
+      prefersSalty: userData.prefersSalty || false,
+      prefersSpicy: userData.prefersSpicy || false,
+      prefersSweet: userData.prefersSweet || false,
+      prefersSour: userData.prefersSour || false,
+      dislikedIngredients: userData.dislikedIngredients || []
+    };
+
+    res.status(200).json({ personalization: personalizationData });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Legacy favorites endpoints were removed in favor of the unified collections API.
 // Favorites are now handled in backend/functions/src/routes/collections.js via
 // /api/collections/favorites and related collection recipe endpoints to keep a

@@ -57,9 +57,6 @@ router.put('/profile', verifyAuthToken, async (req, res) => {
 router.put('/personalization', verifyAuthToken, async (req, res) => {
   try {
     console.log('Received personalization update:', req.body);
-    console.log('dislikesInput value:', dislikesInput);
-    console.log('dislikesInput type:', typeof dislikesInput);
-    console.log('dislikesInput isArray:', Array.isArray(dislikesInput));
     
     const {
       nationality,
@@ -84,8 +81,12 @@ router.put('/personalization', verifyAuthToken, async (req, res) => {
     // Validation
     const updates = {};
 
+    // Handle nationality - store as array for consistency with frontend
     if (nationality && typeof nationality === 'string' && nationality.trim().length > 0) {
+      // Store as array to support multiple nationalities in the future
+      // For backward compatibility, also keep the single nationality field
       updates.nationality = nationality.trim();
+      updates.nationalities = [nationality.trim()];
     }
 
     if (age !== undefined) {
@@ -166,7 +167,7 @@ router.get('/personalization', verifyAuthToken, async (req, res) => {
     
     // Return only personalization fields
     const personalizationData = {
-      nationality: userData.nationality || '',
+      nationality: userData.nationality || userData.nationalities?.[0] || '',
       age: userData.age || null,
       gender: userData.gender || '',
       allergies: userData.allergies || [],

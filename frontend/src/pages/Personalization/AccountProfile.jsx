@@ -7,8 +7,27 @@ import {
   ArrowLeft, Settings, Mail, Calendar,
   Globe, User, Activity, Edit2, Scale, Moon,
   WheatOff, Ban, Flame, Utensils, Check, X,
-  ChevronRight, Loader2, Plus, Save, Edit3
+  ChevronRight, Loader2, Plus, Save, Edit3, Search
 } from 'lucide-react';
+
+// Country data similar to AccountPreferences
+const COUNTRIES = [
+  { code: 'CN', name: 'China', flag: '🇨🇳' },
+  { code: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: 'KR', name: 'South Korea', flag: '🇰🇷' },
+  { code: 'PH', name: 'Philippines', flag: '🇵🇭' },
+  { code: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: 'IN', name: 'India', flag: '🇮🇳' },
+  { code: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: 'MX', name: 'Mexico', flag: '🇲🇽' }
+];
 
 export default function AccountProfile() {
   const { updateUserProfile: updateAuthUserProfile } = useAuth();
@@ -24,7 +43,7 @@ export default function AccountProfile() {
   // Modal state for editing preferences
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const [preferencesForm, setPreferencesForm] = useState({
-    nationality: '',
+    nationalities: [],
     age: null,
     gender: '',
     allergies: [],
@@ -90,12 +109,28 @@ export default function AccountProfile() {
           prefersSour: userProfile.prefersSour,
           dislikedIngredients: userProfile.dislikedIngredients || userProfile.dislikes
         };
+
+        // Convert single nationality to array format for consistency
+        const nationalities = [];
+        if (personalization.nationality) {
+          // Find matching country from our list
+          const matchingCountry = COUNTRIES.find(c => 
+            c.name.toLowerCase() === personalization.nationality.toLowerCase()
+          );
+          if (matchingCountry) {
+            nationalities.push(matchingCountry);
+          } else {
+            // If not found in our list, create a placeholder
+            nationalities.push({
+              code: 'XX',
+              name: personalization.nationality,
+              flag: '🌍'
+            });
+          }
+        }
+
         setPreferences({
-          nationalities: personalization.nationality ? [{
-            code: 'XX', // We don't have country codes, using placeholder
-            name: personalization.nationality,
-            flag: getCountryFlag(personalization.nationality)
-          }] : [],
+          nationalities: nationalities,
           age: personalization.age || null,
           ageLabel: personalization.age ? getAgeLabel(personalization.age) : "",
           gender: personalization.gender || "",
@@ -129,24 +164,8 @@ export default function AccountProfile() {
 
   // Helper functions
   const getCountryFlag = (countryName) => {
-    // Simple country flag mapping
-    const flagMap = {
-      'Philippines': '🇵🇭',
-      'Japan': '🇯🇵',
-      'United States': '🇺🇸',
-      'Canada': '🇨🇦',
-      'United Kingdom': '🇬🇧',
-      'Australia': '🇦🇺',
-      'Germany': '🇩🇪',
-      'France': '🇫🇷',
-      'Italy': '🇮🇹',
-      'Spain': '🇪🇸',
-      'China': '🇨🇳',
-      'India': '🇮🇳',
-      'Brazil': '🇧🇷',
-      'Mexico': '🇲🇽'
-    };
-    return flagMap[countryName] || '🌍';
+    const country = COUNTRIES.find(c => c.name.toLowerCase() === countryName.toLowerCase());
+    return country ? country.flag : '🌍';
   };
 
   const getAgeLabel = (age) => {
@@ -160,7 +179,7 @@ export default function AccountProfile() {
   const openPreferencesModal = () => {
     // Initialize form with current preferences
     setPreferencesForm({
-      nationality: preferences?.nationalities?.[0]?.name || '',
+      nationalities: preferences?.nationalities || [],
       age: preferences?.age || null,
       gender: preferences?.gender || '',
       allergies: preferences?.allergies || [],
@@ -203,23 +222,51 @@ export default function AccountProfile() {
     setPreferencesForm(prev => ({ ...prev, dislikedIngredients: prev.dislikedIngredients.filter(d => d !== dislike) }));
   };
 
+  // Country selection handlers
+  const toggleNationality = (country) => {
+    setPreferencesForm(prev => {
+      const exists = prev.nationalities.find(n => n.code === country.code);
+      if (exists) {
+        return { ...prev, nationalities: prev.nationalities.filter(n => n.code !== country.code) };
+      }
+      if (prev.nationalities.length >= 2) return prev; // Max 2 countries
+      return { ...prev, nationalities: [...prev.nationalities, country] };
+    });
+  };
+
   const savePreferences = async () => {
     try {
       setPreferencesSaving(true);
       console.log('Submitting preferences form:', preferencesForm);
+      
+      // Send only the first nationality to backend (for backward compatibility)
+      // But store all in local state
+      const nationality = preferencesForm.nationalities.length > 0 
+        ? preferencesForm.nationalities[0].name 
+        : '';
+      
       await updateUserPersonalization({
-        ...preferencesForm,
-        dislikedIngredients: preferencesForm.dislikedIngredients
+        nationality: nationality,
+        age: preferencesForm.age,
+        gender: preferencesForm.gender,
+        allergies: preferencesForm.allergies,
+        dislikedIngredients: preferencesForm.dislikedIngredients,
+        isVegan: preferencesForm.isVegan,
+        isDiabetic: preferencesForm.isDiabetic,
+        isDiet: preferencesForm.isDiet,
+        isMuslim: preferencesForm.isMuslim,
+        isLactoseFree: preferencesForm.isLactoseFree,
+        isHighCalorie: preferencesForm.isHighCalorie,
+        prefersSalty: preferencesForm.prefersSalty,
+        prefersSpicy: preferencesForm.prefersSpicy,
+        prefersSweet: preferencesForm.prefersSweet,
+        prefersSour: preferencesForm.prefersSour
       });
       
       // Update local state to reflect changes
       setPreferences(prev => ({
         ...prev,
-        nationalities: preferencesForm.nationality ? [{
-          code: 'XX',
-          name: preferencesForm.nationality,
-          flag: getCountryFlag(preferencesForm.nationality)
-        }] : [],
+        nationalities: preferencesForm.nationalities,
         age: preferencesForm.age,
         ageLabel: preferencesForm.age ? getAgeLabel(preferencesForm.age) : "",
         gender: preferencesForm.gender,
@@ -270,6 +317,71 @@ export default function AccountProfile() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Country selector component for the modal
+  const CountrySelector = () => {
+    const [search, setSearch] = useState('');
+    const [isOpen, setIsOpen] = useState(false);
+
+    const filtered = COUNTRIES.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            className="w-full pl-12 pr-4 py-3 bg-white border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all shadow-sm"
+            placeholder="Search countries..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
+            onFocus={() => setIsOpen(true)}
+          />
+        </div>
+
+        {isOpen && (
+          <div className="absolute top-full left-0 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 p-2">
+            {filtered.length > 0 ? filtered.map(c => {
+              const isSelected = preferencesForm.nationalities.some(n => n.code === c.code);
+              const disabled = !isSelected && preferencesForm.nationalities.length >= 2;
+              return (
+                <button
+                  key={c.code}
+                  disabled={disabled}
+                  onClick={() => toggleNationality(c)}
+                  className={`w-full text-left px-4 py-3 rounded-lg flex items-center justify-between transition-all ${
+                    isSelected ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50 text-gray-700'
+                  } ${disabled ? 'opacity-40' : ''}`}
+                >
+                  <span className="flex items-center gap-3 font-medium">
+                    <span className="text-2xl">{c.flag}</span>
+                    {c.name}
+                  </span>
+                  {isSelected && <Check className="w-5 h-5 text-orange-600" />}
+                </button>
+              );
+            }) : (
+              <div className="p-4 text-center text-gray-400 text-sm">No matches found</div>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 min-h-[50px]">
+          {preferencesForm.nationalities.map(nat => (
+            <div key={nat.code} className="flex items-center gap-2 bg-orange-100 text-orange-800 pl-4 pr-2 py-2 rounded-full shadow-md animate-scale-in">
+              <span className="text-lg">{nat.flag}</span>
+              <span className="font-semibold text-sm">{nat.name}</span>
+              <button
+                onClick={() => toggleNationality(nat)}
+                className="bg-orange-200 hover:bg-orange-300 rounded-full p-1 ml-1 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -567,14 +679,10 @@ export default function AccountProfile() {
             <div className="p-6 space-y-6">
               {/* Nationality */}
               <div>
-                <label className="block text-sm font-bold text-stone-600 mb-2">Nationality</label>
-                <input
-                  type="text"
-                  value={preferencesForm.nationality}
-                  onChange={(e) => handlePreferencesChange('nationality', e.target.value)}
-                  placeholder="e.g., Philippines, Japan, United States"
-                  className="w-full px-4 py-3 border border-stone-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
-                />
+                <label className="block text-sm font-bold text-stone-600 mb-2">Nationality (Select up to 2)</label>
+                <div className="relative">
+                  <CountrySelector />
+                </div>
               </div>
 
               {/* Age */}

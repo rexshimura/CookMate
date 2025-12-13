@@ -20,6 +20,17 @@ function safeJSONParse(str) {
 // In-memory cache for recipe consistency during development
 const recipeCache = new Map();
 
+function normalizeServings(servings) {
+  if (servings === null || servings === undefined) {
+    return '4';
+  }
+  const parsed = parseFloat(servings);
+  if (!isNaN(parsed) && parsed > 0) {
+    return parsed % 1 === 0 ? parsed.toString() : parsed.toFixed(1).replace(/\.0$/, '');
+  }
+  return '4';
+}
+
 // Helper function to generate consistent recipe ID
 function generateConsistentRecipeId(recipeName) {
   if (!recipeName) return '';
@@ -36,6 +47,10 @@ function generateConsistentRecipeId(recipeName) {
 // Helper function to save recipe to Firestore
 async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
   try {
+    const safeServings = normalizeServings(recipeData.servings);
+    const safeCookingTime = (typeof recipeData.cookingTime === 'string' && recipeData.cookingTime.trim())
+      ? recipeData.cookingTime
+      : '30 mins';
     // Generate a clean recipe ID from title
     const recipeId = generateConsistentRecipeId(recipeData.title);
 
@@ -45,8 +60,8 @@ async function saveRecipeToFirestore(recipeData, userId = 'anonymous') {
       description: recipeData.description || '',
       ingredients: recipeData.ingredients || [],
       instructions: recipeData.instructions || [],
-      cookingTime: recipeData.cookingTime || 'Varies',
-      servings: recipeData.servings || '4',
+      cookingTime: safeCookingTime,
+      servings: safeServings,
       difficulty: recipeData.difficulty || 'Medium',
       estimatedCost: recipeData.estimatedCost || 'Moderate',
       nutritionInfo: recipeData.nutritionInfo || {},
@@ -75,6 +90,10 @@ async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
   try {
     // SAFEGUARD: Handle both Object and String inputs
     const recipeTitle = typeof recipeInput === 'string' ? recipeInput : recipeInput?.title;
+    const safeServings = normalizeServings(recipeInput?.servings);
+    const safeCookingTime = (typeof recipeInput?.cookingTime === 'string' && recipeInput.cookingTime.trim())
+      ? recipeInput.cookingTime
+      : '30 mins';
     
     if (!recipeTitle) {
       console.warn('⚠️ Skipping storage: Missing title');
@@ -99,8 +118,8 @@ async function storeDetectedRecipe(recipeInput, userId = 'anonymous') {
         description: `A delicious ${recipeTitle} recipe to try`,
         ingredients: ["Click on the recipe card to get detailed ingredients"],
         instructions: ["Click on the recipe card to get detailed instructions"],
-        cookingTime: "Varies",
-        servings: recipeInput?.servings || "4",
+        cookingTime: safeCookingTime,
+        servings: safeServings,
         difficulty: recipeInput?.difficulty || "Medium",
         estimatedCost: "Moderate",
         nutritionInfo: {
@@ -777,7 +796,7 @@ function isValidRecipe(text) {
   // 2. COOKING VERB CHECK: If it starts with a verb, it's an instruction, not a title
   // e.g. "Bake for 20 mins" -> REJECT
   // But be more lenient - only reject if it's clearly an instruction
-  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust)/i;
+  const cookingVerbs = /^(bake|boil|fry|roast|grill|steam|poach|simmer|saute|chop|slice|dice|mince|peel|cut|wash|dry|serve|garnish|sprinkle|cover|let|allow|wait|remove|turn|flip|blend|process|whisk|beat|marinate|season|taste|adjust|mix|add|pour|place|combine|stir|heat|warm|cool|refrigerate|knead|fold)/i;
 
   if (cookingVerbs.test(cleanText)) {
     // Only reject if it looks like an instruction (has additional words after the verb)
@@ -967,6 +986,195 @@ If the user asks for something that is NOT a food item (e.g., "Swimming Pool", "
   return aiResponse;
 }
 
+// Enhanced callGroqAI function with user personalization support
+async function callGroqAI(message, conversationHistory = [], userProfile = null) {
+  const apiKey = process.env.GROQ_API_KEY;
+  
+  // Check if API key is provided
+  if (!apiKey || apiKey === 'your_groq_api_key_here' || apiKey.trim() === '') {
+    throw new Error('GROQ_API_KEY environment variable is required. Please get a free API key from https://console.groq.com/ and add it to your .env file.');
+  }
+
+  // Build system message with personalization context
+  let systemMessageContent = `You are CookMate, a comprehensive AI cooking assistant. Your primary goal is to provide a helpful and engaging conversational experience about cooking, while also extracting key recipe information in a structured format.
+
+**Conversational Response:**
+First, provide a friendly, conversational response to the user's query. This should be natural and helpful, as if you were talking to a friend about cooking. **IMPORTANT: Keep your conversational response brief and concise - aim for 1-3 sentences maximum.** Focus on the key information the user needs.
+
+**Structured JSON Output:**
+After the conversational text, you MUST include a structured JSON object. This JSON object should be enclosed in \`\`\`json code blocks. The JSON should contain a single key, "recipes," which is an array of recipe objects. For each recipe mentioned or implied in the user's request, create a JSON object with the following fields:
+
+- "title": The name of the recipe (e.g., "Chicken Adobo").
+- "servings": The number of servings as a string (e.g., "4-6").
+- "difficulty": The difficulty level (e.g., "Easy", "Medium", "Hard").
+
+**CRITICAL:** The \`\`\`json block MUST be the VERY LAST part of your response. There should be no text or characters after the closing \`\`\` of the JSON block.
+
+**User Personalization Context:**
+`;
+
+  // Add personalization context if available
+  if (userProfile) {
+    const personalizationContext = [];
+    
+    // Add dietary restrictions (highest priority)
+    if (userProfile.isVegan === true) {
+      personalizationContext.push("User is Vegan.");
+    }
+    if (userProfile.isDiabetic === true) {
+      personalizationContext.push("User has Diabetes - avoid high sugar ingredients.");
+    }
+    if (userProfile.isOnDiet === true) {
+      personalizationContext.push("User is on a diet - suggest healthier options.");
+    }
+    
+    // Add allergies (critical safety information)
+    if (userProfile.allergies && userProfile.allergies.length > 0) {
+      personalizationContext.push(`User is allergic to: ${userProfile.allergies.join(', ')}.`);
+    }
+    
+    // Add taste preferences
+    if (userProfile.prefersSpicy === true) {
+      personalizationContext.push("User prefers spicy food.");
+    }
+    if (userProfile.prefersSalty === true) {
+      personalizationContext.push("User prefers salty food.");
+    }
+    
+    // Add disliked ingredients
+    if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
+      personalizationContext.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')}.`);
+    }
+    
+    // Add demographic info
+    if (userProfile.nationality && userProfile.nationality.trim()) {
+      personalizationContext.push(`User's nationality: ${userProfile.nationality}.`);
+    }
+    if (userProfile.age && userProfile.age > 0) {
+      personalizationContext.push(`User's age: ${userProfile.age}.`);
+    }
+    if (userProfile.gender && userProfile.gender.trim()) {
+      personalizationContext.push(`User's gender: ${userProfile.gender}.`);
+    }
+    
+    if (personalizationContext.length > 0) {
+      systemMessageContent += personalizationContext.join('\n') + '\n\n';
+    }
+  }
+
+  systemMessageContent += `RECIPE ANALYSIS MODE: If the user provides a recipe text (or says "Import recipe: ...") and asks for improvements, critiques, or "how to make this better":
+
+Analyze: Critically evaluate their ingredients and methods. Look for flavor imbalances, missing techniques (e.g., "searing meat first"), or opportunities for better textures.
+
+Conversational Response: Explicitly list 3-5 concrete suggestions to improve the dish (e.g., "Add a splash of lemon juice to cut the richness," or "Roast the veggies instead of boiling for better flavor").
+
+JSON Output: In the recipes JSON array, you can either:
+
+Return the Original recipe (if you just analyzed it).
+
+OR, preferably, return the Improved Version of the recipe as a new entry (e.g., Title: "Improved [Recipe Name]").
+
+**Example Interaction:**
+
+User: "I'm thinking of making some adobo and maybe some sinigang."
+
+Your Response:
+That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinegar-based stew, while Sinigang is a sour and savory soup.
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "title": "Chicken Adobo",
+      "servings": "4",
+      "difficulty": "Easy"
+    },
+    {
+      "title": "Pork Sinigang",
+      "servings": "6",
+      "difficulty": "Medium"
+    }
+  ]
+}
+
+**Recipe Improvement Example:**
+
+User: "Here is my recipe for tomato sauce: Tomato paste, water, salt. How can I improve it?"
+
+Your Response:
+To make this sauce richer, I suggest sautéing onions and garlic first. Also, using crushed tomatoes instead of just paste and water will give it better body. Add basil for freshness.
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "title": "Rich Tomato Sauce",
+      "servings": "4",
+      "difficulty": "Easy"
+    }
+  ]
+}
+
+**NON-FOOD QUERIES:**
+If the user asks for something that is NOT a food item (e.g., "Swimming Pool", "Cement", "Chair"), you MUST return an empty recipes array in the JSON: { "recipes": [] }. Do NOT invent recipes for non-food items.
+\`\`\``;
+
+  const systemMessage = {
+    role: "system",
+    content: systemMessageContent
+  };
+  
+  // Prepare conversation messages
+  const conversation = Array.isArray(conversationHistory) ? conversationHistory : [];
+  const messages = [systemMessage];
+  
+  // Add conversation history (limit to last 10 messages to manage token count)
+  const recentHistory = conversation.slice(-10);
+  messages.push(...recentHistory);
+  
+  // Add current user message if not already included
+  const lastMessage = recentHistory[recentHistory.length - 1];
+  const includeUserMessage = !(lastMessage && lastMessage.role === 'user' && lastMessage.content === message);
+  
+  if (includeUserMessage) {
+    messages.push({
+      role: 'user',
+      content: message
+    });
+  }
+  
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant", // Current free tier model
+      messages: messages,
+      max_tokens: 4096, // High token limit for complete responses ( model's maximum)
+      temperature: 0.7,
+      top_p: 0.9,
+      stream: false
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error('Groq API Error:', response.status, errorData);
+    throw new Error(`Groq API request failed: ${response.status} - ${errorData}`);
+  }
+  
+  const data = await response.json();
+  const aiResponse = data.choices[0]?.message?.content;
+  
+  if (!aiResponse) {
+    throw new Error('No response generated from Groq API');
+  }
+  
+  return aiResponse;
+}
+
 // CHAT ENDPOINT - ChatGPT-like interface
 router.post('/chat', verifyAuthToken, async (req, res) => {
   try {
@@ -974,6 +1182,17 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
     
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
+    }
+    
+    // Fetch user profile for personalization
+    let userProfile = null;
+    try {
+      const userDoc = await db.collection('users').doc(req.userId).get();
+      if (userDoc.exists) {
+        userProfile = userDoc.data();
+      }
+    } catch (profileError) {
+      console.warn('Failed to fetch user profile for personalization:', profileError);
     }
     
     // Check for developer questions first (highest priority)
@@ -1014,7 +1233,7 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
         // Use AI to generate a natural, personalized response to gratitude
         const gratitudePrompt = `The user said: "${message}". This is a compliment or expression of gratitude. Respond warmly and naturally as CookMate, the AI cooking assistant. Keep the response friendly, personal, and cooking-themed. Do NOT generate any recipes or cooking suggestions - this is purely a social response. Make it feel genuine and engaging.`;
 
-        const aiResponse = await callGroqAI(gratitudePrompt);
+        const aiResponse = await callGroqAI(gratitudePrompt, history, userProfile);
 
         // Clean up the AI response to remove any accidental recipe references
         let cleanedResponse = aiResponse
@@ -1089,7 +1308,7 @@ router.post('/chat', verifyAuthToken, async (req, res) => {
 
     try {
       console.log('🔄 Calling Groq AI for chat response...');
-      fullResponse = await callGroqAI(message, history);
+      fullResponse = await callGroqAI(message, history, userProfile);
       console.log('✅ AI response received successfully');
 
       // STRATEGY 1: Look for Markdown Code Blocks (Standard)
@@ -1271,10 +1490,21 @@ I should be back to full AI functionality shortly. Thanks for your patience! �
   }
 });
 
-// GENERATE RECIPE ENDPOINT - Enhanced with real AI
+// GENERATE RECIPE ENDPOINT - Enhanced with real AI and user personalization
 router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
   try {
     const { userMessage, ingredients: providedIngredients, dietaryPreferences, recipeType } = req.body;
+    
+    // Fetch user profile for personalization
+    let userProfile = null;
+    try {
+      const userDoc = await db.collection('users').doc(req.userId).get();
+      if (userDoc.exists) {
+        userProfile = userDoc.data();
+      }
+    } catch (profileError) {
+      console.warn('Failed to fetch user profile for personalization:', profileError);
+    }
     
     let ingredients = providedIngredients;
     
@@ -1283,11 +1513,49 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       ingredients = extractIngredients(userMessage);
     }
     
-    // Create a detailed prompt for recipe generation
+    // Create a detailed prompt for recipe generation with personalization
     let recipePrompt = `Create a delicious recipe`;
     
     if (ingredients && ingredients.length > 0) {
       recipePrompt += ` using these ingredients: ${ingredients.join(', ')}`;
+    }
+    
+    // Add user personalization context
+    if (userProfile) {
+      const personalizationNotes = [];
+      
+      // Add dietary restrictions
+      if (userProfile.isVegan === true) {
+        personalizationNotes.push("User is Vegan - ensure recipe is completely plant-based");
+      }
+      if (userProfile.isDiabetic === true) {
+        personalizationNotes.push("User has Diabetes - avoid high sugar ingredients, use diabetic-friendly alternatives");
+      }
+      if (userProfile.isOnDiet === true) {
+        personalizationNotes.push("User is on a diet - suggest healthier, lower-calorie options");
+      }
+      
+      // Add allergies (critical safety information)
+      if (userProfile.allergies && userProfile.allergies.length > 0) {
+        personalizationNotes.push(`User is allergic to: ${userProfile.allergies.join(', ')} - DO NOT include these ingredients`);
+      }
+      
+      // Add taste preferences
+      if (userProfile.prefersSpicy === true) {
+        personalizationNotes.push("User prefers spicy food - include spicy elements");
+      }
+      if (userProfile.prefersSalty === true) {
+        personalizationNotes.push("User prefers salty food - include savory/salty elements");
+      }
+      
+      // Add disliked ingredients
+      if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
+        personalizationNotes.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')} - avoid these ingredients`);
+      }
+      
+      if (personalizationNotes.length > 0) {
+        recipePrompt += `. Personalization notes: ${personalizationNotes.join('; ')}`;
+      }
     }
     
     if (dietaryPreferences) {
@@ -1313,8 +1581,8 @@ Please provide the recipe in this JSON format:
 
 Only return the JSON, no additional text.`;
 
-    // Generate recipe using Groq
-    const aiResponse = await callGroqAI(recipePrompt);
+    // Generate recipe using Groq with user profile
+    const aiResponse = await callGroqAI(recipePrompt, [], userProfile);
     
     // Parse JSON response from AI with improved error handling
     let recipeData;
@@ -1391,14 +1659,25 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
       return res.status(400).json({ error: 'Recipe name is required' });
     }
     
+    // Fetch user profile for personalization
+    let userProfile = null;
+    try {
+      const userDoc = await db.collection('users').doc(req.userId).get();
+      if (userDoc.exists) {
+        userProfile = userDoc.data();
+      }
+    } catch (profileError) {
+      console.warn('Failed to fetch user profile for personalization:', profileError);
+    }
+    
     // 1. CHECK CACHE FIRST: Don't call AI if we already have the recipe
     try {
       const cachedRecipe = await getStoredRecipe(recipeName);
       
       // VALIDATION: Ensure it's a real recipe, not a placeholder
-      if (cachedRecipe && 
-          cachedRecipe.ingredients && 
-          cachedRecipe.ingredients.length > 0 && 
+      if (cachedRecipe &&
+          cachedRecipe.ingredients &&
+          cachedRecipe.ingredients.length > 0 &&
           !cachedRecipe.ingredients[0].includes("Click on the recipe")) {
             
         console.log('✅ Serving recipe from cache:', recipeName);
@@ -1415,8 +1694,48 @@ router.post('/recipe-details', verifyAuthToken, async (req, res) => {
     
     // STEP 2: If no stored data found, generate new recipe details
     
-    // Create a detailed prompt for recipe details generation
-    const detailPrompt = `Create detailed recipe information for "${recipeName}". IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.
+    // Create a detailed prompt for recipe details generation with personalization
+    let detailPrompt = `Create detailed recipe information for "${recipeName}". IMPORTANT: Return ONLY valid JSON. Do not add markdown formatting like \`\`\`json. Just the raw JSON string.`;
+    
+    // Add personalization context if available
+    if (userProfile) {
+      const personalizationNotes = [];
+      
+      // Add dietary restrictions
+      if (userProfile.isVegan === true) {
+        personalizationNotes.push("User is Vegan - ensure recipe is completely plant-based");
+      }
+      if (userProfile.isDiabetic === true) {
+        personalizationNotes.push("User has Diabetes - avoid high sugar ingredients, use diabetic-friendly alternatives");
+      }
+      if (userProfile.isOnDiet === true) {
+        personalizationNotes.push("User is on a diet - suggest healthier, lower-calorie options");
+      }
+      
+      // Add allergies (critical safety information)
+      if (userProfile.allergies && userProfile.allergies.length > 0) {
+        personalizationNotes.push(`User is allergic to: ${userProfile.allergies.join(', ')} - DO NOT include these ingredients`);
+      }
+      
+      // Add taste preferences
+      if (userProfile.prefersSpicy === true) {
+        personalizationNotes.push("User prefers spicy food - include spicy elements");
+      }
+      if (userProfile.prefersSalty === true) {
+        personalizationNotes.push("User prefers salty food - include savory/salty elements");
+      }
+      
+      // Add disliked ingredients
+      if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
+        personalizationNotes.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')} - avoid these ingredients`);
+      }
+      
+      if (personalizationNotes.length > 0) {
+        detailPrompt += ` Personalization notes: ${personalizationNotes.join('; ')}`;
+      }
+    }
+    
+    detailPrompt += `
 
 Please provide the recipe in this exact JSON format:
 {
@@ -1440,8 +1759,8 @@ Please provide the recipe in this exact JSON format:
 
 Only return the JSON, no additional text. Make sure the recipe is practical and detailed.`;
 
-    // Generate recipe details using Groq
-    const aiResponse = await callGroqAI(detailPrompt);
+    // Generate recipe details using Groq with user profile
+    const aiResponse = await callGroqAI(detailPrompt, [], userProfile);
     
     // Parse JSON response from AI with improved error handling
     let recipeData;
@@ -1520,7 +1839,7 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
             nutritionInfo: {
               calories: "350-450 per serving",
               protein: "20-30 grams",
-              carbs: "30-40 grams", 
+              carbs: "30-40 grams",
               fat: "15-25 grams"
             },
             tips: ["Use fresh ingredients for best results", "Taste and adjust seasoning as needed"],
@@ -1545,7 +1864,7 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
           nutritionInfo: {
             calories: "Varies",
             protein: "Varies",
-            carbs: "Varies", 
+            carbs: "Varies",
             fat: "Varies"
           },
           tips: ["Use fresh ingredients", "Cook to proper temperature", "Taste and adjust seasoning"],
@@ -1600,17 +1919,66 @@ Only return the JSON, no additional text. Make sure the recipe is practical and 
   }
 });
 
-// SUGGEST INGREDIENTS ENDPOINT - Enhanced with AI suggestions
+// SUGGEST INGREDIENTS ENDPOINT - Enhanced with AI suggestions and user personalization
 router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
   try {
     const { availableIngredients } = req.body;
     
+    // Fetch user profile for personalization
+    let userProfile = null;
+    try {
+      const userDoc = await db.collection('users').doc(req.userId).get();
+      if (userDoc.exists) {
+        userProfile = userDoc.data();
+      }
+    } catch (profileError) {
+      console.warn('Failed to fetch user profile for personalization:', profileError);
+    }
+    
     // If we have available ingredients, use AI to suggest complementary ingredients
     if (availableIngredients && availableIngredients.length > 0) {
       try {
-        const prompt = `I have these ingredients: ${availableIngredients.join(', ')}. Suggest 5-7 complementary ingredients that would go well with them for cooking. Return only a JSON array of ingredient strings.`;
+        let prompt = `I have these ingredients: ${availableIngredients.join(', ')}. Suggest 5-7 complementary ingredients that would go well with them for cooking. Return only a JSON array of ingredient strings.`;
         
-        const aiResponse = await callGroqAI(prompt);
+        // Add personalization context if available
+        if (userProfile) {
+          const personalizationNotes = [];
+          
+          // Add dietary restrictions
+          if (userProfile.isVegan === true) {
+            personalizationNotes.push("User is Vegan - suggest plant-based complementary ingredients");
+          }
+          if (userProfile.isDiabetic === true) {
+            personalizationNotes.push("User has Diabetes - suggest low-sugar complementary ingredients");
+          }
+          if (userProfile.isOnDiet === true) {
+            personalizationNotes.push("User is on a diet - suggest healthier, lower-calorie complementary ingredients");
+          }
+          
+          // Add allergies (critical safety information)
+          if (userProfile.allergies && userProfile.allergies.length > 0) {
+            personalizationNotes.push(`User is allergic to: ${userProfile.allergies.join(', ')} - DO NOT suggest these ingredients`);
+          }
+          
+          // Add taste preferences
+          if (userProfile.prefersSpicy === true) {
+            personalizationNotes.push("User prefers spicy food - suggest spicy complementary ingredients");
+          }
+          if (userProfile.prefersSalty === true) {
+            personalizationNotes.push("User prefers salty food - suggest savory/salty complementary ingredients");
+          }
+          
+          // Add disliked ingredients
+          if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
+            personalizationNotes.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')} - avoid suggesting these ingredients`);
+          }
+          
+          if (personalizationNotes.length > 0) {
+            prompt += ` Personalization notes: ${personalizationNotes.join('; ')}`;
+          }
+        }
+        
+        const aiResponse = await callGroqAI(prompt, [], userProfile);
         
         // Try to parse AI suggestions
         let aiSuggestions = [];
@@ -1682,3 +2050,4 @@ router.post('/suggest-ingredients', verifyAuthToken, async (req, res) => {
 module.exports = router;
 module.exports.extractRecipesFromResponse = extractRecipesFromResponse;
 module.exports.isValidRecipe = isValidRecipe;
+module.exports.callGroqAI = callGroqAI;

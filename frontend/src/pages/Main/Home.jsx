@@ -833,7 +833,7 @@ export default function Home({ favoritesHook, collectionsHook }) {
                         <h4 className="text-sm font-semibold text-stone-700 mb-3">Click on a recipe for full details:</h4>
                         {detected.map((recipe, index) => (
                           <RecipeCard
-                            key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : recipe.title}`}
+                            key={`${message.id}_recipe_${index}_${typeof recipe === 'string' ? recipe : (recipe.id || recipe.title || 'unknown')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`}
                             recipe={recipe}
                             onClick={handleRecipeClick}
                             isLoading={recipeDetailsLoading}
