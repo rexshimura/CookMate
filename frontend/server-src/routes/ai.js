@@ -785,7 +785,8 @@ function isValidRecipe(text) {
   // Reduced blocklist to only clear non-recipe terms
   const blockTerms = [
     'click', 'view', 'read', 'here', 'link', 'website', 'youtube', 'video',
-    'welcome', 'hello', 'hi', 'thank', 'sorry', 'goodbye'
+    'welcome', 'hello', 'hi', 'thank', 'sorry', 'goodbye',
+    'medium', 'easy', 'hard', 'difficulty', 'prep time', 'cook time'
   ];
 
   if (blockTerms.some(term => lowerText.startsWith(term) || lowerText === term)) {
@@ -1010,12 +1011,19 @@ After the conversational text, you MUST include a structured JSON object. This J
 
 **CRITICAL:** The \`\`\`json block MUST be the VERY LAST part of your response. There should be no text or characters after the closing \`\`\` of the JSON block.
 
+**STRICT COOKING-ONLY POLICY:**
+- You may only discuss food, cooking, ingredients, nutrition, or kitchen techniques.
+- If the user request is not about food/cooking, reply EXACTLY with: "I'm only able to help with cooking-related questions. Tell me what dish or ingredient you're interested in!" and return this JSON: {"recipes": []}
+- Never ask the user follow-up questions like "Would you like me to suggest something else?".
+- Do not offer to switch topics or provide non-food assistance.
+
 **User Personalization Context:**
 `;
 
   // Add personalization context if available
   if (userProfile) {
     const personalizationContext = [];
+    const followsStrictHalal = userProfile.isMuslim === true || userProfile.isHalal === true;
     
     // Add dietary restrictions (highest priority)
     if (userProfile.isVegan === true) {
@@ -1024,7 +1032,7 @@ After the conversational text, you MUST include a structured JSON object. This J
     if (userProfile.isDiabetic === true) {
       personalizationContext.push("User has Diabetes - avoid high sugar ingredients.");
     }
-    if (userProfile.isOnDiet === true) {
+    if (userProfile.isOnDiet === true || userProfile.isDiet === true) {
       personalizationContext.push("User is on a diet - suggest healthier options.");
     }
     
@@ -1045,6 +1053,10 @@ After the conversational text, you MUST include a structured JSON object. This J
     if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
       personalizationContext.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')}.`);
     }
+
+    if (followsStrictHalal) {
+      personalizationContext.push("User follows a strict Halal diet. Avoid pork, bacon, ham, lard, alcohol, and gelatin.");
+    }
     
     // Add demographic info
     if (userProfile.nationality && userProfile.nationality.trim()) {
@@ -1059,6 +1071,10 @@ After the conversational text, you MUST include a structured JSON object. This J
     
     if (personalizationContext.length > 0) {
       systemMessageContent += personalizationContext.join('\n') + '\n\n';
+    }
+
+    if (followsStrictHalal) {
+      systemMessageContent += "User follows a STRICT HALAL diet. Absolutely NO PORK, NO BACON, NO HAM, NO LARD, NO ALCOHOL, and NO GELATIN. Do not suggest recipes containing these ingredients.\n\n";
     }
   }
 
@@ -1451,6 +1467,20 @@ I should be back to full AI functionality shortly. Thanks for your patience! ðŸ
         detectedRecipes = extractRecipesFromResponse(message);
       }
     }
+
+    const cookingOnlyReminder = "I'm only able to help with cooking-related questions. Tell me what dish or ingredient you're interested in!";
+    const forbiddenPhrases = [
+      /would you like me to/i,
+      /want me to suggest/i,
+      /shall i suggest/i,
+      /need something else/i
+    ];
+
+    const violatesPolicy = forbiddenPhrases.some(regex => regex.test(aiReply));
+    if (violatesPolicy || detectedRecipes.length === 0) {
+      aiReply = cookingOnlyReminder;
+      detectedRecipes = [];
+    }
        
       // 5. Send Response (Ensuring detectedRecipes is included!)
       res.status(200).json({
@@ -1523,6 +1553,7 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
     // Add user personalization context
     if (userProfile) {
       const personalizationNotes = [];
+      const followsStrictHalal = userProfile.isMuslim === true || userProfile.isHalal === true;
       
       // Add dietary restrictions
       if (userProfile.isVegan === true) {
@@ -1531,7 +1562,7 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       if (userProfile.isDiabetic === true) {
         personalizationNotes.push("User has Diabetes - avoid high sugar ingredients, use diabetic-friendly alternatives");
       }
-      if (userProfile.isOnDiet === true) {
+      if (userProfile.isOnDiet === true || userProfile.isDiet === true) {
         personalizationNotes.push("User is on a diet - suggest healthier, lower-calorie options");
       }
       
@@ -1552,9 +1583,17 @@ router.post('/generate-recipe', verifyAuthToken, async (req, res) => {
       if (userProfile.dislikedIngredients && userProfile.dislikedIngredients.length > 0) {
         personalizationNotes.push(`User dislikes: ${userProfile.dislikedIngredients.join(', ')} - avoid these ingredients`);
       }
+
+      if (followsStrictHalal) {
+        personalizationNotes.push("User follows a STRICT Halal diet - absolutely no pork, bacon, ham, lard, alcohol, or gelatin");
+      }
       
       if (personalizationNotes.length > 0) {
         recipePrompt += `. Personalization notes: ${personalizationNotes.join('; ')}`;
+      }
+
+      if (followsStrictHalal) {
+        recipePrompt += `. Exclude pork, bacon, ham, lard, alcohol, and gelatin. Use only Halal-friendly ingredients.`;
       }
     }
     

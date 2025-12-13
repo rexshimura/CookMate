@@ -79,8 +79,37 @@ const RecipeDetailsPage = ({ favoritesHook, collectionsHook }) => {
 
   // Helper function to extract time from instruction text
   const extractTime = (text) => {
-    const match = text.match(/(\d+)\s*(?:minute|min|mins|m)/i);
-    return match ? parseInt(match[1]) : null;
+    if (!text) return null;
+    const lowerText = text.toLowerCase();
+
+    const toMinutes = (value, unit) => {
+      const minutesPerUnit = /hour|hr|hrs|h/.test(unit) ? 60 : 1;
+      return Math.round(parseFloat(value) * minutesPerUnit);
+    };
+
+    // Handle ranges like "10-15 minutes" or "1-2 hours"
+    const rangeMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h|minutes?|mins?|min|m)\b/);
+    if (rangeMatch) {
+      const [, start, end, unit] = rangeMatch;
+      const startMinutes = toMinutes(start, unit);
+      const endMinutes = toMinutes(end, unit);
+      return Math.max(startMinutes, endMinutes);
+    }
+
+    // Handle combined expressions like "1 hour 20 minutes"
+    const hourMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|hr|h)\b/);
+    const minuteMatch = lowerText.match(/(\d+(?:\.\d+)?)\s*(minutes?|mins?|min|m)\b/);
+    if (hourMatch || minuteMatch) {
+      const hours = hourMatch ? toMinutes(hourMatch[1], hourMatch[2]) : 0;
+      const minutes = minuteMatch ? toMinutes(minuteMatch[1], minuteMatch[2]) : 0;
+      const total = hours + minutes;
+      if (total > 0) {
+        return total;
+      }
+    }
+
+    // Fallback to single minute value
+    return minuteMatch ? toMinutes(minuteMatch[1], minuteMatch[2]) : null;
   };
 
   // Handle text-to-speech

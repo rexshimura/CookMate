@@ -61,6 +61,11 @@ export default function AccountProfile() {
   });
   const [preferencesSaving, setPreferencesSaving] = useState(false);
 
+  // Helper variables for display name - moved to main component scope
+  const trimmedDisplayName = (displayName || '').trim();
+  const hasDisplayName = trimmedDisplayName.length > 0;
+  const headerDisplayName = hasDisplayName ? trimmedDisplayName : 'Set Display Name';
+
   // Fetch user data on component mount
   useEffect(() => {
     const fetchUserData = async () => {
@@ -77,18 +82,24 @@ export default function AccountProfile() {
         
         const userData = await getUserProfile();
         const userProfile = userData.user;
+        const normalizedDisplayName = (userProfile.displayName || "").trim();
         
-        // Set display name (prefer displayName, fallback to email)
-        setDisplayName(userProfile.displayName || userProfile.email || "");
+        // Set display name (prefer profile displayName only)
+        setDisplayName(normalizedDisplayName);
         
         // Set user data
+        const avatarSource = normalizedDisplayName || (userProfile.email || "");
+
         setUser({
           email: userProfile.email || "",
           joinedDate: userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long'
           }) : "",
-          avatar: userProfile.displayName ? userProfile.displayName.split(' ').map(n => n[0]).join('').toUpperCase() : userProfile.email ? userProfile.email[0].toUpperCase() : "U"
+          displayName: normalizedDisplayName,
+          avatar: avatarSource
+            ? avatarSource.split(' ').map(n => n[0]).join('').toUpperCase()
+            : "U"
         });
         
         // Set preferences from personalization data (stored directly in user document)
@@ -443,7 +454,15 @@ export default function AccountProfile() {
                       />
                     </div>
                   ) : (
-                    <h2 className="text-2xl md:text-3xl font-bold text-stone-800">{displayName || "User"}</h2>
+                    <h2 className={`text-2xl md:text-3xl font-bold ${hasDisplayName ? 'text-stone-800' : 'text-orange-600'}`}>
+                      {headerDisplayName}
+                    </h2>
+                  )}
+
+                  {!hasDisplayName && !isEditing && (
+                    <div className="mt-1 text-sm font-medium text-orange-600">
+                      Add a display name so friends know it's you.
+                    </div>
                   )}
 
                   <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-stone-500 text-sm">
