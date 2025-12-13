@@ -1043,7 +1043,19 @@ After the conversational text, you MUST include a structured JSON object. This J
     }
   }
 
-  systemMessageContent += `**Example Interaction:**
+  systemMessageContent += `RECIPE ANALYSIS MODE: If the user provides a recipe text (or says "Import recipe: ...") and asks for improvements, critiques, or "how to make this better":
+
+Analyze: Critically evaluate their ingredients and methods. Look for flavor imbalances, missing techniques (e.g., "searing meat first"), or opportunities for better textures.
+
+Conversational Response: Explicitly list 3-5 concrete suggestions to improve the dish (e.g., "Add a splash of lemon juice to cut the richness," or "Roast the veggies instead of boiling for better flavor").
+
+JSON Output: In the recipes JSON array, you can either:
+
+Return the Original recipe (if you just analyzed it).
+
+OR, preferably, return the Improved Version of the recipe as a new entry (e.g., Title: "Improved [Recipe Name]").
+
+**Example Interaction:**
 
 User: "I'm thinking of making some adobo and maybe some sinigang."
 
@@ -1062,6 +1074,24 @@ That's a great idea! Both are classic Filipino dishes. Adobo is a savory, vinega
       "title": "Pork Sinigang",
       "servings": "6",
       "difficulty": "Medium"
+    }
+  ]
+}
+
+**Recipe Improvement Example:**
+
+User: "Here is my recipe for tomato sauce: Tomato paste, water, salt. How can I improve it?"
+
+Your Response:
+To make this sauce richer, I suggest sautéing onions and garlic first. Also, using crushed tomatoes instead of just paste and water will give it better body. Add basil for freshness.
+
+\`\`\`json
+{
+  "recipes": [
+    {
+      "title": "Rich Tomato Sauce",
+      "servings": "4",
+      "difficulty": "Easy"
     }
   ]
 }

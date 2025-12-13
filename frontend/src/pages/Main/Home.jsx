@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn, Bookmark } from 'lucide-react';
+import { Send, Menu, Plus, ChefHat, X, MessageSquare, Flame, User, ArrowRight, LogOut, Trash2, Clock, ArrowDown, Heart, Folder, LogIn, Bookmark, ClipboardList } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { useSessions, useSessionChat } from '../../hooks/useSessions.js';
@@ -85,6 +85,8 @@ export default function Home({ favoritesHook, collectionsHook }) {
   const inputRef = useRef(null);
   const [inputMessage, setInputMessage] = useState('');
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importRecipeText, setImportRecipeText] = useState('');
   
   // Recipe modal state
   const [recipeDetailsLoading, setRecipeDetailsLoading] = useState(false);
@@ -274,7 +276,29 @@ export default function Home({ favoritesHook, collectionsHook }) {
     setPreviousUserId(currentUserId);
   }, [user, clearMessages]);
 
+  const handleAnalyzeRecipe = async () => {
+    const trimmedText = importRecipeText.trim();
+    if (!trimmedText) return;
 
+    if (!currentSessionId) {
+      setError('No active chat session. Please create a new chat before importing a recipe.');
+      setShowError(true);
+      return;
+    }
+
+    const messageText = `I am importing this recipe: \n\n${trimmedText}\n\nPlease analyze it and tell me how to improve it.`;
+
+    try {
+      await sendMessage(messageText);
+      setImportRecipeText('');
+      setShowImportModal(false);
+      setTimeout(scrollToBottom, 200);
+    } catch (error) {
+      console.error('Failed to analyze recipe:', error);
+      setError(error.message || 'Failed to analyze recipe. Please try again.');
+      setShowError(true);
+    }
+  };
 
   const focusInput = () => {
     // Small delay to ensure the DOM is ready after re-render
@@ -894,13 +918,22 @@ export default function Home({ favoritesHook, collectionsHook }) {
         <div className="p-4 lg:p-6 bg-gradient-to-t from-stone-50 via-stone-50 to-transparent">
           <div className="max-w-3xl mx-auto relative">
             <form onSubmit={handleSendMessage} className="relative flex items-center bg-white rounded-full shadow-lg border border-stone-200 focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500 transition-all">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="ml-3 mr-2 p-2.5 rounded-full bg-stone-100 text-stone-500 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                title="Import & Analyze Recipe"
+                disabled={!currentSessionId}
+              >
+                <ClipboardList className="w-4 h-4" />
+              </button>
               <input
                 ref={inputRef}
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 py-4 pl-6 pr-14 bg-transparent border-none focus:ring-0 focus:outline-none placeholder:text-stone-400 text-stone-700"
+                className="flex-1 py-4 pl-2 pr-14 bg-transparent border-none focus:ring-0 focus:outline-none placeholder:text-stone-400 text-stone-700"
                 disabled={!currentSessionId || isTyping}
               />
               <div className="absolute right-2 p-1">
@@ -923,6 +956,52 @@ export default function Home({ favoritesHook, collectionsHook }) {
       {/* Confirmation Dialogs */}
       <DeleteDialog />
       <LogoutDialog />
+
+      {showImportModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 space-y-5 animate-slideUp">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-orange-500 font-semibold">CookMate AI</p>
+                <h3 className="text-2xl font-bold text-stone-800">Import & Analyze Recipe</h3>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors"
+                aria-label="Close import modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-stone-500">
+              Paste any recipe text below and CookMate will critique it with 3–5 concrete improvements.
+            </p>
+            <textarea
+              value={importRecipeText}
+              onChange={(e) => setImportRecipeText(e.target.value)}
+              placeholder="e.g. Pasta: boiled noodles, jarred sauce, cheese…"
+              className="w-full min-h-[160px] rounded-2xl border border-stone-200 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 px-4 py-3 text-stone-700 placeholder:text-stone-400 resize-none bg-stone-50"
+            />
+            <div className="flex flex-col sm:flex-row gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="flex-1 sm:flex-none px-5 py-3 rounded-2xl border border-stone-200 text-stone-600 font-semibold hover:bg-stone-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAnalyzeRecipe}
+                disabled={!importRecipeText.trim()}
+                className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl font-semibold text-white transition-all shadow-lg shadow-orange-200/50 ${importRecipeText.trim() ? 'bg-orange-600 hover:bg-orange-700' : 'bg-stone-300 cursor-not-allowed'}`}
+              >
+                Analyze
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
